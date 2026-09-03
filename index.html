@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>כניסת לקוחות | משרד עורכי הדין NAHMANI-BENDAHAN</title>
+<meta name="description" content="אזור אישי ללקוחות המשרד - מעקב אחר שלבי תביעת הביטוח הלאומי והעלאת מסמכים.">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="login-wrap">
+
+  <!-- צד מיתוג -->
+  <section class="login-brand">
+    <div class="scales">⚖️</div>
+    <div class="firm-name">NAHMANI-BENDAHAN</div>
+    <h1>האזור האישי<br>ללקוחות המשרד</h1>
+    <p>מעקב שקוף ומלא אחר תביעת הביטוח הלאומי שלך - בכל שעה, מכל מכשיר.</p>
+
+    <div class="brand-points">
+      <div><span>📍</span> השלב המדויק שבו נמצאת התביעה</div>
+      <div><span>🗺️</span> הצעדים הבאים ולוחות הזמנים הצפויים</div>
+      <div><span>📄</span> רשימת המסמכים החסרים והעלאתם ישירות באתר</div>
+      <div><span>💬</span> עדכונים והודעות מהצוות המטפל בתיק</div>
+    </div>
+  </section>
+
+  <!-- צד טופס -->
+  <section class="login-form-side">
+    <div class="login-card">
+      <h2>כניסה לאזור האישי</h2>
+      <p class="sub">הזדהות באמצעות מספר תעודת זהות והקוד האישי שנמסר לך.</p>
+
+      <div class="alert err" id="loginError" role="alert"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="idNumber">מספר תעודת זהות</label>
+          <input type="text" id="idNumber" inputmode="numeric" autocomplete="username"
+                 maxlength="9" placeholder="9 ספרות" required>
+        </div>
+
+        <div class="field">
+          <label for="password">קוד אישי</label>
+          <input type="password" id="password" autocomplete="current-password"
+                 placeholder="הקוד שנמסר במשרד" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">כניסה לאזור האישי ←</button>
+      </form>
+
+      <div class="demo-hint">
+        <b>חשבונות הדגמה</b>
+        ת״ז <code>123456782</code> · קוד <code>1234</code> — תיק בשלב ועדה רפואית<br>
+        ת״ז <code>987654321</code> · קוד <code>1234</code> — תיק בשלב ערר
+      </div>
+
+      <p class="footer-note">
+        נתקלת בבעיה בהתחברות? התקשר למשרד: 03-5551234<br>
+        המידע באזור האישי חסוי ומיועד ללקוח בלבד.
+      </p>
+    </div>
+  </section>
+
+</div>
+
+<script src="assets/js/data.js"></script>
+<script>
+  // אם המשתמש כבר מחובר - מעבר ישיר לאזור האישי
+  if (Auth.current()) location.replace('dashboard.html');
+
+  const form = document.getElementById('loginForm');
+  const errBox = document.getElementById('loginError');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const id = document.getElementById('idNumber').value.trim();
+    const pw = document.getElementById('password').value;
+
+    errBox.classList.remove('show');
+
+    if (id.length !== 9 || !/^\d+$/.test(id)) {
+      return showError('מספר תעודת הזהות חייב להכיל 9 ספרות.');
+    }
+    if (!pw) {
+      return showError('נא להזין את הקוד האישי.');
+    }
+    if (!Auth.login(id, pw)) {
+      return showError('פרטי ההזדהות שגויים. יש לוודא את מספר תעודת הזהות והקוד האישי.');
+    }
+    location.href = 'dashboard.html';
+  });
+
+  function showError(msg) {
+    errBox.textContent = msg;
+    errBox.classList.add('show');
+  }
+</script>
+</body>
+</html>

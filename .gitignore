@@ -1,0 +1,12 @@
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.obsidian/
+.vscode/
+.idea/
+
+# uploads / temp
+uploads/
+*.log
+*.tmp

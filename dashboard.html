@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>האזור האישי | מעקב תביעת ביטוח לאומי</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">⚖️ NAHMANI-BENDAHAN <em>| אזור לקוחות</em></div>
+  <div class="topbar-left">
+    <div class="user-chip">
+      <div class="avatar" id="userInitials">--</div>
+      <span id="userName">טוען...</span>
+    </div>
+    <button class="logout" id="logoutBtn">יציאה</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="page-head">
+    <h1 id="greeting">שלום</h1>
+    <p id="caseSummary"></p>
+  </div>
+
+  <!-- סטטוס נוכחי -->
+  <section class="card status-hero">
+    <div class="label">השלב הנוכחי בתביעה</div>
+    <h2 id="stageTitle"></h2>
+    <div class="desc" id="stageDesc"></div>
+
+    <div class="status-meta">
+      <div><span>מספר תיק</span><strong id="metaCase"></strong></div>
+      <div><span>סוג התביעה</span><strong id="metaType"></strong></div>
+      <div><span>סניף מטפל</span><strong id="metaBranch"></strong></div>
+      <div><span>בשלב זה מאז</span><strong id="metaSince"></strong></div>
+    </div>
+
+    <div class="progress-outer">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-label">
+        <span id="progressText"></span>
+        <span id="progressPct"></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid-2">
+
+    <!-- טור ראשי -->
+    <div>
+      <!-- ציר השלבים -->
+      <section class="card">
+        <div class="card-head"><h2><span class="ic">🧭</span> מסלול התביעה - כל השלבים</h2></div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+
+      <!-- מסמכים -->
+      <section class="card" id="documentsCard">
+        <div class="card-head">
+          <h2><span class="ic">📁</span> המסמכים בתיק</h2>
+          <button class="btn btn-gold btn-sm" id="uploadTopBtn">＋ העלאת מסמך</button>
+        </div>
+
+        <div class="upload-zone" id="dropZone">
+          <span class="ic">📤</span>
+          <h4>גרירת קובץ לכאן, או לחיצה לבחירת קובץ</h4>
+          <p>PDF, JPG, PNG · עד 10MB לקובץ · הקובץ מועבר ישירות לצוות המטפל בתיק</p>
+        </div>
+
+        <div class="doc-tabs" id="docTabs"></div>
+        <div id="docList"></div>
+      </section>
+    </div>
+
+    <!-- סרגל צד -->
+    <aside>
+      <!-- צעדים הבאים -->
+      <section class="card">
+        <div class="card-head"><h2><span class="ic">➡️</span> הצעדים הבאים</h2></div>
+        <div class="next-list" id="nextSteps"></div>
+      </section>
+
+      <!-- מבט מהיר -->
+      <section class="card">
+        <div class="card-head"><h2><span class="ic">📊</span> מבט מהיר</h2></div>
+        <div class="side-stat" id="sideStats"></div>
+      </section>
+
+      <!-- הודעות -->
+      <section class="card">
+        <div class="card-head"><h2><span class="ic">📬</span> עדכונים מהמשרד</h2></div>
+        <div id="messages"></div>
+      </section>
+
+      <!-- יצירת קשר -->
+      <section class="card contact-box">
+        <div class="card-head"><h2><span class="ic">👤</span> הצוות המטפל</h2></div>
+        <div class="lawyer">
+          <div class="avatar" id="lawyerInitials">--</div>
+          <div>
+            <h4 id="lawyerName"></h4>
+            <span id="lawyerRole"></span>
+          </div>
+        </div>
+        <div class="contact-lines">
+          <div>📞 <a id="lawyerPhone" href="#"></a></div>
+          <div>✉️ <a id="lawyerEmail" href="#"></a></div>
+        </div>
+        <a class="btn btn-ghost btn-sm" id="callBtn" href="#" style="width:100%">בקשת שיחה חוזרת</a>
+      </section>
+    </aside>
+
+  </div>
+
+  <p class="footer-note">
+    המידע המוצג באזור האישי הוא לצורכי מעקב בלבד ואינו מהווה ייעוץ משפטי.<br>
+    לשאלות בנוגע לתיק יש לפנות לצוות המטפל. © 2026 משרד עורכי הדין NAHMANI-BENDAHAN.
+  </p>
+
+</main>
+
+<input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" hidden>
+<div class="toast" id="toast"></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/dashboard.js"></script>
+</body>
+</html>
