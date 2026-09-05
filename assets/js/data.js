@@ -18,6 +18,72 @@ const CLAIM_STAGES = [
   { id: 8, title: 'סיום התיק ותשלום הגמלה',        desc: 'קבלת ההחלטה הסופית, חישוב רטרו ותשלום הגמלה.' }
 ];
 
+/* ==========================================================
+   קטלוג מסמכים לפי סוג תביעה
+   ----------------------------------------------------------
+   רוב הבקשות חוזרות על עצמן, ולכן הן מנוסחות פעם אחת כאן
+   במקום שכל פרליגל ינסח אחרת. ההנחיה (note) היא החלק החשוב -
+   היא זו שמונעת מהלקוח להעלות את המסמך הלא נכון.
+
+   ⚠️ התוכן הוא ידע מקצועי של המשרד. זו טיוטה להשלמה.
+   ========================================================== */
+const REQUIRED_DOC_CATALOG = {
+  'נכות כללית': [
+    { name: 'צילום תעודת זהות + ספח',          note: 'קריא, כולל הספח המלא',                             required: true },
+    { name: 'ייפוי כוח חתום',                   note: 'חתום בפני עורך דין',                                required: true },
+    { name: 'טופס ויתור על סודיות רפואית',      note: 'טופס 1811 של המוסד לביטוח לאומי',                   required: true },
+    { name: 'סיכומי אשפוז',                     note: 'כל האשפוזים משנת 2023 ואילך',                       required: true },
+    { name: 'חוות דעת רפואית עדכנית',           note: 'מרופא מומחה בתחום הרלוונטי, עד 6 חודשים אחורה',     required: true },
+    { name: 'תלושי שכר - 12 חודשים אחרונים',    note: 'לחישוב בסיס הגמלה',                                 required: true },
+    { name: 'אישורי מחלה (טופס 100)',           note: 'מקופת החולים, לתקופת אי הכושר',                     required: true },
+    { name: 'תוצאות בדיקות הדמיה',              note: 'MRI / CT / רנטגן - דיסק או קובץ סרוק',              required: false },
+    { name: 'אישור על קצבאות אחרות',            note: 'ככל שמתקבלות קצבאות ממקור אחר',                     required: false },
+    { name: 'פרוטוקול ועדה רפואית',             note: 'מתקבל מהמוסד לביטוח לאומי לאחר הוועדה',             required: false }
+  ],
+  'נכות מעבודה': [
+    { name: 'צילום תעודת זהות + ספח',           note: 'קריא, כולל הספח המלא',                              required: true },
+    { name: 'ייפוי כוח חתום',                    note: 'חתום בפני עורך דין',                                 required: true },
+    { name: 'הודעה על פגיעה בעבודה (ב.ל 250)',  note: 'חתום על ידי המעסיק',                                 required: true },
+    { name: 'טופס ויתור על סודיות רפואית',       note: 'טופס 1811 של המוסד לביטוח לאומי',                    required: true },
+    { name: 'אישור על תאונת עבודה מהמעסיק',      note: 'כולל תיאור נסיבות הפגיעה ומועדה',                    required: true },
+    { name: 'תיעוד חדר מיון',                    note: 'מהפנייה הראשונה לאחר הפגיעה',                        required: true },
+    { name: 'פרוטוקול ועדה מדרג ראשון',          note: 'התקבל מהמוסד לביטוח לאומי',                          required: true },
+    { name: 'חוות דעת מומחה מטעמנו',             note: 'לצורך הדיון בוועדת העררים',                          required: true },
+    { name: 'תיעוד טיפולים פיזיותרפיים',         note: 'מ-2026 ואילך',                                       required: false },
+    { name: 'תצהירי עדים לפגיעה',                note: 'ככל שהיו עדים לאירוע',                               required: false }
+  ]
+};
+
+/* ==========================================================
+   מה נדרש כדי לעבור כל שלב, לפי סוג תביעה
+   ----------------------------------------------------------
+   זהו הבסיס לניתוח הפער הטכני. הוא מכוון להיות דטרמיניסטי
+   לחלוטין - בלי מודל ובלי אי-ודאות. כל מפתח (שם מסמך) חייב
+   להופיע בקטלוג של אותו סוג תביעה.
+   ========================================================== */
+const STAGE_DOC_REQUIREMENTS = {
+  'נכות כללית': {
+    1: ['צילום תעודת זהות + ספח', 'ייפוי כוח חתום', 'טופס ויתור על סודיות רפואית'],
+    2: ['תלושי שכר - 12 חודשים אחרונים', 'אישורי מחלה (טופס 100)'],
+    3: ['סיכומי אשפוז'],
+    4: ['חוות דעת רפואית עדכנית'],
+    5: ['חוות דעת רפואית עדכנית', 'סיכומי אשפוז'],
+    6: [],
+    7: ['פרוטוקול ועדה רפואית'],
+    8: []
+  },
+  'נכות מעבודה': {
+    1: ['צילום תעודת זהות + ספח', 'ייפוי כוח חתום', 'הודעה על פגיעה בעבודה (ב.ל 250)'],
+    2: ['טופס ויתור על סודיות רפואית', 'אישור על תאונת עבודה מהמעסיק'],
+    3: ['תיעוד חדר מיון'],
+    4: [],
+    5: [],
+    6: ['פרוטוקול ועדה מדרג ראשון'],
+    7: ['חוות דעת מומחה מטעמנו'],
+    8: []
+  }
+};
+
 /* ---- לקוחות הדגמה ---- */
 const DEMO_CLIENTS = {
   '123456782': {
@@ -163,6 +229,13 @@ const CaseStore = {
     const mine = this._overrides()[idNumber];
     if (!mine) return data;
 
+    // מסמכים שהמשרד דרש מצטרפים לרשימה לפני מיזוג הסטטוסים,
+    // כדי שגם הם יוכלו לעבור אישור/דחייה כמו כל מסמך אחר.
+    if (mine.addedDocuments && mine.addedDocuments.length) {
+      data.documents = data.documents.concat(
+        JSON.parse(JSON.stringify(mine.addedDocuments))
+      );
+    }
     if (mine.documents) {
       data.documents = data.documents.map(doc =>
         mine.documents[doc.id] ? Object.assign({}, doc, mine.documents[doc.id]) : doc
@@ -196,7 +269,9 @@ const CaseStore = {
         stageTitle:  CLAIM_STAGES[file.currentStage - 1].title,
         nextHearing: file.nextHearing,
         waiting:     file.documents.filter(d => d.status === 'pending-review').length,
-        open:        file.documents.filter(d => DOC_NEEDS_UPLOAD(d) && d.required).length
+        open:        file.documents.filter(d => DOC_NEEDS_UPLOAD(d) && d.required).length,
+        unread:      this.clientReplies(id).filter(r => !r.readAt).length,
+        blocking:    analyzeGap(file).blocking.length
       };
     });
   },
@@ -237,6 +312,74 @@ const CaseStore = {
     this._addLog(idNumber, staffName, decision === 'approved'
       ? 'אישר את המסמך "' + name + '"'
       : 'דחה את המסמך "' + name + '" - ' + reason);
+  },
+
+  /** דורש מסמך חדש מהלקוח - מופיע אצלו מיד כ"צריך להעלות" */
+  addDocument(idNumber, doc, staffName) {
+    const id = 'req-' + Date.now().toString(36);
+    this._patch(idNumber, mine => {
+      const added = mine.addedDocuments || (mine.addedDocuments = []);
+      added.push({
+        id:       id,
+        name:     doc.name,
+        note:     doc.note,
+        required: !!doc.required,
+        status:   'missing',
+        file:     null,
+        date:     null,
+        requestedAt: this._today(),
+        requestedBy: staffName
+      });
+    });
+    this._addLog(idNumber, staffName, 'דרש מהלקוח את המסמך "' + doc.name + '"');
+    return id;
+  },
+
+  /** מבטל דרישת מסמך. אפשר להסיר רק מסמך שהמשרד הוסיף ידנית. */
+  removeDocument(idNumber, docId, staffName) {
+    let removed = null;
+    this._patch(idNumber, mine => {
+      const added = mine.addedDocuments || [];
+      const i = added.findIndex(d => d.id === docId);
+      if (i !== -1) removed = added.splice(i, 1)[0];
+    });
+    if (removed) {
+      this._addLog(idNumber, staffName, 'ביטל את דרישת המסמך "' + removed.name + '"');
+    }
+    return !!removed;
+  },
+
+  /** תגובת לקוח על מסמך - תגובה מובנית ואופציונלית גם טקסט חופשי */
+  addClientReply(idNumber, docId, kind, text) {
+    const file = this.load(idNumber);
+    const doc  = file && file.documents.find(d => d.id === docId);
+
+    this._patch(idNumber, mine => {
+      const list = mine.clientReplies || (mine.clientReplies = []);
+      list.unshift({
+        id:       'rep-' + Date.now().toString(36),
+        docId:    docId,
+        docName:  doc ? doc.name : '',
+        kind:     kind,
+        text:     text || '',
+        date:     this._today(),
+        readAt:   null
+      });
+    });
+  },
+
+  /** כל פניות הלקוח בתיק, החדשות ראשונות */
+  clientReplies(idNumber) {
+    const mine = this._overrides()[idNumber];
+    return (mine && mine.clientReplies) ? mine.clientReplies : [];
+  },
+
+  /** מסמן פנייה כנקראה על ידי המשרד */
+  markReplyRead(idNumber, replyId) {
+    this._patch(idNumber, mine => {
+      const reply = (mine.clientReplies || []).find(r => r.id === replyId);
+      if (reply && !reply.readAt) reply.readAt = this._today();
+    });
   },
 
   /** שומר סטטוס/קובץ עבור מסמך מסוים */
@@ -301,6 +444,56 @@ const CaseStore = {
 /** מסמך שהלקוח עדיין צריך להעלות - חסר, או שנדחה וצריך העלאה מחדש */
 function DOC_NEEDS_UPLOAD(doc) {
   return doc.status === 'missing' || doc.status === 'rejected';
+}
+
+/* ==========================================================
+   ניתוח הפער הטכני - דטרמיניסטי
+   ----------------------------------------------------------
+   מחזיר מה חוסם את התיק מלהתקדם, מה חסר בהמשך הדרך,
+   ומה נדרש אך כבר ממתין לבדיקת המשרד.
+   אין כאן מודל ואין הערכה - רק השוואה מול STAGE_DOC_REQUIREMENTS.
+   ========================================================== */
+function analyzeGap(caseFile) {
+  const byType  = STAGE_DOC_REQUIREMENTS[caseFile.claimType] || {};
+  const stage   = caseFile.currentStage;
+  const byName  = {};
+  caseFile.documents.forEach(d => { byName[d.name] = d; });
+
+  /** ממפה שם מסמך למצבו בתיק */
+  const resolve = (name) => {
+    const doc = byName[name];
+    if (!doc)                            return { name, state: 'not-requested', doc: null };
+    if (doc.status === 'approved')       return { name, state: 'ready',         doc };
+    if (doc.status === 'pending-review') return { name, state: 'in-review',     doc };
+    return { name, state: 'outstanding', doc };
+  };
+
+  const current = (byType[stage] || []).map(resolve);
+
+  // מה שנדרש בשלבים שעוד לפנינו
+  const upcoming = [];
+  Object.keys(byType).forEach(key => {
+    const s = parseInt(key, 10);
+    if (s <= stage) return;
+    byType[key].forEach(name => {
+      const item = resolve(name);
+      if (item.state === 'ready' || item.state === 'in-review') return;
+      upcoming.push(Object.assign({ stage: s }, item));
+    });
+  });
+  upcoming.sort((a, b) => a.stage - b.stage);
+
+  const blocking = current.filter(i => i.state === 'outstanding' || i.state === 'not-requested');
+
+  return {
+    hasRules:  Object.keys(byType).length > 0,
+    stage:     stage,
+    blocking:  blocking,                                        // חוסם את השלב הנוכחי
+    inReview:  current.filter(i => i.state === 'in-review'),     // נדרש, ואצלנו בבדיקה
+    ready:     current.filter(i => i.state === 'ready'),
+    upcoming:  upcoming,                                        // ייחסם בהמשך
+    canAdvance: blocking.length === 0
+  };
 }
 
 /* ---- אימות לקוח (הדגמה בלבד - ראה docs/ לגבי מימוש שרת) ---- */

@@ -96,6 +96,8 @@
 
       tr.appendChild(countCell(c.waiting, c.waiting > 0 ? 'hot' : 'calm'));
       tr.appendChild(countCell(c.open,    c.open    > 0 ? 'hot' : 'calm'));
+      tr.appendChild(countCell(c.unread,  c.unread  > 0 ? 'hot' : 'calm'));
+      tr.appendChild(countCell(c.blocking, c.blocking > 0 ? 'hot' : 'calm'));
 
       var act = document.createElement('td');
       var btn = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק');
@@ -162,6 +164,11 @@
     $('caseView').hidden = false;
     $('backBtn').hidden  = false;
 
+    // הניתוח שייך לתיק - אסור שישאר על המסך כשעוברים לתיק אחר
+    assistHistory = [];
+    $('assistLog').textContent = '';
+    $('assistInput').value = '';
+
     renderCase();
     $('caseClient').focus();
   }
@@ -180,9 +187,78 @@
       'תיק ' + file.caseNumber + ' · ' + file.claimType + ' · ' + file.branch +
       ' · נפתח ב-' + formatDate(file.openedAt) + ' · מטפל: ' + file.lawyer.name;
 
+    renderGap(file);
     renderStage(file);
+    renderCatalog(file);
     renderReview(file);
+    renderReplies();
     renderSent(file);
+  }
+
+  /* ---- מצב טכני: מה חוסם ומה חסר ---- */
+
+  function renderGap(file) {
+    var gap  = analyzeGap(file);
+    var body = $('gapBody');
+    body.textContent = '';
+
+    if (!gap.hasRules) {
+      body.appendChild(el('p', 'empty',
+        'לא הוגדרו דרישות מסמכים לסוג התביעה "' + file.claimType + '".'));
+      return;
+    }
+
+    var head = el('p', 'gap-head');
+    if (gap.canAdvance) {
+      head.className += ' ok';
+      head.textContent = 'כל המסמכים הנדרשים לשלב ' + gap.stage + ' התקבלו. אין חסם טכני להתקדמות.';
+    } else {
+      head.className += ' stop';
+      head.textContent = gap.blocking.length === 1
+        ? 'מסמך אחד חוסם את המעבר מהשלב הנוכחי.'
+        : gap.blocking.length + ' מסמכים חוסמים את המעבר מהשלב הנוכחי.';
+    }
+    body.appendChild(head);
+
+    if (gap.blocking.length) {
+      body.appendChild(gapList('חוסם עכשיו', gap.blocking, 'stop'));
+    }
+    if (gap.inReview.length) {
+      body.appendChild(gapList('נדרש, ואצלנו בבדיקה', gap.inReview, 'wait'));
+    }
+    if (gap.upcoming.length) {
+      body.appendChild(gapList('ייחסם בשלבים הבאים', gap.upcoming, 'soon'));
+    }
+  }
+
+  function gapList(title, items, tone) {
+    var wrap = el('div', 'gap-group ' + tone);
+    wrap.appendChild(el('h3', null, title));
+
+    var ul = el('ul', 'gap-items');
+    items.forEach(function (item) {
+      var li = el('li');
+      li.appendChild(el('span', 'gap-name', item.name));
+
+      var why = item.state === 'not-requested' ? 'עוד לא נדרש מהלקוח'
+              : item.state === 'in-review'     ? 'הועלה וממתין לבדיקה'
+              : item.doc && item.doc.status === 'rejected' ? 'נדחה - הלקוח התבקש להעלות מחדש'
+              : 'הלקוח עוד לא העלה';
+      if (item.stage) why += ' · נדרש בשלב ' + item.stage;
+      li.appendChild(el('span', 'gap-why', why));
+
+      // מסמך שכלל לא נדרש - קיצור דרך לדרוש אותו
+      if (item.state === 'not-requested') {
+        var btn = el('button', 'btn btn-outline btn-sm gap-req', 'דרישה מהלקוח');
+        btn.type = 'button';
+        btn.addEventListener('click', function () { prefillRequest(item.name); });
+        li.appendChild(btn);
+      }
+      ul.appendChild(li);
+    });
+
+    wrap.appendChild(ul);
+    return wrap;
   }
 
   /* ---- שלב התביעה ---- */
@@ -217,6 +293,93 @@
     renderCase();
     toast('התיק עודכן לשלב ' + stage + ' - ' + CLAIM_STAGES[stage - 1].title + '.');
   });
+
+  /* ---- דרישת מסמך מהלקוח ---- */
+
+  /** ממלא את הקטלוג של סוג התביעה, בלי מסמכים שכבר קיימים בתיק */
+  function renderCatalog(file) {
+    var catalog = REQUIRED_DOC_CATALOG[file.claimType] || [];
+    var taken   = {};
+    file.documents.forEach(function (d) { taken[d.name] = true; });
+
+    var sel = $('reqPick');
+    sel.textContent = '';
+
+    var blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = catalog.length ? '— בחירה מהקטלוג או מילוי ידני —' : '— אין קטלוג לסוג תביעה זה —';
+    sel.appendChild(blank);
+
+    catalog.forEach(function (entry, i) {
+      if (taken[entry.name]) return;          // כבר בתיק - אין טעם לדרוש שוב
+      var opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = entry.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  // בחירה מהקטלוג ממלאת את השדות, ואפשר עדיין לערוך אותם
+  $('reqPick').addEventListener('change', function () {
+    var file = CaseStore.load(openId);
+    var entry = (REQUIRED_DOC_CATALOG[file.claimType] || [])[parseInt(this.value, 10)];
+    if (!entry) return;
+    $('reqName').value     = entry.name;
+    $('reqNote').value     = entry.note;
+    $('reqRequired').checked = entry.required;
+  });
+
+  /** ממלא את הטופס משם מסמך שהגיע מניתוח הפער */
+  function prefillRequest(name) {
+    var file  = CaseStore.load(openId);
+    var entry = (REQUIRED_DOC_CATALOG[file.claimType] || [])
+                  .find(function (e) { return e.name === name; });
+
+    $('reqName').value       = name;
+    $('reqNote').value       = entry ? entry.note : '';
+    $('reqRequired').checked = entry ? entry.required : true;
+    $('reqName').focus();
+    $('reqName').scrollIntoView({ block: 'center' });
+  }
+
+  var reqForm = $('reqForm');
+  var reqErr  = $('reqError');
+
+  reqForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    var name = $('reqName').value.trim();
+    var note = $('reqNote').value.trim();
+
+    reqErr.hidden = true;
+
+    if (!name) return reqFail('צריך שם למסמך.', $('reqName'));
+    if (note.length < 5) {
+      return reqFail('ההנחיה קצרה מדי. בלי הנחיה ברורה הלקוח יעלה את המסמך הלא נכון.', $('reqNote'));
+    }
+
+    var file = CaseStore.load(openId);
+    if (file.documents.some(function (d) { return d.name === name; })) {
+      return reqFail('המסמך "' + name + '" כבר קיים בתיק.', $('reqName'));
+    }
+
+    CaseStore.addDocument(openId, {
+      name:     name,
+      note:     note,
+      required: $('reqRequired').checked
+    }, staff.name);
+
+    reqForm.reset();
+    $('reqRequired').checked = true;
+    renderCase();
+    toast('הדרישה נשלחה. המסמך מופיע כעת אצל הלקוח.');
+  });
+
+  function reqFail(text, focusOn) {
+    reqErr.textContent = text;
+    reqErr.hidden = false;
+    focusOn.focus();
+  }
 
   /* ---- בדיקת מסמכים ---- */
 
@@ -263,6 +426,19 @@
       }
       if (doc.status === 'pending-review') {
         li.appendChild(reviewControls(doc));
+      }
+
+      // דרישה שהמשרד הוסיף וטרם נענתה - אפשר לבטל אותה
+      if (doc.id.indexOf('req-') === 0 && doc.status === 'missing') {
+        var cancel = el('button', 'btn btn-outline btn-sm doc-actions', 'ביטול הדרישה');
+        cancel.type = 'button';
+        cancel.setAttribute('aria-label', 'ביטול הדרישה למסמך ' + doc.name);
+        cancel.addEventListener('click', function () {
+          CaseStore.removeDocument(openId, doc.id, staff.name);
+          renderCase();
+          toast('הדרישה למסמך "' + doc.name + '" בוטלה.');
+        });
+        li.appendChild(cancel);
       }
 
       list.appendChild(li);
@@ -337,6 +513,59 @@
     return wrap;
   }
 
+  /* ---- פניות מהלקוח ---- */
+
+  var REPLY_KINDS = {
+    'no-document':  'אין לי את המסמך',
+    'need-help':    'צריך עזרה בהשגתו',
+    'sent-by-mail': 'שלחתי בדואר',
+    'already-gave': 'כבר מסרתי למשרד',
+    'other':        'הודעה מהלקוח'
+  };
+
+  function renderReplies() {
+    var replies = CaseStore.clientReplies(openId);
+    var list    = $('replyList');
+    list.textContent = '';
+
+    if (!replies.length) {
+      list.appendChild(el('li', 'empty', 'הלקוח עוד לא פנה בתיק הזה.'));
+      return;
+    }
+
+    replies.forEach(function (reply) {
+      var li = el('li', reply.readAt ? 'reply read' : 'reply unread');
+
+      if (!reply.readAt) {
+        var tag = el('span', 'tag tag-warn');
+        tag.appendChild(el('span', null, '!', true));
+        tag.appendChild(document.createTextNode('חדש'));
+        li.appendChild(tag);
+      }
+
+      li.appendChild(el('h3', null, REPLY_KINDS[reply.kind] || reply.kind));
+      if (reply.docName) {
+        li.appendChild(el('p', 'item-note', 'בנוגע ל: ' + reply.docName));
+      }
+      if (reply.text) {
+        li.appendChild(el('p', 'reply-text', reply.text));
+      }
+      li.appendChild(el('p', 'item-when', formatDate(reply.date)));
+
+      if (!reply.readAt) {
+        var done = el('button', 'btn btn-outline btn-sm', 'סימון כטופל');
+        done.type = 'button';
+        done.addEventListener('click', function () {
+          CaseStore.markReplyRead(openId, reply.id);
+          renderCase();
+        });
+        li.appendChild(done);
+      }
+
+      list.appendChild(li);
+    });
+  }
+
   /* ---- שליחת עדכון ללקוח ---- */
 
   var msgForm = $('msgForm');
@@ -394,6 +623,155 @@
       list.appendChild(li);
     });
   }
+
+  /* ================= ניתוח מקצועי ================= */
+
+  var assistHistory = [];
+  var assistBusy    = false;
+
+  /**
+   * בונה את הקשר התיק לשליחה.
+   * נשלחת מטא-דאטה בלבד - בלי שם, תעודת זהות, טלפון או שם קובץ.
+   * השרת מצמצם ובודק שוב (server/policy.py); הצמצום כאן הוא
+   * השכבה הראשונה, לא היחידה.
+   */
+  function assistContext() {
+    var file = CaseStore.load(openId);
+    var gap  = analyzeGap(file);
+
+    return {
+      claimType:      file.claimType,
+      branch:         file.branch,
+      currentStage:   file.currentStage,
+      totalStages:    CLAIM_STAGES.length,
+      stageTitle:     CLAIM_STAGES[file.currentStage - 1].title,
+      stageEnteredAt: file.stageEnteredAt,
+      openedAt:       file.openedAt,
+      nextHearing:    file.nextHearing,
+      documents:      file.documents.map(function (d) {
+        return {
+          name:         d.name,
+          note:         d.note,
+          required:     d.required,
+          status:       d.status,
+          rejectReason: d.rejectReason || null,
+          file:         d.file            // השרת ממיר ל-hasFile בלבד
+        };
+      }),
+      gap: {
+        blocking: gap.blocking.map(function (i) { return i.name; }),
+        inReview: gap.inReview.map(function (i) { return i.name; }),
+        upcoming: gap.upcoming.map(function (i) { return i.name + ' (שלב ' + i.stage + ')'; })
+      }
+    };
+  }
+
+  /** נועל את הכפתורים בזמן ניתוח, כדי שברור למה לחיצה לא עושה דבר */
+  function setAssistBusy(busy) {
+    assistBusy = busy;
+    var controls = document.querySelectorAll(
+      '.assist-actions [data-ask], #assistSend, #assistInput');
+    Array.prototype.forEach.call(controls, function (c) { c.disabled = busy; });
+  }
+
+  function askAssist(preset, question) {
+    if (assistBusy) return;
+    setAssistBusy(true);
+
+    var log  = $('assistLog');
+    var turn = el('div', 'assist-turn');
+
+    var label = preset === 'next'    ? 'מה השלב הבא בתיק'
+              : preset === 'say'     ? 'מה כדאי לומר ללקוח'
+              : preset === 'medical' ? 'אילו השלמות רפואיות חסרות'
+              : question;
+
+    turn.appendChild(el('p', 'assist-q', label));
+    var answer = el('div', 'assist-a pending', 'מנתח את התיק...');
+    turn.appendChild(answer);
+    log.appendChild(turn);
+    turn.scrollIntoView({ block: 'nearest' });
+
+    // בקשה שנתקעת חייבת להשתחרר מעצמה - אחרת הצ'אט מת בשקט
+    var abort = new AbortController();
+    var timer = setTimeout(function () { abort.abort(); }, 120000);
+
+    fetch('/api/office/assist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: abort.signal,
+      body: JSON.stringify({
+        case:     assistContext(),
+        preset:   preset || '',
+        question: question || '',
+        history:  assistHistory
+      })
+    }).then(function (res) {
+      var reader  = res.body.getReader();
+      var decoder = new TextDecoder();
+      var text    = '';
+      answer.className = 'assist-a' + (res.ok ? '' : ' error');
+      answer.textContent = '';
+
+      function pump() {
+        return reader.read().then(function (chunk) {
+          if (chunk.done) {
+            clearTimeout(timer);
+            finishAssist(turn, answer, label, text, res.ok);
+            return;
+          }
+          text += decoder.decode(chunk.value, { stream: true });
+          answer.textContent = text;
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (err) {
+      clearTimeout(timer);
+      answer.className = 'assist-a error';
+      answer.textContent = err && err.name === 'AbortError'
+        ? 'הניתוח לקח יותר מדי זמן והופסק. אפשר לנסות שוב.'
+        : 'לא ניתן להגיע לשרת הניתוח. ודא שהשרת פועל (uvicorn server.app:app).';
+      setAssistBusy(false);
+    });
+  }
+
+  function finishAssist(turn, answer, label, text, ok) {
+    setAssistBusy(false);
+    if (!ok || !text) return;
+
+    assistHistory.push({ role: 'user',      text: label });
+    assistHistory.push({ role: 'assistant', text: text });
+
+    // המודל לעולם לא שולח ללקוח. הוא רק ממלא טיוטה שעורך הדין עורך.
+    var copy = el('button', 'btn btn-outline btn-sm assist-copy', 'העתקה לטיוטת הודעה');
+    copy.type = 'button';
+    copy.addEventListener('click', function () {
+      $('msgBody').value = text;
+      if (!$('msgTitle').value) $('msgTitle').value = 'עדכון בתיק שלך';
+      $('msgTitle').focus();
+      $('msgTitle').scrollIntoView({ block: 'center' });
+      toast('הטיוטה הועתקה. יש לערוך ולשלוח ידנית.');
+    });
+    turn.appendChild(copy);
+  }
+
+  Array.prototype.forEach.call(
+    document.querySelectorAll('.assist-actions [data-ask]'),
+    function (btn) {
+      btn.addEventListener('click', function () {
+        askAssist(btn.getAttribute('data-ask'), '');
+      });
+    }
+  );
+
+  $('assistForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var q = $('assistInput').value.trim();
+    if (!q) return;
+    $('assistInput').value = '';
+    askAssist('', q);
+  });
 
   /* ================= עזרים ================= */
 

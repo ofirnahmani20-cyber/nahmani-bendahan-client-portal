@@ -85,6 +85,8 @@
               <th scope="col">שלב נוכחי</th>
               <th scope="col">ממתין לבדיקה</th>
               <th scope="col">חסר ללקוח</th>
+              <th scope="col">פניות חדשות</th>
+              <th scope="col">חוסם שלב</th>
               <th scope="col"><span class="visually-hidden">פעולה</span></th>
             </tr>
           </thead>
@@ -108,6 +110,12 @@
       <div class="cols">
 
         <div>
+          <!-- מצב טכני - חישוב דטרמיניסטי, לא AI -->
+          <section class="block gap-block" aria-labelledby="h-gap">
+            <h2 id="h-gap">מצב טכני</h2>
+            <div id="gapBody"></div>
+          </section>
+
           <!-- שלב -->
           <section class="block" aria-labelledby="h-stage">
             <h2 id="h-stage">שלב התביעה</h2>
@@ -119,6 +127,37 @@
             <button type="button" class="btn btn-primary btn-sm" id="stageSave">שמירת השלב</button>
           </section>
 
+          <!-- דרישת מסמך מהלקוח -->
+          <section class="block" aria-labelledby="h-request">
+            <h2 id="h-request">דרישת מסמך מהלקוח</h2>
+            <div class="alert alert-error" id="reqError" role="alert" hidden></div>
+
+            <form id="reqForm" novalidate>
+              <div class="field">
+                <label for="reqPick">בחירה מהקטלוג</label>
+                <select id="reqPick"></select>
+              </div>
+
+              <div class="field">
+                <label for="reqName">שם המסמך</label>
+                <input type="text" id="reqName" maxlength="80" required>
+              </div>
+
+              <div class="field">
+                <label for="reqNote">הנחיה ללקוח</label>
+                <p class="hint">מה בדיוק נדרש - זה מה שמונע העלאה שגויה.</p>
+                <input type="text" id="reqNote" maxlength="140" required>
+              </div>
+
+              <label class="check">
+                <input type="checkbox" id="reqRequired" checked>
+                <span>מסמך חובה</span>
+              </label>
+
+              <button type="submit" class="btn btn-primary btn-sm">שליחת הדרישה ללקוח</button>
+            </form>
+          </section>
+
           <!-- מסמכים -->
           <section class="block" aria-labelledby="h-review">
             <h2 id="h-review">מסמכים</h2>
@@ -128,6 +167,39 @@
         </div>
 
         <div>
+          <!-- פניות מהלקוח -->
+          <section class="block" aria-labelledby="h-replies">
+            <h2 id="h-replies">פניות מהלקוח</h2>
+            <ul class="plain-list" id="replyList"></ul>
+          </section>
+
+          <!-- ניתוח מקצועי -->
+          <section class="block assist-block" aria-labelledby="h-assist">
+            <h2 id="h-assist">ניתוח מקצועי</h2>
+
+            <p class="assist-note">
+              חומר לשיקול דעתך בלבד - אינו ייעוץ משפטי או רפואי, ואינו נשלח ללקוח.
+              נשלחים לניתוח נתוני התיק בלבד, <strong>בלי שם, תעודת זהות או תוכן רפואי</strong>.
+            </p>
+
+            <div class="assist-actions">
+              <button type="button" class="btn btn-outline btn-sm" data-ask="next">מה השלב הבא בתיק</button>
+              <button type="button" class="btn btn-outline btn-sm" data-ask="say">מה כדאי לומר ללקוח</button>
+              <button type="button" class="btn btn-outline btn-sm" data-ask="medical">אילו השלמות רפואיות חסרות</button>
+            </div>
+
+            <div class="assist-log" id="assistLog" aria-live="polite"></div>
+
+            <form id="assistForm" novalidate>
+              <div class="field">
+                <label for="assistInput" class="visually-hidden">שאלה מקצועית</label>
+                <textarea id="assistInput" rows="2" maxlength="1000"
+                          placeholder="או שאל שאלה משלך על התיק..."></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm" id="assistSend">שליחה</button>
+            </form>
+          </section>
+
           <!-- שליחת עדכון -->
           <section class="block" aria-labelledby="h-send">
             <h2 id="h-send">שליחת עדכון ללקוח</h2>

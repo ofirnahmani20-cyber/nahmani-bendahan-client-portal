@@ -111,6 +111,79 @@ body.admin select { cursor: pointer; }
 /* ---- ריק ---- */
 .empty { color: var(--text-soft); font-style: italic; margin: 0; }
 
+/* ---- מצב טכני ---- */
+.gap-block { border-inline-start: 5px solid var(--border); }
+.gap-head { font-weight: 700; margin: 0 0 14px; }
+.gap-head.ok   { color: var(--ok); }
+.gap-head.stop { color: var(--stop); }
+
+.gap-group { margin: 0 0 16px; }
+.gap-group:last-child { margin-bottom: 0; }
+.gap-group h3 {
+  font-size: 14px; text-transform: none; letter-spacing: .3px;
+  color: var(--text-soft); margin: 0 0 8px;
+}
+.gap-items { list-style: none; margin: 0; padding: 0; }
+.gap-items > li {
+  padding: 10px 12px;
+  margin: 0 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.gap-group.stop .gap-items > li { border-color: var(--stop); background: var(--stop-soft); }
+.gap-group.wait .gap-items > li { border-color: var(--warn); background: var(--warn-soft); }
+.gap-group.soon .gap-items > li { background: var(--wait-soft); }
+
+.gap-name { display: block; font-weight: 700; }
+.gap-why  { display: block; font-size: 13.5px; color: var(--text-soft); }
+.gap-req  { margin: 8px 0 0; }
+
+/* ---- פניות מהלקוח ---- */
+.reply.unread { background: var(--warn-soft); border-radius: 8px; padding-inline: 12px; }
+.reply-text {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+
+/* ---- ניתוח מקצועי ---- */
+.assist-block { border: 2px solid var(--accent); }
+.assist-note {
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  margin: 0 0 14px;
+}
+.assist-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+
+.assist-log { margin: 0 0 14px; }
+.assist-log:empty { display: none; }
+
+.assist-turn { margin: 0 0 14px; }
+.assist-q {
+  font-weight: 700;
+  background: var(--wait-soft);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 8px;
+}
+.assist-a {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.assist-a.error { border-color: var(--stop); background: var(--stop-soft); color: #7d1414; }
+.assist-a.pending { color: var(--text-soft); font-style: italic; }
+.assist-copy { margin: 10px 0 0; }
+
 @media (max-width: 520px) {
   body.admin .btn { width: auto; }
   .review-actions .btn { flex: 1 1 auto; }

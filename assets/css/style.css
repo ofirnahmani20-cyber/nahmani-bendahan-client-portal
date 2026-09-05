@@ -263,6 +263,50 @@ p  { margin: 0 0 14px; }
   border-radius: 6px; padding: 2px 8px; font-size: 1em;
 }
 
+/* ---- תגובה למשרד על מסמך ---- */
+.reply-box {
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px dashed var(--border);
+}
+.reply-lead {
+  font-size: calc(17px * var(--scale));
+  color: var(--text-soft);
+  margin: 0 0 10px;
+}
+
+.reply-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.reply-pick {
+  min-height: 48px;
+  padding: 10px 18px;
+  font-size: calc(17px * var(--scale));
+}
+/* הבחירה מסומנת גם במילוי וגם בסימן, לא בצבע בלבד */
+.reply-pick.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.reply-pick.on::before { content: "✓"; font-weight: 700; }
+
+.reply-detail { margin: 14px 0 0; }
+.reply-detail[hidden] { display: none; }
+.reply-label { display: block; font-weight: 700; margin: 0 0 6px; }
+.reply-text {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: calc(18px * var(--scale));
+  color: var(--text);
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  resize: vertical;
+  margin: 0 0 12px;
+}
+.reply-small {
+  font-size: calc(15px * var(--scale));
+  color: var(--text-soft);
+  margin: 10px 0 0;
+}
+
 /* ---- העדפות משתמש ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

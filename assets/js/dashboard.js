@@ -42,6 +42,84 @@
     return doc.status === 'rejected' ? 'העלאת מסמך מתוקן' : 'העלאת המסמך';
   }
 
+  /* ---- תגובה למשרד על מסמך ---- */
+
+  var REPLY_OPTIONS = [
+    { kind: 'no-document',  label: 'אין לי את המסמך' },
+    { kind: 'need-help',    label: 'צריך עזרה בהשגתו' },
+    { kind: 'sent-by-mail', label: 'שלחתי בדואר' },
+    { kind: 'already-gave', label: 'כבר מסרתי למשרד' }
+  ];
+
+  /**
+   * בונה את אזור התגובה: כפתורי תגובה מהירה, ומתחתיהם
+   * שדה טקסט חופשי שנפתח רק אחרי בחירה - כדי שהמסך לא יתמלא
+   * בתיבות טקסט שאיש לא ימלא.
+   */
+  function replyBox(doc) {
+    var wrap = el('div', 'reply-box');
+    wrap.appendChild(el('p', 'reply-lead', 'לא מצליחים להעלות? אפשר לעדכן אותנו:'));
+
+    var row     = el('div', 'reply-options');
+    var chosen  = null;
+    var buttons = [];
+
+    var form = el('div', 'reply-detail');
+    form.hidden = true;
+
+    var areaId = 'reply-text-' + doc.id;
+    var label  = el('label', 'reply-label', 'רוצים להוסיף פרטים? (לא חובה)');
+    label.setAttribute('for', areaId);
+
+    var area = document.createElement('textarea');
+    area.id = areaId;
+    area.rows = 3;
+    area.maxLength = 400;
+    area.className = 'reply-text';
+
+    var send = el('button', 'btn btn-primary', 'שליחה למשרד');
+    send.type = 'button';
+
+    var small = el('p', 'reply-small',
+      'זו אינה פנייה דחופה. לעניין דחוף יש להתקשר למשרד.');
+
+    form.appendChild(label);
+    form.appendChild(area);
+    form.appendChild(send);
+    form.appendChild(small);
+
+    REPLY_OPTIONS.forEach(function (opt) {
+      var btn = el('button', 'btn btn-outline reply-pick', opt.label);
+      btn.type = 'button';
+      btn.setAttribute('aria-pressed', 'false');
+      btn.addEventListener('click', function () {
+        chosen = opt.kind;
+        buttons.forEach(function (b) {
+          var on = b === btn;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-pressed', String(on));
+        });
+        form.hidden = false;
+        area.focus();
+      });
+      buttons.push(btn);
+      row.appendChild(btn);
+    });
+
+    send.addEventListener('click', function () {
+      if (!chosen) return;
+      CaseStore.addClientReply(user.idNumber, doc.id, chosen, area.value.trim());
+      toast('העדכון נשלח למשרד. ניצור קשר בהקדם.');
+      caseFile = CaseStore.load(user.idNumber);
+      renderTodo();
+      renderDocs();
+    });
+
+    wrap.appendChild(row);
+    wrap.appendChild(form);
+    return wrap;
+  }
+
   /* ---- 1. כותרת ומצב התביעה ---- */
 
   function renderStatus() {
@@ -96,6 +174,7 @@
         li.appendChild(el('p', 'reject-note', 'המשרד ביקש להעלות מחדש: ' + doc.rejectReason));
       }
       li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+      li.appendChild(replyBox(doc));
       list.appendChild(li);
     });
     body.appendChild(list);
