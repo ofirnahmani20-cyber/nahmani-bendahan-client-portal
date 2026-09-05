@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ניהול תיקים | משרד עורכי הדין NAHMANI-BENDAHAN</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="admin">
+
+<!-- ============ כניסת צוות ============ -->
+<main class="login" id="loginView">
+
+  <div class="login-head">
+    <p class="firm">משרד עורכי הדין NAHMANI-BENDAHAN</p>
+    <h1>ניהול תיקים</h1>
+    <p class="lead">מערכת פנימית לצוות המשרד בלבד.</p>
+  </div>
+
+  <div class="block">
+    <div class="alert alert-error" id="loginError" role="alert" hidden></div>
+
+    <form id="staffLoginForm" novalidate>
+      <div class="field">
+        <label for="staffUser">שם משתמש</label>
+        <input type="text" id="staffUser" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="staffPass">סיסמה</label>
+        <input type="password" id="staffPass" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">כניסה</button>
+    </form>
+
+    <div class="demo-box">
+      <strong>חשבונות להתנסות</strong><br>
+      <code>nahmani</code> · סיסמה <code>office2026</code><br>
+      <code>bendahan</code> · סיסמה <code>office2026</code>
+    </div>
+  </div>
+
+  <p class="small-print"><a href="index.html">מעבר לאזור הלקוחות</a></p>
+</main>
+
+<!-- ============ המערכת ============ -->
+<div id="appView" hidden>
+
+  <a class="skip-link" href="#main">דילוג לתוכן</a>
+
+  <header class="topbar">
+    <div class="topbar-in wide">
+      <div>
+        <div class="firm">NAHMANI-BENDAHAN · ניהול תיקים</div>
+        <div class="who" id="staffName"></div>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn btn-quiet" id="backBtn" hidden>חזרה לרשימת התיקים</button>
+        <button type="button" class="btn btn-quiet" id="staffLogout">יציאה</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page wide" id="main">
+
+    <p class="demo-warning" role="note">
+      <strong>גרסת הדגמה.</strong> הנתונים נשמרים בדפדפן הזה בלבד ואינם מוגנים.
+      אין להשתמש במסך זה עם נתוני לקוחות אמיתיים לפני מימוש שרת - ראה <code>docs/03</code>.
+    </p>
+
+    <!-- ---- רשימת תיקים ---- -->
+    <section id="listView">
+      <h1>התיקים במשרד</h1>
+      <p class="lead" id="listSummary"></p>
+
+      <div class="block table-block">
+        <table class="cases">
+          <caption class="visually-hidden">רשימת תיקי הלקוחות במשרד</caption>
+          <thead>
+            <tr>
+              <th scope="col">לקוח</th>
+              <th scope="col">תיק</th>
+              <th scope="col">סוג התביעה</th>
+              <th scope="col">שלב נוכחי</th>
+              <th scope="col">ממתין לבדיקה</th>
+              <th scope="col">חסר ללקוח</th>
+              <th scope="col"><span class="visually-hidden">פעולה</span></th>
+            </tr>
+          </thead>
+          <tbody id="caseRows"></tbody>
+        </table>
+      </div>
+
+      <section class="block" aria-labelledby="h-log">
+        <h2 id="h-log">יומן פעולות הצוות</h2>
+        <p class="item-note" id="logIntro"></p>
+        <ul class="plain-list" id="logList"></ul>
+      </section>
+    </section>
+
+    <!-- ---- תיק בודד ---- -->
+    <section id="caseView" hidden>
+
+      <h1 id="caseClient"></h1>
+      <p class="lead" id="caseMeta"></p>
+
+      <div class="cols">
+
+        <div>
+          <!-- שלב -->
+          <section class="block" aria-labelledby="h-stage">
+            <h2 id="h-stage">שלב התביעה</h2>
+            <p class="item-note" id="stageNow"></p>
+            <div class="field">
+              <label for="stageSelect">עדכון השלב הנוכחי</label>
+              <select id="stageSelect"></select>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="stageSave">שמירת השלב</button>
+          </section>
+
+          <!-- מסמכים -->
+          <section class="block" aria-labelledby="h-review">
+            <h2 id="h-review">מסמכים</h2>
+            <p class="item-note" id="reviewIntro"></p>
+            <ul class="plain-list" id="reviewList"></ul>
+          </section>
+        </div>
+
+        <div>
+          <!-- שליחת עדכון -->
+          <section class="block" aria-labelledby="h-send">
+            <h2 id="h-send">שליחת עדכון ללקוח</h2>
+            <div class="alert alert-error" id="msgError" role="alert" hidden></div>
+            <form id="msgForm" novalidate>
+              <div class="field">
+                <label for="msgTitle">כותרת</label>
+                <input type="text" id="msgTitle" maxlength="80" required>
+              </div>
+              <div class="field">
+                <label for="msgBody">תוכן ההודעה</label>
+                <textarea id="msgBody" rows="5" maxlength="600" required></textarea>
+              </div>
+              <label class="check">
+                <input type="checkbox" id="msgImportant">
+                <span>סימון כעדכון חשוב</span>
+              </label>
+              <button type="submit" class="btn btn-primary btn-sm">שליחה ללקוח</button>
+            </form>
+          </section>
+
+          <!-- עדכונים קיימים -->
+          <section class="block" aria-labelledby="h-sent">
+            <h2 id="h-sent">עדכונים שנשלחו</h2>
+            <ul class="plain-list" id="sentList"></ul>
+          </section>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/admin.js"></script>
+</body>
+</html>

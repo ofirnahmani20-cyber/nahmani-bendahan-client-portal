@@ -3,128 +3,97 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>האזור האישי | מעקב תביעת ביטוח לאומי</title>
+<title>האזור האישי שלי | מעקב תביעת ביטוח לאומי</title>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
+<a class="skip-link" href="#main">דילוג לתוכן</a>
+
 <header class="topbar">
-  <div class="logo">⚖️ NAHMANI-BENDAHAN <em>| אזור לקוחות</em></div>
-  <div class="topbar-left">
-    <div class="user-chip">
-      <div class="avatar" id="userInitials">--</div>
-      <span id="userName">טוען...</span>
+  <div class="topbar-in">
+    <div>
+      <div class="firm">משרד עורכי הדין NAHMANI-BENDAHAN</div>
+      <div class="who" id="userName"></div>
     </div>
-    <button class="logout" id="logoutBtn">יציאה</button>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-quiet" id="textSizeBtn" aria-pressed="false">
+        הגדלת טקסט
+      </button>
+      <button type="button" class="btn btn-quiet" id="logoutBtn">יציאה</button>
+    </div>
   </div>
 </header>
 
-<main class="container">
+<main class="page" id="main">
 
-  <div class="page-head">
-    <h1 id="greeting">שלום</h1>
-    <p id="caseSummary"></p>
-  </div>
+  <h1 id="greeting">האזור האישי שלי</h1>
+  <p class="lead" id="caseSummary"></p>
 
-  <!-- סטטוס נוכחי -->
-  <section class="card status-hero">
-    <div class="label">השלב הנוכחי בתביעה</div>
-    <h2 id="stageTitle"></h2>
-    <div class="desc" id="stageDesc"></div>
+  <!-- 1. איפה התיק עומד -->
+  <section class="block status" aria-labelledby="h-status">
+    <h2 id="h-status" class="visually-hidden">מצב התביעה</h2>
+    <p class="step-of" id="stepOf"></p>
+    <p class="step-name" id="stepName"></p>
+    <p class="step-what" id="stepWhat"></p>
 
-    <div class="status-meta">
-      <div><span>מספר תיק</span><strong id="metaCase"></strong></div>
-      <div><span>סוג התביעה</span><strong id="metaType"></strong></div>
-      <div><span>סניף מטפל</span><strong id="metaBranch"></strong></div>
-      <div><span>בשלב זה מאז</span><strong id="metaSince"></strong></div>
+    <div class="bar" role="img" id="progressBar">
+      <i id="progressFill" style="width:0%"></i>
     </div>
+    <p class="bar-note" id="progressNote"></p>
+  </section>
 
-    <div class="progress-outer">
-      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-      <div class="progress-label">
-        <span id="progressText"></span>
-        <span id="progressPct"></span>
-      </div>
+  <!-- 2. מה עליי לעשות עכשיו -->
+  <section class="block todo" id="todoBlock" aria-labelledby="h-todo">
+    <h2 id="h-todo">מה עליי לעשות עכשיו</h2>
+    <div id="todoBody"></div>
+  </section>
+
+  <!-- 3. המסמכים שלי -->
+  <section class="block" aria-labelledby="h-docs">
+    <h2 id="h-docs">המסמכים שלי</h2>
+    <p id="docsIntro"></p>
+    <ul class="plain-list" id="docList"></ul>
+  </section>
+
+  <!-- 4. מה יקרה בהמשך -->
+  <section class="block" aria-labelledby="h-next">
+    <h2 id="h-next">מה יקרה בהמשך</h2>
+    <ul class="plain-list" id="nextSteps"></ul>
+  </section>
+
+  <!-- 5. כל שלבי התביעה -->
+  <section class="block" aria-labelledby="h-steps">
+    <h2 id="h-steps">כל שלבי התביעה</h2>
+    <ul class="steps" id="stepsList"></ul>
+  </section>
+
+  <!-- 6. עדכונים מהמשרד -->
+  <section class="block" aria-labelledby="h-msgs">
+    <h2 id="h-msgs">עדכונים מהמשרד</h2>
+    <ul class="plain-list" id="messages"></ul>
+  </section>
+
+  <!-- 7. יצירת קשר -->
+  <section class="block" aria-labelledby="h-contact">
+    <h2 id="h-contact">מי מטפל בתיק שלי</h2>
+    <p class="contact-name" id="lawyerName"></p>
+    <p class="contact-role" id="lawyerRole"></p>
+    <div class="contact-btns">
+      <a class="btn btn-primary" id="lawyerPhone" href="#"></a>
+      <a class="btn btn-outline" id="lawyerEmail" href="#">שליחת אימייל</a>
     </div>
   </section>
 
-  <div class="grid-2">
-
-    <!-- טור ראשי -->
-    <div>
-      <!-- ציר השלבים -->
-      <section class="card">
-        <div class="card-head"><h2><span class="ic">🧭</span> מסלול התביעה - כל השלבים</h2></div>
-        <div class="timeline" id="timeline"></div>
-      </section>
-
-      <!-- מסמכים -->
-      <section class="card" id="documentsCard">
-        <div class="card-head">
-          <h2><span class="ic">📁</span> המסמכים בתיק</h2>
-          <button class="btn btn-gold btn-sm" id="uploadTopBtn">＋ העלאת מסמך</button>
-        </div>
-
-        <div class="upload-zone" id="dropZone">
-          <span class="ic">📤</span>
-          <h4>גרירת קובץ לכאן, או לחיצה לבחירת קובץ</h4>
-          <p>PDF, JPG, PNG · עד 10MB לקובץ · הקובץ מועבר ישירות לצוות המטפל בתיק</p>
-        </div>
-
-        <div class="doc-tabs" id="docTabs"></div>
-        <div id="docList"></div>
-      </section>
-    </div>
-
-    <!-- סרגל צד -->
-    <aside>
-      <!-- צעדים הבאים -->
-      <section class="card">
-        <div class="card-head"><h2><span class="ic">➡️</span> הצעדים הבאים</h2></div>
-        <div class="next-list" id="nextSteps"></div>
-      </section>
-
-      <!-- מבט מהיר -->
-      <section class="card">
-        <div class="card-head"><h2><span class="ic">📊</span> מבט מהיר</h2></div>
-        <div class="side-stat" id="sideStats"></div>
-      </section>
-
-      <!-- הודעות -->
-      <section class="card">
-        <div class="card-head"><h2><span class="ic">📬</span> עדכונים מהמשרד</h2></div>
-        <div id="messages"></div>
-      </section>
-
-      <!-- יצירת קשר -->
-      <section class="card contact-box">
-        <div class="card-head"><h2><span class="ic">👤</span> הצוות המטפל</h2></div>
-        <div class="lawyer">
-          <div class="avatar" id="lawyerInitials">--</div>
-          <div>
-            <h4 id="lawyerName"></h4>
-            <span id="lawyerRole"></span>
-          </div>
-        </div>
-        <div class="contact-lines">
-          <div>📞 <a id="lawyerPhone" href="#"></a></div>
-          <div>✉️ <a id="lawyerEmail" href="#"></a></div>
-        </div>
-        <a class="btn btn-ghost btn-sm" id="callBtn" href="#" style="width:100%">בקשת שיחה חוזרת</a>
-      </section>
-    </aside>
-
-  </div>
-
-  <p class="footer-note">
-    המידע המוצג באזור האישי הוא לצורכי מעקב בלבד ואינו מהווה ייעוץ משפטי.<br>
-    לשאלות בנוגע לתיק יש לפנות לצוות המטפל. © 2026 משרד עורכי הדין NAHMANI-BENDAHAN.
+  <p class="small-print">
+    המידע כאן הוא למעקב בלבד ואינו ייעוץ משפטי. לשאלות על התיק יש לפנות לצוות המטפל.<br>
+    © 2026 משרד עורכי הדין NAHMANI-BENDAHAN.
   </p>
 
 </main>
 
 <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" hidden>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/dashboard.js"></script>

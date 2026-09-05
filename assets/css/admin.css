@@ -1,0 +1,117 @@
+/* ==========================================================
+   admin.css - ממשק הניהול הפנימי של המשרד
+   ----------------------------------------------------------
+   נטען אחרי style.css ומשתמש באותם טוקני צבע.
+   ההבדל מאזור הלקוחות: קהל היעד הוא הצוות, לא לקוח מבוגר -
+   לכן צפיפות גבוהה יותר, טקסט קטן יותר וטבלה במקום כרטיסים.
+   הניגודיות ומטרות המגע נשמרות מעל הסף.
+   ========================================================== */
+
+body.admin { font-size: 16px; line-height: 1.55; }
+
+body.admin h1 { font-size: 26px; }
+body.admin h2 { font-size: 19px; }
+body.admin h3 { font-size: 17px; }
+body.admin .lead { font-size: 17px; }
+body.admin .item-note { font-size: 15px; }
+body.admin .block { padding: 20px 18px; margin: 0 0 18px; }
+
+/* מסך הכניסה של הצוות נשאר בגודל הרגיל וברוחב צר */
+body.admin .login { font-size: 17px; }
+
+.wide { max-width: 1100px; }
+
+/* ---- כפתור קומפקטי ---- */
+.btn-sm { min-height: 42px; padding: 9px 18px; font-size: 15px; }
+
+/* ---- אזהרת הדגמה ---- */
+.demo-warning {
+  background: var(--warn-soft);
+  border: 2px solid var(--warn);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 0 0 22px;
+  font-size: 15px;
+  color: #5c3200;
+}
+.demo-warning code {
+  background: #fff; border: 1px solid var(--warn);
+  border-radius: 5px; padding: 1px 6px; direction: ltr; display: inline-block;
+}
+
+/* ---- טבלת התיקים ---- */
+.table-block { padding: 0; overflow-x: auto; }
+
+table.cases { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.cases th,
+table.cases td { padding: 14px 16px; text-align: start; vertical-align: middle; }
+table.cases thead th {
+  background: var(--wait-soft);
+  border-bottom: 2px solid var(--border);
+  font-size: 14px;
+  white-space: nowrap;
+}
+table.cases tbody tr { border-bottom: 1px solid var(--border); }
+table.cases tbody tr:last-child { border-bottom: 0; }
+table.cases tbody tr:hover { background: var(--accent-soft); }
+table.cases .client { font-weight: 700; }
+table.cases .sub { color: var(--text-soft); font-size: 13.5px; }
+table.cases .num { direction: ltr; text-align: start; unicode-bidi: plaintext; }
+
+/* מונים: אפס נראה שקט, כל ערך אחר דורש תשומת לב */
+.count {
+  display: inline-block; min-width: 34px; text-align: center;
+  border-radius: 999px; padding: 3px 10px;
+  font-weight: 700; font-size: 14px;
+  border: 2px solid var(--border); background: var(--surface); color: var(--text-soft);
+}
+.count.hot  { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.count.calm { background: var(--ok-soft);   border-color: var(--ok);   color: var(--ok); }
+
+/* ---- שתי עמודות במסך רחב ---- */
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+
+/* ---- שדות טופס בממשק הניהול ---- */
+body.admin .field { margin: 0 0 16px; }
+body.admin .field input,
+body.admin select,
+body.admin textarea {
+  width: 100%; min-height: 44px;
+  padding: 10px 12px;
+  font: inherit; font-size: 16px;
+  color: var(--text); background: var(--surface);
+  border: 2px solid var(--border); border-radius: 8px;
+}
+body.admin textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+body.admin select { cursor: pointer; }
+
+.check {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 16px; cursor: pointer; font-weight: 600;
+}
+.check input { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; }
+
+/* ---- בדיקת מסמכים ---- */
+.review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
+.btn-ok   { background: var(--ok);   color: #fff; }
+.btn-ok:hover   { background: #14471a; }
+.btn-stop { background: var(--surface); color: var(--stop); border-color: var(--stop); }
+.btn-stop:hover { background: var(--stop-soft); }
+
+.reject-form { margin: 12px 0 0; }
+.reject-form[hidden] { display: none; }
+
+/* ---- יומן פעולות ---- */
+#logList > li { padding: 12px 0; }
+.log-when { color: var(--text-soft); font-size: 13.5px; }
+.log-text { margin: 2px 0 0; }
+.log-text b { font-weight: 700; }
+
+/* ---- ריק ---- */
+.empty { color: var(--text-soft); font-style: italic; margin: 0; }
+
+@media (max-width: 520px) {
+  body.admin .btn { width: auto; }
+  .review-actions .btn { flex: 1 1 auto; }
+}

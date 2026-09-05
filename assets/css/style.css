@@ -1,308 +1,286 @@
 /* ==========================================================
-   מערכת מעקב תיקים - משרד עורכי דין לתביעות ביטוח לאומי
-   גיליון עיצוב ראשי (RTL)
+   style.css - אזור הלקוחות NAHMANI-BENDAHAN
+   ----------------------------------------------------------
+   עקרונות: מסך אחד, טור אחד, טקסט גדול, ניגודיות גבוהה.
+   כל סטטוס מסומן גם בטקסט וגם בסמל - לא בצבע בלבד.
    ========================================================== */
 
-:root{
-  --navy:#0f2540;
-  --navy-700:#1b3a5f;
-  --navy-500:#2c5282;
-  --gold:#b8935a;
-  --gold-light:#d9bd8b;
-  --bg:#f4f6f9;
-  --card:#ffffff;
-  --line:#e2e8f0;
-  --text:#1a202c;
-  --muted:#64748b;
-  --green:#1f9254;
-  --green-bg:#e7f6ee;
-  --amber:#b7791f;
-  --amber-bg:#fdf6e3;
-  --red:#c53030;
-  --red-bg:#fdecec;
-  --blue-bg:#eaf1f9;
-  --radius:14px;
-  --shadow:0 1px 3px rgba(15,37,64,.08), 0 8px 24px rgba(15,37,64,.06);
-  --shadow-lg:0 12px 40px rgba(15,37,64,.14);
+:root {
+  --scale: 1;                      /* מוגדל ע"י כפתור "הגדלת טקסט" */
+
+  --bg:        #f4f6f9;
+  --surface:   #ffffff;
+  --border:    #c9d2de;
+  --text:      #14203a;            /* 14.9:1 על לבן */
+  --text-soft: #4d5a72;            /* 7.4:1 על לבן */
+
+  --accent:      #0d47a1;          /* 8.6:1 על לבן */
+  --accent-dark: #08306b;
+  --accent-soft: #e8eff9;
+
+  --ok:        #1b5e20;            /* 7.9:1 */
+  --ok-soft:   #e6f2e7;
+  --warn:      #8a4b00;            /* 6.4:1 */
+  --warn-soft: #fdf0e0;
+  --wait:      #4d5a72;
+  --wait-soft: #eef1f5;
+  --stop:      #a32020;            /* 7.5:1 */
+  --stop-soft: #fdeeee;
+
+  --radius: 12px;
+  --focus:  3px solid #b8460e;
 }
 
-*{box-sizing:border-box;margin:0;padding:0}
+* { box-sizing: border-box; }
 
-body{
-  font-family:"Segoe UI",Assistant,Rubik,Arial,sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  direction:rtl;
-  line-height:1.6;
-  -webkit-font-smoothing:antialiased;
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: calc(19px * var(--scale));
+  line-height: 1.65;
 }
 
-a{color:var(--navy-500);text-decoration:none}
-button{font-family:inherit;cursor:pointer;border:none}
+/* ---- נגישות בסיסית ---- */
+:focus-visible { outline: var(--focus); outline-offset: 3px; border-radius: 4px; }
 
-/* ---------- מסך התחברות ---------- */
-.login-wrap{
-  min-height:100vh;
-  display:grid;
-  grid-template-columns:1fr 1fr;
+.skip-link {
+  position: absolute; inset-inline-start: 0; top: -100px;
+  background: var(--accent-dark); color: #fff;
+  padding: 14px 20px; z-index: 100; font-weight: 700;
 }
-.login-brand{
-  background:linear-gradient(150deg,var(--navy) 0%,var(--navy-700) 60%,#25507f 100%);
-  color:#fff;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  padding:64px 56px;
-  position:relative;
-  overflow:hidden;
-}
-.login-brand::after{
-  content:"";position:absolute;left:-120px;bottom:-120px;
-  width:380px;height:380px;border-radius:50%;
-  background:rgba(184,147,90,.14);
-}
-.login-brand .scales{font-size:56px;margin-bottom:20px}
-.login-brand h1{font-size:34px;line-height:1.3;font-weight:700;margin-bottom:14px;position:relative;z-index:1}
-.login-brand p{font-size:17px;opacity:.86;max-width:420px;position:relative;z-index:1}
-.brand-points{margin-top:36px;display:flex;flex-direction:column;gap:14px;position:relative;z-index:1}
-.brand-points div{display:flex;align-items:center;gap:12px;font-size:15.5px;opacity:.92}
-.brand-points span{
-  width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);
-  display:grid;place-items:center;flex-shrink:0
+.skip-link:focus { top: 0; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-.login-form-side{display:flex;align-items:center;justify-content:center;padding:40px}
-.login-card{width:100%;max-width:400px}
-.login-card h2{font-size:26px;margin-bottom:8px}
-.login-card .sub{color:var(--muted);margin-bottom:30px}
+a { color: var(--accent); }
 
-.field{margin-bottom:18px}
-.field label{display:block;font-size:14px;font-weight:600;margin-bottom:7px;color:var(--navy-700)}
-.field input{
-  width:100%;padding:12px 14px;border:1.5px solid var(--line);
-  border-radius:10px;font-size:15px;font-family:inherit;background:#fff;transition:.15s;
-}
-.field input:focus{outline:none;border-color:var(--navy-500);box-shadow:0 0 0 3px rgba(44,82,130,.12)}
+/* ---- פריסה ---- */
+.page { max-width: 760px; margin: 0 auto; padding: 24px 18px 72px; }
 
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  padding:12px 20px;border-radius:10px;font-size:15px;font-weight:600;transition:.15s;
-}
-.btn-primary{background:var(--navy);color:#fff;width:100%}
-.btn-primary:hover{background:var(--navy-700)}
-.btn-gold{background:var(--gold);color:#fff}
-.btn-gold:hover{background:#a67f47}
-.btn-ghost{background:#fff;border:1.5px solid var(--line);color:var(--navy-700)}
-.btn-ghost:hover{border-color:var(--navy-500)}
-.btn-sm{padding:8px 14px;font-size:13.5px}
+h1 { font-size: calc(30px * var(--scale)); line-height: 1.3; margin: 0 0 8px; }
+h2 { font-size: calc(23px * var(--scale)); line-height: 1.35; margin: 0 0 14px; }
+h3 { font-size: calc(20px * var(--scale)); line-height: 1.4; margin: 0 0 4px; }
+p  { margin: 0 0 14px; }
 
-.alert{padding:11px 14px;border-radius:10px;font-size:14px;margin-bottom:16px;display:none}
-.alert.err{background:var(--red-bg);color:var(--red);border:1px solid #f5c6c6}
-.alert.show{display:block}
+.lead { font-size: calc(20px * var(--scale)); color: var(--text-soft); }
 
-.demo-hint{
-  margin-top:24px;padding:14px 16px;background:var(--blue-bg);
-  border-radius:10px;font-size:13.5px;color:var(--navy-700);line-height:1.9
-}
-.demo-hint b{display:block;margin-bottom:4px}
-.demo-hint code{background:#fff;padding:1px 6px;border-radius:5px;font-size:13px;direction:ltr;display:inline-block}
-
-/* ---------- מבנה אפליקציה ---------- */
-.topbar{
-  background:var(--navy);color:#fff;padding:0 32px;height:64px;
-  display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:50;box-shadow:0 2px 12px rgba(15,37,64,.18)
-}
-.topbar .logo{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700}
-.topbar .logo em{font-style:normal;color:var(--gold-light);font-weight:500;font-size:14px}
-.topbar-left{display:flex;align-items:center;gap:16px}
-.user-chip{display:flex;align-items:center;gap:10px;font-size:14px}
-.avatar{
-  width:36px;height:36px;border-radius:50%;background:var(--gold);
-  display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff
-}
-.logout{background:rgba(255,255,255,.1);color:#fff;padding:7px 14px;border-radius:8px;font-size:13.5px}
-.logout:hover{background:rgba(255,255,255,.2)}
-
-.container{max-width:1180px;margin:0 auto;padding:28px 24px 64px}
-
-.page-head{margin-bottom:24px}
-.page-head h1{font-size:25px;margin-bottom:4px}
-.page-head p{color:var(--muted);font-size:15px}
-
-/* ---------- כרטיסים ---------- */
-.card{
-  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:24px;box-shadow:var(--shadow);margin-bottom:22px
-}
-.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
-.card-head h2{font-size:18px;display:flex;align-items:center;gap:9px}
-.card-head h2 .ic{font-size:20px}
-
-.grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start}
-
-/* ---------- כרטיס סטטוס נוכחי ---------- */
-.status-hero{
-  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-700) 100%);
-  color:#fff;border:none
-}
-.status-hero .label{font-size:13.5px;opacity:.75;margin-bottom:6px;letter-spacing:.3px}
-.status-hero h2{font-size:27px;margin-bottom:10px;color:#fff}
-.status-hero .desc{opacity:.88;font-size:15px;max-width:640px}
-.status-meta{display:flex;gap:34px;margin-top:22px;padding-top:20px;border-top:1px solid rgba(255,255,255,.16);flex-wrap:wrap}
-.status-meta div span{display:block;font-size:12.5px;opacity:.7;margin-bottom:3px}
-.status-meta div strong{font-size:16px;font-weight:600}
-
-.progress-outer{margin-top:22px}
-.progress-bar{height:9px;background:rgba(255,255,255,.18);border-radius:99px;overflow:hidden}
-.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:99px;transition:width .8s ease}
-.progress-label{display:flex;justify-content:space-between;font-size:13px;margin-top:9px;opacity:.85}
-
-/* ---------- ציר שלבים ---------- */
-.timeline{position:relative;padding-inline-start:8px}
-.step{display:flex;gap:16px;padding-bottom:26px;position:relative}
-.step:last-child{padding-bottom:0}
-.step::before{
-  content:"";position:absolute;inset-inline-start:15px;top:34px;bottom:0;
-  width:2px;background:var(--line)
-}
-.step:last-child::before{display:none}
-.step.done::before{background:var(--green)}
-.step-dot{
-  width:32px;height:32px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
-  font-size:14px;font-weight:700;background:#eef2f7;color:var(--muted);border:2px solid var(--line);z-index:1
-}
-.step.done .step-dot{background:var(--green);color:#fff;border-color:var(--green)}
-.step.current .step-dot{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 0 0 5px rgba(184,147,90,.2)}
-.step-body{padding-top:3px;flex:1}
-.step-body h4{font-size:15.5px;margin-bottom:3px}
-.step.pending .step-body h4{color:var(--muted)}
-.step-body p{font-size:14px;color:var(--muted);margin-bottom:6px}
-.step-date{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
-.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600}
-.pill.done{background:var(--green-bg);color:var(--green)}
-.pill.current{background:#fdf3e3;color:var(--amber)}
-.pill.pending{background:#f1f5f9;color:var(--muted)}
-
-/* ---------- הצעדים הבאים ---------- */
-.next-list{display:flex;flex-direction:column;gap:12px}
-.next-item{
-  display:flex;gap:12px;padding:14px;border:1px solid var(--line);
-  border-radius:11px;background:#fbfcfe
-}
-.next-item .num{
-  width:26px;height:26px;border-radius:8px;background:var(--navy);color:#fff;
-  display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0
-}
-.next-item h5{font-size:14.5px;margin-bottom:2px}
-.next-item p{font-size:13.5px;color:var(--muted)}
-.next-item .eta{font-size:12.5px;color:var(--gold);font-weight:600;margin-top:4px}
-
-/* ---------- מסמכים ---------- */
-.doc-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
-.doc-tab{
-  padding:8px 16px;border-radius:99px;background:#eef2f7;color:var(--muted);
-  font-size:14px;font-weight:600;transition:.15s
-}
-.doc-tab.active{background:var(--navy);color:#fff}
-.doc-tab .count{
-  display:inline-block;background:rgba(0,0,0,.12);border-radius:99px;
-  padding:0 7px;font-size:12px;margin-inline-start:6px
-}
-.doc-tab.active .count{background:rgba(255,255,255,.22)}
-
-.doc-row{
-  display:flex;align-items:center;gap:14px;padding:15px 16px;
-  border:1px solid var(--line);border-radius:12px;margin-bottom:11px;background:#fff;transition:.15s
-}
-.doc-row:hover{border-color:var(--navy-500);box-shadow:var(--shadow)}
-.doc-row.missing{border-inline-start:4px solid var(--red);background:#fffbfb}
-.doc-row.pending-review{border-inline-start:4px solid var(--amber);background:#fffdf7}
-.doc-row.approved{border-inline-start:4px solid var(--green)}
-.doc-icon{
-  width:42px;height:42px;border-radius:11px;display:grid;place-items:center;
-  font-size:19px;flex-shrink:0;background:#eef2f7
-}
-.doc-row.missing .doc-icon{background:var(--red-bg)}
-.doc-row.pending-review .doc-icon{background:var(--amber-bg)}
-.doc-row.approved .doc-icon{background:var(--green-bg)}
-.doc-info{flex:1;min-width:0}
-.doc-info h4{font-size:15px;margin-bottom:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.doc-info p{font-size:13.5px;color:var(--muted)}
-.req-badge{background:var(--red-bg);color:var(--red);font-size:11.5px;padding:2px 8px;border-radius:99px;font-weight:600}
-.file-name{
-  font-size:13px;color:var(--navy-500);margin-top:4px;
-  display:flex;align-items:center;gap:6px;word-break:break-all
-}
-.doc-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.status-tag{padding:5px 12px;border-radius:99px;font-size:12.5px;font-weight:600;white-space:nowrap}
-.status-tag.missing{background:var(--red-bg);color:var(--red)}
-.status-tag.pending-review{background:var(--amber-bg);color:var(--amber)}
-.status-tag.approved{background:var(--green-bg);color:var(--green)}
-
-.upload-zone{
-  border:2px dashed var(--line);border-radius:12px;padding:28px;text-align:center;
-  background:#fafbfd;transition:.2s;cursor:pointer;margin-bottom:20px
-}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--gold);background:#fdfaf4}
-.upload-zone .ic{font-size:34px;display:block;margin-bottom:8px}
-.upload-zone h4{font-size:15.5px;margin-bottom:4px}
-.upload-zone p{font-size:13.5px;color:var(--muted)}
-
-/* ---------- סרגל צד ---------- */
-.side-stat{display:flex;flex-direction:column;gap:14px}
-.stat-row{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.stat-row:last-child{border:none;padding-bottom:0}
-.stat-ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:18px;flex-shrink:0}
-.stat-row span{font-size:13px;color:var(--muted);display:block}
-.stat-row strong{font-size:15px}
-
-.contact-box{background:linear-gradient(135deg,#fdfaf4,#fff);border:1px solid var(--gold-light)}
-.contact-box .lawyer{display:flex;align-items:center;gap:13px;margin-bottom:16px}
-.contact-box .lawyer .avatar{width:48px;height:48px;font-size:17px;background:var(--navy)}
-.contact-box .lawyer h4{font-size:16px}
-.contact-box .lawyer span{font-size:13.5px;color:var(--muted)}
-.contact-lines{font-size:14px;display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-.contact-lines div{display:flex;align-items:center;gap:9px;color:var(--navy-700)}
-
-/* ---------- הודעות מהמשרד ---------- */
-.msg{padding:14px 16px;border-radius:11px;background:#fbfcfe;border:1px solid var(--line);margin-bottom:11px}
-.msg.important{background:var(--amber-bg);border-color:#f0dcb0}
-.msg-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:10px}
-.msg-head h5{font-size:14.5px}
-.msg-head time{font-size:12.5px;color:var(--muted);white-space:nowrap}
-.msg p{font-size:14px;color:#475569}
-
-.empty{text-align:center;padding:34px;color:var(--muted);font-size:14.5px}
-.empty .ic{font-size:38px;display:block;margin-bottom:8px;opacity:.5}
-
-/* ---------- טוסט ---------- */
-.toast{
-  position:fixed;bottom:26px;inset-inline-start:26px;background:var(--navy);color:#fff;
-  padding:14px 20px;border-radius:11px;box-shadow:var(--shadow-lg);font-size:14.5px;
-  display:flex;align-items:center;gap:10px;z-index:200;
-  transform:translateY(140%);transition:transform .3s cubic-bezier(.2,.8,.3,1)
-}
-.toast.show{transform:translateY(0)}
-.toast.ok{background:var(--green)}
-
-.footer-note{text-align:center;font-size:13px;color:var(--muted);margin-top:34px;line-height:1.9}
-
-@media (max-width:900px){
-  .login-wrap{grid-template-columns:1fr}
-  .login-brand{padding:44px 30px}
-  .login-brand h1{font-size:27px}
-  .grid-2{grid-template-columns:1fr}
-  .container{padding:20px 16px 48px}
-  .topbar{padding:0 16px}
-  .topbar .logo em{display:none}
-  .status-hero h2{font-size:22px}
-  .doc-row{flex-wrap:wrap}
-  .doc-actions{width:100%;justify-content:flex-end}
+.block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 22px;
+  margin: 0 0 20px;
 }
 
-/* ---------- שם המשרד במסך הכניסה ---------- */
-.firm-name{
-  font-size:14px;font-weight:700;letter-spacing:3px;color:var(--gold-light);
-  margin-bottom:14px;position:relative;z-index:1;direction:ltr;text-align:right
+/* ---- סרגל עליון ---- */
+.topbar {
+  background: var(--accent-dark);
+  color: #fff;
+  padding: 14px 18px;
+}
+.topbar-in {
+  max-width: 760px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 12px;
+  align-items: center; justify-content: space-between;
+}
+.topbar .firm { font-weight: 700; font-size: calc(18px * var(--scale)); }
+.topbar .who  { font-size: calc(16px * var(--scale)); }
+.topbar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---- כפתורים: מטרת מגע 48px+ ---- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; padding: 12px 24px;
+  font: inherit; font-weight: 700;
+  border-radius: 10px; border: 2px solid transparent;
+  cursor: pointer; text-decoration: none;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-outline { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+.btn-outline:hover { background: var(--accent-soft); }
+.btn-quiet {
+  background: transparent; color: #fff; border-color: #7f9bc9;
+  min-height: 44px; padding: 8px 16px;
+}
+.btn-quiet:hover { background: #ffffff22; }
+.btn-block { width: 100%; }
+
+/* ---- טופס ---- */
+.field { margin: 0 0 22px; }
+.field label { display: block; font-weight: 700; margin: 0 0 6px; }
+.field .hint { color: var(--text-soft); font-size: calc(16px * var(--scale)); margin: 0 0 8px; }
+
+.field input {
+  width: 100%; min-height: 56px;
+  padding: 12px 14px;
+  font: inherit; font-size: calc(20px * var(--scale));
+  color: var(--text); background: var(--surface);
+  border: 2px solid var(--border); border-radius: 10px;
+}
+.field input:focus-visible { border-color: var(--accent); }
+.field input[aria-invalid="true"] { border-color: #a32020; background: #fdeeee; }
+
+/* ---- הודעות ---- */
+.alert {
+  border-radius: 10px; padding: 14px 16px; margin: 0 0 20px;
+  border: 2px solid; font-weight: 600;
+}
+.alert-error { background: #fdeeee; border-color: #a32020; color: #7d1414; }
+.alert-note  { background: var(--accent-soft); border-color: var(--accent); }
+.alert[hidden] { display: none; }
+
+/* ---- מצב התביעה ---- */
+.status { text-align: center; }
+.status .step-of {
+  display: inline-block;
+  background: var(--accent-soft); color: var(--accent-dark);
+  border-radius: 999px; padding: 6px 20px;
+  font-weight: 700; font-size: calc(18px * var(--scale));
+  margin: 0 0 12px;
+}
+.status .step-name { font-size: calc(27px * var(--scale)); margin: 0 0 10px; }
+.status .step-what { color: var(--text-soft); margin: 0 0 20px; }
+
+.bar {
+  height: 20px; background: var(--wait-soft);
+  border: 1px solid var(--border); border-radius: 999px; overflow: hidden;
+}
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.bar-note { font-size: calc(16px * var(--scale)); color: var(--text-soft); margin: 8px 0 0; }
+
+/* ---- "מה עליי לעשות" ---- */
+.todo { border: 2px solid var(--warn); background: var(--warn-soft); }
+.todo.done { border-color: var(--ok); background: var(--ok-soft); }
+
+/* ---- רשימות ---- */
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.plain-list > li {
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+.plain-list > li:first-child { border-top: 0; padding-top: 0; }
+.plain-list > li:last-child { padding-bottom: 0; }
+
+.item-note { color: var(--text-soft); font-size: calc(17px * var(--scale)); margin: 0; }
+.item-when { font-weight: 700; margin: 6px 0 0; }
+
+/* ---- תגי סטטוס: סמל + טקסט, לא צבע בלבד ---- */
+.tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; padding: 4px 14px; margin: 0 0 6px;
+  font-size: calc(16px * var(--scale)); font-weight: 700;
+  border: 2px solid;
+}
+.tag-ok   { background: var(--ok-soft);   border-color: var(--ok);   color: var(--ok); }
+.tag-warn { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.tag-wait { background: var(--wait-soft); border-color: var(--wait); color: var(--wait); }
+.tag-stop { background: var(--stop-soft); border-color: var(--stop); color: var(--stop); }
+
+/* סיבת דחייה - הלקוח חייב להבין למה המסמך לא התקבל */
+.reject-note {
+  background: var(--stop-soft);
+  border-inline-start: 5px solid var(--stop);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 10px 0 0;
+  font-size: calc(17px * var(--scale));
+  font-weight: 600;
+}
+
+/* ---- שלבי התביעה ---- */
+.steps { list-style: none; margin: 0; padding: 0; }
+.steps > li {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 0; border-top: 1px solid var(--border);
+}
+.steps > li:first-child { border-top: 0; }
+.steps .mark {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: calc(17px * var(--scale));
+  border: 2px solid var(--border); background: var(--surface); color: var(--text-soft);
+}
+.steps .done  .mark { background: var(--ok); border-color: var(--ok); color: #fff; }
+.steps .now   .mark { background: var(--accent); border-color: var(--accent); color: #fff; }
+.steps .now { background: var(--accent-soft); border-radius: 10px; padding-inline: 12px; }
+.steps .name { font-weight: 700; }
+.steps .when { color: var(--text-soft); font-size: calc(16px * var(--scale)); }
+
+/* ---- מסמכים ---- */
+.doc-actions { margin: 12px 0 0; }
+.file-name {
+  display: block; color: var(--text-soft);
+  font-size: calc(16px * var(--scale)); margin: 4px 0 0;
+  word-break: break-all;
+}
+
+/* ---- יצירת קשר ---- */
+.contact-name { font-weight: 700; font-size: calc(21px * var(--scale)); }
+.contact-role { color: var(--text-soft); margin: 0 0 16px; }
+.contact-btns { display: flex; flex-direction: column; gap: 12px; }
+
+/* ---- הודעה צפה ---- */
+.toast {
+  position: fixed; inset-inline: 16px; bottom: 16px;
+  max-width: 560px; margin: 0 auto;
+  background: var(--accent-dark); color: #fff;
+  padding: 16px 20px; border-radius: 10px;
+  font-weight: 700; text-align: center;
+  box-shadow: 0 6px 24px #0003;
+}
+.toast[hidden] { display: none; }
+
+.small-print {
+  color: var(--text-soft);
+  font-size: calc(16px * var(--scale));
+  text-align: center;
+  margin: 32px 0 0;
+}
+
+/* ---- מסך כניסה ---- */
+.login { max-width: 520px; margin: 0 auto; padding: 40px 18px 64px; }
+.login-head { text-align: center; margin: 0 0 28px; }
+.login-head .firm {
+  font-weight: 700; letter-spacing: .5px;
+  color: var(--accent-dark); margin: 0 0 8px;
+}
+.demo-box {
+  background: var(--wait-soft); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 18px; margin: 24px 0 0;
+  font-size: calc(16px * var(--scale));
+}
+.demo-box code {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 2px 8px; font-size: 1em;
+}
+
+/* ---- העדפות משתמש ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+@media (prefers-contrast: more) {
+  :root { --border: #14203a; --text-soft: #14203a; }
+}
+
+@media (max-width: 520px) {
+  body { font-size: calc(18px * var(--scale)); }
+  .page { padding: 18px 14px 56px; }
+  .block { padding: 20px 16px; }
+  .btn { width: 100%; }
+  .topbar-in { justify-content: center; text-align: center; }
+}
+
+@media print {
+  .topbar-actions, .btn, .toast { display: none !important; }
+  body { background: #fff; font-size: 12pt; }
 }

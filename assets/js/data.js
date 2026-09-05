@@ -136,40 +136,174 @@ const DEMO_CLIENTS = {
   }
 };
 
-/* ---- שכבת אחסון: מיזוג נתוני הדגמה עם שינויים מקומיים ---- */
-const CaseStore = {
-  KEY: 'bl_case_overrides_v1',
+/* ---- צוות המשרד (הדגמה בלבד - ראה docs/) ---- */
+const DEMO_STAFF = {
+  'nahmani':  { password: 'office2026', name: 'עו"ד אופיר נחמני', role: 'שותפה, מחלקת ביטוח לאומי' },
+  'bendahan': { password: 'office2026', name: 'עו"ד בן דהן',      role: 'ראש מחלקת נפגעי עבודה' }
+};
 
-  /** טוען את תיק הלקוח כולל שינויים שנשמרו מקומית (העלאות מסמכים) */
+/* ==========================================================
+   שכבת אחסון: מיזוג נתוני הדגמה עם שינויים מקומיים
+   ----------------------------------------------------------
+   מבנה ה-override לכל לקוח:
+     { documents: { <docId>: patch },
+       caseInfo:  { currentStage, stageEnteredAt, stageDates },
+       messages:  [ עדכונים שהמשרד שלח ] }
+   ========================================================== */
+const CaseStore = {
+  KEY:     'bl_case_overrides_v2',
+  LOG_KEY: 'bl_office_log_v1',
+
+  /** טוען את תיק הלקוח כולל כל השינויים שנשמרו מקומית */
   load(idNumber) {
     const base = DEMO_CLIENTS[idNumber];
     if (!base) return null;
+
     const data = JSON.parse(JSON.stringify(base.caseFile));
-    const all = this._overrides();
-    const mine = all[idNumber];
-    if (mine && mine.documents) {
+    const mine = this._overrides()[idNumber];
+    if (!mine) return data;
+
+    if (mine.documents) {
       data.documents = data.documents.map(doc =>
         mine.documents[doc.id] ? Object.assign({}, doc, mine.documents[doc.id]) : doc
       );
     }
+    if (mine.caseInfo) {
+      const dates = Object.assign({}, data.stageDates, mine.caseInfo.stageDates);
+      Object.assign(data, mine.caseInfo);
+      data.stageDates = dates;
+    }
+    if (mine.messages && mine.messages.length) {
+      data.messages = mine.messages.concat(data.messages);
+    }
     return data;
+  },
+
+  /** סיכום כל התיקים - עבור מסך הניהול */
+  list() {
+    return Object.keys(DEMO_CLIENTS).map(id => {
+      const client = DEMO_CLIENTS[id];
+      const file   = this.load(id);
+      return {
+        idNumber:    id,
+        name:        client.profile.name,
+        phone:       client.profile.phone,
+        caseNumber:  file.caseNumber,
+        claimType:   file.claimType,
+        branch:      file.branch,
+        lawyer:      file.lawyer,
+        currentStage: file.currentStage,
+        stageTitle:  CLAIM_STAGES[file.currentStage - 1].title,
+        nextHearing: file.nextHearing,
+        waiting:     file.documents.filter(d => d.status === 'pending-review').length,
+        open:        file.documents.filter(d => DOC_NEEDS_UPLOAD(d) && d.required).length
+      };
+    });
+  },
+
+  /** מעדכן את השלב הנוכחי ומתעד תאריכי השלמה לשלבים שמאחור */
+  setStage(idNumber, stage, staffName) {
+    const base = DEMO_CLIENTS[idNumber];
+    if (!base) return;
+    const today = this._today();
+
+    this._patch(idNumber, mine => {
+      const info  = mine.caseInfo || (mine.caseInfo = {});
+      const dates = info.stageDates || (info.stageDates = {});
+      const known = Object.assign({}, base.caseFile.stageDates, dates);
+
+      // שלב שהושלם ואין לו תאריך מתועד - מקבל את תאריך העדכון
+      for (let s = 1; s < stage; s++) {
+        if (!known[s]) dates[s] = today;
+      }
+      info.currentStage   = stage;
+      info.stageEnteredAt = today;
+    });
+
+    this._addLog(idNumber, staffName,
+      'עדכן את התיק לשלב ' + stage + ' - ' + CLAIM_STAGES[stage - 1].title);
+  },
+
+  /** אישור או דחייה של מסמך שהלקוח העלה */
+  reviewDocument(idNumber, docId, decision, reason, staffName) {
+    const file = this.load(idNumber);
+    const doc  = file && file.documents.find(d => d.id === docId);
+    const name = doc ? doc.name : docId;
+
+    this.saveDocument(idNumber, docId, decision === 'approved'
+      ? { status: 'approved', rejectReason: null }
+      : { status: 'rejected',  rejectReason: reason });
+
+    this._addLog(idNumber, staffName, decision === 'approved'
+      ? 'אישר את המסמך "' + name + '"'
+      : 'דחה את המסמך "' + name + '" - ' + reason);
   },
 
   /** שומר סטטוס/קובץ עבור מסמך מסוים */
   saveDocument(idNumber, docId, patch) {
+    this._patch(idNumber, mine => {
+      const docs = mine.documents || (mine.documents = {});
+      docs[docId] = Object.assign({}, docs[docId], patch);
+    });
+  },
+
+  /** שולח עדכון ללקוח - מופיע בראש "עדכונים מהמשרד" */
+  addMessage(idNumber, msg, staffName) {
+    this._patch(idNumber, mine => {
+      const list = mine.messages || (mine.messages = []);
+      list.unshift({
+        title:     msg.title,
+        body:      msg.body,
+        important: !!msg.important,
+        date:      this._today(),
+        from:      staffName
+      });
+    });
+    this._addLog(idNumber, staffName, 'שלח עדכון ללקוח: "' + msg.title + '"');
+  },
+
+  /** יומן פעולות הצוות - מי עשה מה ומתי */
+  log() {
+    try { return JSON.parse(localStorage.getItem(this.LOG_KEY)) || []; }
+    catch (e) { return []; }
+  },
+
+  _addLog(idNumber, staffName, text) {
+    const client = DEMO_CLIENTS[idNumber];
+    const log = this.log();
+    log.unshift({
+      at:     new Date().toISOString(),
+      staff:  staffName || 'לא ידוע',
+      client: client ? client.profile.name : idNumber,
+      text:   text
+    });
+    try { localStorage.setItem(this.LOG_KEY, JSON.stringify(log.slice(0, 100))); }
+    catch (e) {}
+  },
+
+  _patch(idNumber, fn) {
     const all = this._overrides();
-    all[idNumber] = all[idNumber] || { documents: {} };
-    all[idNumber].documents[docId] = Object.assign({}, all[idNumber].documents[docId], patch);
-    localStorage.setItem(this.KEY, JSON.stringify(all));
+    all[idNumber] = all[idNumber] || {};
+    fn(all[idNumber]);
+    try { localStorage.setItem(this.KEY, JSON.stringify(all)); } catch (e) {}
   },
 
   _overrides() {
     try { return JSON.parse(localStorage.getItem(this.KEY)) || {}; }
     catch (e) { return {}; }
+  },
+
+  _today() {
+    return new Date().toISOString().slice(0, 10);
   }
 };
 
-/* ---- אימות (הדגמה בלבד - ראה docs/ לגבי מימוש שרת) ---- */
+/** מסמך שהלקוח עדיין צריך להעלות - חסר, או שנדחה וצריך העלאה מחדש */
+function DOC_NEEDS_UPLOAD(doc) {
+  return doc.status === 'missing' || doc.status === 'rejected';
+}
+
+/* ---- אימות לקוח (הדגמה בלבד - ראה docs/ לגבי מימוש שרת) ---- */
 const Auth = {
   KEY: 'bl_session_v1',
 
@@ -195,5 +329,27 @@ const Auth = {
     const u = this.current();
     if (!u) { location.replace('index.html'); return null; }
     return u;
+  }
+};
+
+/* ---- אימות צוות המשרד (הדגמה בלבד) ---- */
+const StaffAuth = {
+  KEY: 'bl_staff_session_v1',
+
+  login(username, password) {
+    const s = DEMO_STAFF[String(username).trim().toLowerCase()];
+    if (!s || s.password !== password) return false;
+    sessionStorage.setItem(this.KEY, JSON.stringify({ name: s.name, role: s.role }));
+    return true;
+  },
+
+  current() {
+    try { return JSON.parse(sessionStorage.getItem(this.KEY)); }
+    catch (e) { return null; }
+  },
+
+  logout() {
+    sessionStorage.removeItem(this.KEY);
+    location.reload();
   }
 };

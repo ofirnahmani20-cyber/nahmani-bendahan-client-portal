@@ -3,98 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>כניסת לקוחות | משרד עורכי הדין NAHMANI-BENDAHAN</title>
-<meta name="description" content="אזור אישי ללקוחות המשרד - מעקב אחר שלבי תביעת הביטוח הלאומי והעלאת מסמכים.">
+<title>כניסה לאזור האישי | משרד עורכי הדין NAHMANI-BENDAHAN</title>
+<meta name="description" content="כניסה לאזור האישי - מעקב אחר תביעת הביטוח הלאומי שלך.">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
-<div class="login-wrap">
+<a class="skip-link" href="#main">דילוג לתוכן</a>
 
-  <!-- צד מיתוג -->
-  <section class="login-brand">
-    <div class="scales">⚖️</div>
-    <div class="firm-name">NAHMANI-BENDAHAN</div>
-    <h1>האזור האישי<br>ללקוחות המשרד</h1>
-    <p>מעקב שקוף ומלא אחר תביעת הביטוח הלאומי שלך - בכל שעה, מכל מכשיר.</p>
+<main class="login" id="main">
 
-    <div class="brand-points">
-      <div><span>📍</span> השלב המדויק שבו נמצאת התביעה</div>
-      <div><span>🗺️</span> הצעדים הבאים ולוחות הזמנים הצפויים</div>
-      <div><span>📄</span> רשימת המסמכים החסרים והעלאתם ישירות באתר</div>
-      <div><span>💬</span> עדכונים והודעות מהצוות המטפל בתיק</div>
-    </div>
-  </section>
+  <div class="login-head">
+    <p class="firm">משרד עורכי הדין NAHMANI-BENDAHAN</p>
+    <h1>כניסה לאזור האישי</h1>
+    <p class="lead">כאן אפשר לראות איפה התביעה שלך עומדת ומה צריך להשלים.</p>
+  </div>
 
-  <!-- צד טופס -->
-  <section class="login-form-side">
-    <div class="login-card">
-      <h2>כניסה לאזור האישי</h2>
-      <p class="sub">הזדהות באמצעות מספר תעודת זהות והקוד האישי שנמסר לך.</p>
+  <div class="block">
 
-      <div class="alert err" id="loginError" role="alert"></div>
+    <div class="alert alert-error" id="loginError" role="alert" hidden></div>
 
-      <form id="loginForm" novalidate>
-        <div class="field">
-          <label for="idNumber">מספר תעודת זהות</label>
-          <input type="text" id="idNumber" inputmode="numeric" autocomplete="username"
-                 maxlength="9" placeholder="9 ספרות" required>
-        </div>
+    <form id="loginForm" novalidate>
 
-        <div class="field">
-          <label for="password">קוד אישי</label>
-          <input type="password" id="password" autocomplete="current-password"
-                 placeholder="הקוד שנמסר במשרד" required>
-        </div>
-
-        <button type="submit" class="btn btn-primary">כניסה לאזור האישי ←</button>
-      </form>
-
-      <div class="demo-hint">
-        <b>חשבונות הדגמה</b>
-        ת״ז <code>123456782</code> · קוד <code>1234</code> — תיק בשלב ועדה רפואית<br>
-        ת״ז <code>987654321</code> · קוד <code>1234</code> — תיק בשלב ערר
+      <div class="field">
+        <label for="idNumber">מספר תעודת זהות</label>
+        <p class="hint" id="idHint">9 ספרות, בלי מקף</p>
+        <input type="text" id="idNumber" name="idNumber"
+               inputmode="numeric" autocomplete="username"
+               maxlength="9" aria-describedby="idHint" required>
       </div>
 
-      <p class="footer-note">
-        נתקלת בבעיה בהתחברות? התקשר למשרד: 03-5551234<br>
-        המידע באזור האישי חסוי ומיועד ללקוח בלבד.
-      </p>
-    </div>
-  </section>
+      <div class="field">
+        <label for="password">קוד אישי</label>
+        <p class="hint" id="pwHint">הקוד בן 4 הספרות שקיבלת מהמשרד</p>
+        <input type="password" id="password" name="password"
+               inputmode="numeric" autocomplete="current-password"
+               aria-describedby="pwHint" required>
+      </div>
 
-</div>
+      <button type="submit" class="btn btn-primary btn-block">כניסה</button>
+
+    </form>
+
+    <div class="demo-box">
+      <strong>חשבונות להתנסות</strong><br>
+      תעודת זהות <code>123456782</code> · קוד <code>1234</code><br>
+      תעודת זהות <code>987654321</code> · קוד <code>1234</code>
+    </div>
+
+  </div>
+
+  <p class="small-print">
+    לא מצליחים להיכנס? התקשרו למשרד: <a href="tel:035551234">03-5551234</a><br>
+    המידע באזור האישי חסוי ומיועד ללקוח בלבד.
+  </p>
+
+</main>
 
 <script src="assets/js/data.js"></script>
 <script>
-  // אם המשתמש כבר מחובר - מעבר ישיר לאזור האישי
+  // מי שכבר מחובר מועבר ישירות לאזור האישי
   if (Auth.current()) location.replace('dashboard.html');
 
-  const form = document.getElementById('loginForm');
-  const errBox = document.getElementById('loginError');
+  var form   = document.getElementById('loginForm');
+  var idBox  = document.getElementById('idNumber');
+  var pwBox  = document.getElementById('password');
+  var errBox = document.getElementById('loginError');
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    const id = document.getElementById('idNumber').value.trim();
-    const pw = document.getElementById('password').value;
 
-    errBox.classList.remove('show');
+    var id = idBox.value.trim();
+    var pw = pwBox.value;
+
+    clearError();
 
     if (id.length !== 9 || !/^\d+$/.test(id)) {
-      return showError('מספר תעודת הזהות חייב להכיל 9 ספרות.');
+      return showError('מספר תעודת הזהות צריך להיות 9 ספרות.', idBox);
     }
     if (!pw) {
-      return showError('נא להזין את הקוד האישי.');
+      return showError('צריך להזין את הקוד האישי.', pwBox);
     }
     if (!Auth.login(id, pw)) {
-      return showError('פרטי ההזדהות שגויים. יש לוודא את מספר תעודת הזהות והקוד האישי.');
+      return showError('מספר תעודת הזהות או הקוד האישי אינם נכונים. אפשר לנסות שוב.', idBox);
     }
+
     location.href = 'dashboard.html';
   });
 
-  function showError(msg) {
+  function showError(msg, focusOn) {
     errBox.textContent = msg;
-    errBox.classList.add('show');
+    errBox.hidden = false;
+    if (focusOn) {
+      focusOn.setAttribute('aria-invalid', 'true');
+      focusOn.focus();
+    }
+  }
+
+  function clearError() {
+    errBox.hidden = true;
+    idBox.removeAttribute('aria-invalid');
+    pwBox.removeAttribute('aria-invalid');
   }
 </script>
 </body>

@@ -1,242 +1,330 @@
 /* ==========================================================
-   dashboard.js - לוגיקת האזור האישי
+   dashboard.js - רינדור האזור האישי
+   ----------------------------------------------------------
+   מבנה: טור אחד, לפי סדר החשיבות ללקוח -
+   איפה התיק עומד -> מה עליי לעשות -> מסמכים -> המשך -> קשר.
    ========================================================== */
 
-const user = Auth.requireLogin();
-if (user) {
+(function () {
+  'use strict';
 
-  const caseFile = CaseStore.load(user.idNumber);
-  let activeFilter = 'all';
-  let targetDocId = null;   // המסמך שאליו משויכת ההעלאה הנוכחית
+  var user = Auth.requireLogin();
+  if (!user) return;
 
-  const $ = id => document.getElementById(id);
-  const initials = name => name.split(' ').map(w => w[0]).slice(0, 2).join('');
-  const fmt = d => d ? new Date(d).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  var caseFile = CaseStore.load(user.idNumber);
+  if (!caseFile) { Auth.logout(); return; }
 
-  const STATUS_TEXT = { missing: 'חסר', 'pending-review': 'בבדיקת המשרד', approved: 'התקבל ואושר' };
-  const STATUS_ICON = { missing: '⚠️', 'pending-review': '🕓', approved: '✅' };
+  var $ = function (id) { return document.getElementById(id); };
 
-  /* ---------- כותרת עליונה ---------- */
-  $('userInitials').textContent = initials(user.name);
-  $('userName').textContent = user.name;
-  $('greeting').textContent = 'שלום ' + user.name;
-  $('caseSummary').textContent =
-    'תיק מספר ' + caseFile.caseNumber + ' · ' + caseFile.claimType + ' · נפתח בתאריך ' + fmt(caseFile.openedAt);
-  $('logoutBtn').addEventListener('click', () => Auth.logout());
+  /* ---- עזרי טקסט ---- */
 
-  /* ---------- כרטיס סטטוס ---------- */
-  const stage = CLAIM_STAGES.find(s => s.id === caseFile.currentStage);
-  $('stageTitle').textContent = 'שלב ' + stage.id + ' מתוך ' + CLAIM_STAGES.length + ': ' + stage.title;
-  $('stageDesc').textContent = stage.desc;
-  $('metaCase').textContent = caseFile.caseNumber;
-  $('metaType').textContent = caseFile.claimType;
-  $('metaBranch').textContent = caseFile.branch;
-  $('metaSince').textContent = fmt(caseFile.stageEnteredAt);
-
-  const pct = Math.round((caseFile.currentStage / CLAIM_STAGES.length) * 100);
-  $('progressText').textContent = 'הושלמו ' + (caseFile.currentStage - 1) + ' שלבים מתוך ' + CLAIM_STAGES.length;
-  $('progressPct').textContent = pct + '%';
-  setTimeout(() => { $('progressFill').style.width = pct + '%'; }, 120);
-
-  /* ---------- ציר השלבים ---------- */
-  $('timeline').innerHTML = CLAIM_STAGES.map(s => {
-    const state = s.id < caseFile.currentStage ? 'done'
-                : s.id === caseFile.currentStage ? 'current' : 'pending';
-    const pillText = { done: 'הושלם', current: 'בשלב זה כעת', pending: 'ממתין' }[state];
-    const date = state === 'done' ? caseFile.stageDates[s.id]
-               : state === 'current' ? caseFile.stageEnteredAt : null;
-    const dateLine = date
-      ? '<div class="step-date">🗓️ ' + (state === 'done' ? 'הושלם ב-' : 'החל ב-') + fmt(date) + '</div>'
-      : '';
-    return '' +
-      '<div class="step ' + state + '">' +
-        '<div class="step-dot">' + (state === 'done' ? '✓' : s.id) + '</div>' +
-        '<div class="step-body">' +
-          '<h4>' + s.title + ' <span class="pill ' + state + '">' + pillText + '</span></h4>' +
-          '<p>' + s.desc + '</p>' + dateLine +
-        '</div>' +
-      '</div>';
-  }).join('');
-
-  /* ---------- הצעדים הבאים ---------- */
-  $('nextSteps').innerHTML = caseFile.nextSteps.map((n, i) =>
-    '<div class="next-item">' +
-      '<div class="num">' + (i + 1) + '</div>' +
-      '<div><h5>' + n.title + '</h5><p>' + n.desc + '</p>' +
-      '<div class="eta">🕒 ' + n.eta + '</div></div>' +
-    '</div>'
-  ).join('');
-
-  /* ---------- מסמכים ---------- */
-  function countBy(status) {
-    return caseFile.documents.filter(d => d.status === status).length;
+  /** ממיר 2026-09-22 ל-22.09.2026 */
+  function formatDate(iso) {
+    if (!iso) return '';
+    var p = iso.split('-');
+    return p[2] + '.' + p[1] + '.' + p[0];
   }
 
-  function renderTabs() {
-    const tabs = [
-      { key: 'all',            label: 'הכל',            n: caseFile.documents.length },
-      { key: 'missing',        label: 'מסמכים חסרים',   n: countBy('missing') },
-      { key: 'pending-review', label: 'בבדיקת המשרד',   n: countBy('pending-review') },
-      { key: 'approved',       label: 'אושרו',          n: countBy('approved') }
-    ];
-    $('docTabs').innerHTML = tabs.map(t =>
-      '<button class="doc-tab' + (activeFilter === t.key ? ' active' : '') + '" data-filter="' + t.key + '">' +
-        t.label + '<span class="count">' + t.n + '</span></button>'
-    ).join('');
+  /** "מסמך אחד" / "3 מסמכים" - עברית תקינה גם ביחיד */
+  function countDocs(n) {
+    return n === 1 ? 'מסמך אחד' : n + ' מסמכים';
+  }
 
-    $('docTabs').querySelectorAll('.doc-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        activeFilter = btn.dataset.filter;
-        renderTabs();
-        renderDocs();
-      });
+  var STATUS = {
+    'approved':       { tag: 'tag-ok',   mark: '✓', text: 'התקבל ואושר' },
+    'pending-review': { tag: 'tag-wait', mark: '●', text: 'אצלנו בבדיקה' },
+    'missing':        { tag: 'tag-warn', mark: '!', text: 'צריך להעלות' },
+    'rejected':       { tag: 'tag-stop', mark: '✗', text: 'צריך להעלות מחדש' }
+  };
+
+  /** תווית הכפתור משתנה לפי הסיבה שהמסמך חסר */
+  function uploadLabel(doc) {
+    return doc.status === 'rejected' ? 'העלאת מסמך מתוקן' : 'העלאת המסמך';
+  }
+
+  /* ---- 1. כותרת ומצב התביעה ---- */
+
+  function renderStatus() {
+    var stage = CLAIM_STAGES[caseFile.currentStage - 1];
+    var total = CLAIM_STAGES.length;
+    var pct   = Math.round((caseFile.currentStage / total) * 100);
+
+    $('userName').textContent = user.name;
+    $('greeting').textContent = 'שלום ' + user.name.split(' ')[0];
+    $('caseSummary').textContent =
+      'תביעת ' + caseFile.claimType + ' · תיק מספר ' + caseFile.caseNumber;
+
+    $('stepOf').textContent   = 'שלב ' + caseFile.currentStage + ' מתוך ' + total;
+    $('stepName').textContent = stage.title;
+    $('stepWhat').textContent = stage.desc;
+
+    $('progressFill').style.width = pct + '%';
+    $('progressBar').setAttribute('aria-label',
+      'התקדמות התביעה: ' + pct + ' אחוז, שלב ' + caseFile.currentStage + ' מתוך ' + total);
+    $('progressNote').textContent =
+      'בשלב הזה מאז ' + formatDate(caseFile.stageEnteredAt) + ' · ' + pct + '% מהדרך';
+  }
+
+  /* ---- 2. מה עליי לעשות עכשיו ---- */
+
+  function renderTodo() {
+    var required = caseFile.documents.filter(function (d) {
+      return d.required && DOC_NEEDS_UPLOAD(d);
     });
-  }
+    var block = $('todoBlock');
+    var body  = $('todoBody');
 
-  function renderDocs() {
-    const list = activeFilter === 'all'
-      ? caseFile.documents
-      : caseFile.documents.filter(d => d.status === activeFilter);
+    body.textContent = '';
 
-    if (!list.length) {
-      $('docList').innerHTML =
-        '<div class="empty"><span class="ic">🎉</span>אין מסמכים בקטגוריה זו.</div>';
+    if (required.length === 0) {
+      block.classList.add('done');
+      body.appendChild(el('p', null,
+        'אין כרגע משימות פתוחות. כל המסמכים הדרושים התקבלו - המשרד ממשיך לטפל בתיק ויעדכן אותך.'));
       return;
     }
 
-    $('docList').innerHTML = list.map(d => {
-      const reqBadge = d.required && d.status === 'missing' ? '<span class="req-badge">חובה</span>' : '';
-      const fileLine = d.file
-        ? '<div class="file-name">📎 ' + d.file + ' · הועלה ב-' + fmt(d.date) + '</div>'
-        : '';
-      const action = d.status === 'approved'
-        ? '<button class="btn btn-ghost btn-sm" data-upload="' + d.id + '">החלפה</button>'
-        : '<button class="btn btn-gold btn-sm" data-upload="' + d.id + '">' +
-            (d.status === 'missing' ? 'העלאה' : 'החלפה') + '</button>';
+    block.classList.remove('done');
+    body.appendChild(el('p', null,
+      'צריך להשלים ' + countDocs(required.length) + ' כדי שנוכל להמשיך בתביעה. אפשר להעלות אותם כאן באתר.'));
 
-      return '' +
-        '<div class="doc-row ' + d.status + '">' +
-          '<div class="doc-icon">' + STATUS_ICON[d.status] + '</div>' +
-          '<div class="doc-info">' +
-            '<h4>' + d.name + reqBadge + '</h4>' +
-            '<p>' + d.note + '</p>' + fileLine +
-          '</div>' +
-          '<div class="doc-actions">' +
-            '<span class="status-tag ' + d.status + '">' + STATUS_TEXT[d.status] + '</span>' +
-            action +
-          '</div>' +
-        '</div>';
-    }).join('');
+    var list = el('ul', 'plain-list');
+    required.forEach(function (doc) {
+      var li = el('li');
+      li.appendChild(el('h3', null, doc.name));
+      li.appendChild(el('p', 'item-note', doc.note));
+      if (doc.status === 'rejected' && doc.rejectReason) {
+        li.appendChild(el('p', 'reject-note', 'המשרד ביקש להעלות מחדש: ' + doc.rejectReason));
+      }
+      li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+      list.appendChild(li);
+    });
+    body.appendChild(list);
 
-    $('docList').querySelectorAll('[data-upload]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        targetDocId = btn.dataset.upload;
-        $('fileInput').click();
-      });
+    if (caseFile.nextHearing) {
+      body.appendChild(el('p', 'item-when',
+        'חשוב להשלים לפני הדיון הקרוב ב-' + formatDate(caseFile.nextHearing) + '.'));
+    }
+  }
+
+  /* ---- 3. המסמכים שלי ---- */
+
+  function renderDocs() {
+    var docs = caseFile.documents.slice().sort(function (a, b) {
+      // הנדחים למעלה, אחריהם החסרים, אחר כך בבדיקה, ולבסוף המאושרים
+      var order = { 'rejected': 0, 'missing': 1, 'pending-review': 2, 'approved': 3 };
+      return order[a.status] - order[b.status];
+    });
+
+    var approved = docs.filter(function (d) { return d.status === 'approved'; }).length;
+    $('docsIntro').textContent =
+      approved + ' מתוך ' + docs.length + ' המסמכים כבר אצלנו. המסמכים שצריך להשלים מופיעים ראשונים.';
+
+    var list = $('docList');
+    list.textContent = '';
+
+    docs.forEach(function (doc) {
+      var s  = STATUS[doc.status];
+      var li = el('li');
+
+      var tag = el('span', 'tag ' + s.tag);
+      tag.appendChild(el('span', null, s.mark, true));
+      tag.appendChild(document.createTextNode(s.text));
+      li.appendChild(tag);
+
+      li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
+      li.appendChild(el('p', 'item-note', doc.note));
+
+      if (doc.file) {
+        li.appendChild(el('span', 'file-name',
+          'הקובץ שהתקבל: ' + doc.file + ' · ' + formatDate(doc.date)));
+      }
+
+      if (doc.status === 'rejected' && doc.rejectReason) {
+        li.appendChild(el('p', 'reject-note', 'סיבת הדחייה: ' + doc.rejectReason));
+      }
+
+      if (DOC_NEEDS_UPLOAD(doc)) {
+        li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+      }
+
+      list.appendChild(li);
     });
   }
 
-  /* ---------- מבט מהיר ---------- */
-  function renderStats() {
-    const missing = countBy('missing');
-    const rows = [
-      { ic: '⚠️', bg: 'var(--red-bg)',   label: 'מסמכים חסרים',   val: missing + (missing === 1 ? ' מסמך' : ' מסמכים') },
-      { ic: '🕓', bg: 'var(--amber-bg)', label: 'בבדיקת המשרד',   val: countBy('pending-review') + ' מסמכים' },
-      { ic: '✅', bg: 'var(--green-bg)', label: 'התקבלו ואושרו',  val: countBy('approved') + ' מסמכים' },
-      { ic: '📅', bg: 'var(--blue-bg)',  label: 'המועד הקרוב',    val: fmt(caseFile.nextHearing) }
-    ];
-    $('sideStats').innerHTML = rows.map(r =>
-      '<div class="stat-row">' +
-        '<div class="stat-ic" style="background:' + r.bg + '">' + r.ic + '</div>' +
-        '<div><span>' + r.label + '</span><strong>' + r.val + '</strong></div>' +
-      '</div>'
-    ).join('');
+  /* ---- 4. מה יקרה בהמשך ---- */
+
+  function renderNextSteps() {
+    var list = $('nextSteps');
+    list.textContent = '';
+
+    caseFile.nextSteps.forEach(function (step) {
+      var li = el('li');
+      li.appendChild(el('h3', null, step.title));
+      li.appendChild(el('p', 'item-note', step.desc));
+      li.appendChild(el('p', 'item-when', 'מתי: ' + step.eta));
+      list.appendChild(li);
+    });
   }
 
-  /* ---------- הודעות ---------- */
-  $('messages').innerHTML = caseFile.messages.map(m =>
-    '<div class="msg' + (m.important ? ' important' : '') + '">' +
-      '<div class="msg-head"><h5>' + (m.important ? '📌 ' : '') + m.title + '</h5>' +
-      '<time>' + fmt(m.date) + '</time></div>' +
-      '<p>' + m.body + '</p>' +
-    '</div>'
-  ).join('');
+  /* ---- 5. כל שלבי התביעה ---- */
 
-  /* ---------- הצוות המטפל ---------- */
-  const L = caseFile.lawyer;
-  $('lawyerInitials').textContent = initials(L.name.replace(/^עו"ד\s*/, ''));
-  $('lawyerName').textContent = L.name;
-  $('lawyerRole').textContent = L.role;
-  $('lawyerPhone').textContent = L.phone;
-  $('lawyerPhone').href = 'tel:' + L.phone.replace(/-/g, '');
-  $('lawyerEmail').textContent = L.email;
-  $('lawyerEmail').href = 'mailto:' + L.email;
-  $('callBtn').href = 'mailto:' + L.email +
-    '?subject=' + encodeURIComponent('בקשת שיחה חוזרת - תיק ' + caseFile.caseNumber) +
-    '&body=' + encodeURIComponent('שלום,\nאשמח לשיחה חוזרת בנוגע לתיק ' + caseFile.caseNumber + '.\n\n' + user.name + '\n' + user.phone);
+  function renderStages() {
+    var list = $('stepsList');
+    list.textContent = '';
 
-  /* ---------- העלאת קבצים ---------- */
-  const MAX_MB = 10;
-  const OK_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+    CLAIM_STAGES.forEach(function (stage) {
+      var state = stage.id < caseFile.currentStage ? 'done'
+                : stage.id === caseFile.currentStage ? 'now'
+                : 'wait';
 
-  function handleFile(file) {
-    if (!file) return;
+      var li = el('li', state);
 
-    if (OK_TYPES.indexOf(file.type) === -1) {
-      return toast('סוג הקובץ אינו נתמך. ניתן להעלות PDF, JPG או PNG בלבד.', false);
+      var mark = el('span', 'mark', state === 'done' ? '✓' : String(stage.id), true);
+      li.appendChild(mark);
+
+      var body = el('div');
+      body.appendChild(el('span', 'name', stage.title));
+
+      var doneOn = caseFile.stageDates[stage.id];
+      var label = state === 'done' ? (doneOn ? 'הושלם ב-' + formatDate(doneOn) : 'הושלם')
+                : state === 'now'  ? 'כאן נמצא התיק עכשיו'
+                : 'עוד לא התחיל';
+      body.appendChild(el('div', 'when', label));
+
+      li.appendChild(body);
+      list.appendChild(li);
+    });
+  }
+
+  /* ---- 6. עדכונים ---- */
+
+  function renderMessages() {
+    var list = $('messages');
+    list.textContent = '';
+
+    caseFile.messages.forEach(function (msg) {
+      var li = el('li');
+      if (msg.important) {
+        var tag = el('span', 'tag tag-warn');
+        tag.appendChild(el('span', null, '!', true));
+        tag.appendChild(document.createTextNode('עדכון חשוב'));
+        li.appendChild(tag);
+      }
+      li.appendChild(el('h3', null, msg.title));
+      li.appendChild(el('p', 'item-note', msg.body));
+      li.appendChild(el('p', 'item-when',
+        formatDate(msg.date) + (msg.from ? ' · מאת ' + msg.from : '')));
+      list.appendChild(li);
+    });
+  }
+
+  /* ---- 7. יצירת קשר ---- */
+
+  function renderContact() {
+    var l = caseFile.lawyer;
+    $('lawyerName').textContent = l.name;
+    $('lawyerRole').textContent = l.role;
+
+    var phone = $('lawyerPhone');
+    phone.textContent = 'התקשרות למשרד: ' + l.phone;
+    phone.href = 'tel:' + l.phone.replace(/[^0-9+]/g, '');
+
+    $('lawyerEmail').href = 'mailto:' + l.email;
+  }
+
+  /* ---- העלאת מסמכים ---- */
+
+  var fileInput = $('fileInput');
+  var pendingDoc = null;
+
+  function uploadButton(doc, label) {
+    var btn = el('button', 'btn btn-primary doc-actions', uploadLabel(doc));
+    btn.type = 'button';
+    btn.setAttribute('aria-label', label);
+    btn.addEventListener('click', function () {
+      pendingDoc = doc;
+      fileInput.click();
+    });
+    return btn;
+  }
+
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files[0];
+    if (!file || !pendingDoc) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast('הקובץ גדול מ-10MB. נא לבחור קובץ קטן יותר.');
+      fileInput.value = '';
+      return;
     }
-    if (file.size > MAX_MB * 1024 * 1024) {
-      return toast('הקובץ גדול מ-' + MAX_MB + 'MB. נא לדחוס אותו או לפצל למספר קבצים.', false);
-    }
 
-    // ללא מסמך יעד - משייכים לחסר החובה הראשון, אחרת לחסר הראשון
-    let docId = targetDocId;
-    if (!docId) {
-      const missing = caseFile.documents.filter(d => d.status === 'missing');
-      const pick = missing.find(d => d.required) || missing[0];
-      if (!pick) return toast('כל המסמכים הנדרשים כבר הועלו.', false);
-      docId = pick.id;
-    }
+    CaseStore.saveDocument(user.idNumber, pendingDoc.id, {
+      status: 'pending-review',
+      file: file.name,
+      date: new Date().toISOString().slice(0, 10)
+    });
 
-    const patch = { status: 'pending-review', file: file.name, date: new Date().toISOString().slice(0, 10) };
-    CaseStore.saveDocument(user.idNumber, docId, patch);
+    toast('המסמך "' + pendingDoc.name + '" נשלח למשרד.');
 
-    const doc = caseFile.documents.find(d => d.id === docId);
-    Object.assign(doc, patch);
-
-    targetDocId = null;
-    renderTabs();
+    caseFile = CaseStore.load(user.idNumber);
+    renderTodo();
     renderDocs();
-    renderStats();
-    toast('הקובץ "' + file.name + '" הועלה עבור: ' + doc.name + '. המשרד יבדוק אותו תוך 3 ימי עסקים.', true);
-  }
 
-  $('fileInput').addEventListener('change', e => {
-    handleFile(e.target.files[0]);
-    e.target.value = '';
+    pendingDoc = null;
+    fileInput.value = '';
   });
 
-  $('dropZone').addEventListener('click', () => { targetDocId = null; $('fileInput').click(); });
-  $('uploadTopBtn').addEventListener('click', () => { targetDocId = null; $('fileInput').click(); });
+  /* ---- הודעה צפה ---- */
 
-  ['dragenter', 'dragover'].forEach(ev =>
-    $('dropZone').addEventListener(ev, e => { e.preventDefault(); $('dropZone').classList.add('drag'); }));
-  ['dragleave', 'drop'].forEach(ev =>
-    $('dropZone').addEventListener(ev, e => { e.preventDefault(); $('dropZone').classList.remove('drag'); }));
-  $('dropZone').addEventListener('drop', e => { targetDocId = null; handleFile(e.dataTransfer.files[0]); });
-
-  /* ---------- טוסט ---------- */
-  let toastTimer;
-  function toast(msg, ok) {
-    const t = $('toast');
-    t.textContent = (ok ? '✅ ' : '⚠️ ') + msg;
-    t.className = 'toast show' + (ok ? ' ok' : '');
+  var toastTimer = null;
+  function toast(msg) {
+    var box = $('toast');
+    box.textContent = msg;
+    box.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 4800);
+    toastTimer = setTimeout(function () { box.hidden = true; }, 5000);
   }
 
-  /* ---------- אתחול ---------- */
-  renderTabs();
+  /* ---- הגדלת טקסט ---- */
+
+  var SIZE_KEY = 'bl_text_scale_v1';
+
+  function applyScale(big) {
+    document.documentElement.style.setProperty('--scale', big ? '1.25' : '1');
+    var btn = $('textSizeBtn');
+    btn.setAttribute('aria-pressed', String(big));
+    btn.textContent = big ? 'טקסט רגיל' : 'הגדלת טקסט';
+  }
+
+  $('textSizeBtn').addEventListener('click', function () {
+    var big = localStorage.getItem(SIZE_KEY) !== 'big';
+    try { localStorage.setItem(SIZE_KEY, big ? 'big' : 'normal'); } catch (e) {}
+    applyScale(big);
+  });
+
+  try { applyScale(localStorage.getItem(SIZE_KEY) === 'big'); } catch (e) { applyScale(false); }
+
+  /* ---- יציאה ---- */
+
+  $('logoutBtn').addEventListener('click', function () { Auth.logout(); });
+
+  /* ---- עזר ליצירת אלמנטים ---- */
+
+  function el(tag, className, text, decorative) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    if (decorative) node.setAttribute('aria-hidden', 'true');
+    return node;
+  }
+
+  /* ---- הפעלה ---- */
+
+  renderStatus();
+  renderTodo();
   renderDocs();
-  renderStats();
-}
+  renderNextSteps();
+  renderStages();
+  renderMessages();
+  renderContact();
+})();
