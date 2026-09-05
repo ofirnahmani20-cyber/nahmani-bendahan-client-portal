@@ -263,6 +263,54 @@ p  { margin: 0 0 14px; }
   border-radius: 6px; padding: 2px 8px; font-size: 1em;
 }
 
+/* ---- העלאה: צילום או בחירת קובץ ---- */
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 0;
+}
+
+/* ---- משוב על איכות הצילום ---- */
+.quality-slot:empty { display: none; }
+
+.quality-checking {
+  margin: 12px 0 0;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.quality-box {
+  margin: 14px 0 0;
+  padding: 16px 18px;
+  background: var(--stop-soft);
+  border: 2px solid var(--stop);
+  border-radius: var(--radius);
+}
+.quality-title {
+  margin: 0 0 12px;
+  font-size: calc(19px * var(--scale));
+  color: var(--stop);
+}
+
+.quality-reasons { list-style: none; margin: 0 0 16px; padding: 0; }
+.quality-reasons > li {
+  padding: 10px 0;
+  border-top: 1px solid #e6c9c9;
+}
+.quality-reasons > li:first-child { border-top: 0; padding-top: 0; }
+.quality-reasons strong { display: block; margin: 0 0 2px; }
+/* ההסבר מה לעשות חשוב יותר מהאבחנה מה קרה */
+.quality-fix { display: block; font-size: calc(17px * var(--scale)); }
+
+.quality-override-note {
+  margin: 16px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid #e6c9c9;
+  font-size: calc(17px * var(--scale));
+  color: var(--text-soft);
+}
+
 /* ---- תגובה למשרד על מסמך ---- */
 .reply-box {
   margin: 14px 0 0;

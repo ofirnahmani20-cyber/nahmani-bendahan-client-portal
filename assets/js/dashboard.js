@@ -174,6 +174,7 @@
         li.appendChild(el('p', 'reject-note', 'המשרד ביקש להעלות מחדש: ' + doc.rejectReason));
       }
       li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+      li.appendChild(qualitySlot(doc));
       li.appendChild(replyBox(doc));
       list.appendChild(li);
     });
@@ -224,6 +225,7 @@
 
       if (DOC_NEEDS_UPLOAD(doc)) {
         li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+        li.appendChild(qualitySlot(doc));
       }
 
       list.appendChild(li);
@@ -313,45 +315,155 @@
 
   /* ---- העלאת מסמכים ---- */
 
-  var fileInput = $('fileInput');
-  var pendingDoc = null;
+  var fileInput   = $('fileInput');
+  var cameraInput = $('cameraInput');
+  var pendingDoc  = null;
 
+  /* אחרי כמה ניסיונות כושלים ברציפות נפתחת דרך המשך.
+     הסיבה: קהל היעד כולל אנשים מבוגרים ופגועי תנועה. חסימה
+     מוחלטת פירושה לקוח שלא יכול להגיש מסמך כלל, והתיק שלו נתקע -
+     וזה גרוע יותר מצילום בינוני שהמשרד יבדוק ויחליט לגביו.
+     לחסימה קשיחה לחלוטין: ALLOW_OVERRIDE_AFTER = 0 */
+  var ALLOW_OVERRIDE_AFTER = 3;
+  var attempts = {};
+
+  /** אזור שבו יוצג משוב איכות הצילום עבור המסמך הזה */
+  function qualitySlot(doc) {
+    var slot = el('div', 'quality-slot');
+    slot.setAttribute('data-quality-for', doc.id);
+    slot.setAttribute('aria-live', 'polite');
+    return slot;
+  }
+
+  /** שתי דרכים להגיש: צילום ישיר, או קובץ שכבר קיים במכשיר */
   function uploadButton(doc, label) {
-    var btn = el('button', 'btn btn-primary doc-actions', uploadLabel(doc));
-    btn.type = 'button';
-    btn.setAttribute('aria-label', label);
-    btn.addEventListener('click', function () {
+    var wrap = el('div', 'upload-actions');
+
+    var cam = el('button', 'btn btn-primary', 'צילום המסמך');
+    cam.type = 'button';
+    cam.setAttribute('aria-label', 'צילום המסמך ' + doc.name);
+    cam.addEventListener('click', function () {
+      pendingDoc = doc;
+      cameraInput.click();
+    });
+
+    var pick = el('button', 'btn btn-outline', 'בחירת קובץ');
+    pick.type = 'button';
+    pick.setAttribute('aria-label', label);
+    pick.addEventListener('click', function () {
       pendingDoc = doc;
       fileInput.click();
     });
-    return btn;
+
+    wrap.appendChild(cam);
+    wrap.appendChild(pick);
+    return wrap;
   }
 
-  fileInput.addEventListener('change', function () {
-    var file = fileInput.files[0];
-    if (!file || !pendingDoc) return;
+  fileInput.addEventListener('change', function () { handlePick(fileInput); });
+  cameraInput.addEventListener('change', function () { handlePick(cameraInput); });
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast('הקובץ גדול מ-10MB. נא לבחור קובץ קטן יותר.');
-      fileInput.value = '';
-      return;
-    }
+  function handlePick(input) {
+    var file = input.files[0];
+    var doc  = pendingDoc;
+    input.value = '';
+    if (!file || !doc) return;
 
-    CaseStore.saveDocument(user.idNumber, pendingDoc.id, {
+    showChecking(doc);
+
+    DocQuality.check(file).then(function (result) {
+      if (result.verdict === 'ok' || result.verdict === 'skipped') {
+        attempts[doc.id] = 0;
+        acceptFile(doc, file);
+        return;
+      }
+
+      attempts[doc.id] = (attempts[doc.id] || 0) + 1;
+      var mayOverride = ALLOW_OVERRIDE_AFTER > 0 &&
+                        attempts[doc.id] >= ALLOW_OVERRIDE_AFTER &&
+                        result.verdict !== 'too-big' &&
+                        result.verdict !== 'bad-type';
+
+      showProblem(doc, file, result, mayOverride);
+    });
+  }
+
+  function acceptFile(doc, file) {
+    CaseStore.saveDocument(user.idNumber, doc.id, {
       status: 'pending-review',
       file: file.name,
       date: new Date().toISOString().slice(0, 10)
     });
 
-    toast('המסמך "' + pendingDoc.name + '" נשלח למשרד.');
+    toast('המסמך "' + doc.name + '" נשלח למשרד.');
 
     caseFile = CaseStore.load(user.idNumber);
+    pendingDoc = null;
     renderTodo();
     renderDocs();
+  }
 
-    pendingDoc = null;
-    fileInput.value = '';
-  });
+  /* ---- משוב על איכות הצילום ---- */
+
+  /** מאתר את כל אזורי המשוב של מסמך - הוא מופיע גם במשימות וגם ברשימה */
+  function feedbackSlots(docId) {
+    return document.querySelectorAll('[data-quality-for="' + docId + '"]');
+  }
+
+  function showChecking(doc) {
+    Array.prototype.forEach.call(feedbackSlots(doc.id), function (slot) {
+      slot.textContent = '';
+      slot.appendChild(el('p', 'quality-checking', 'בודקים את איכות הצילום...'));
+    });
+  }
+
+  function showProblem(doc, file, result, mayOverride) {
+    Array.prototype.forEach.call(feedbackSlots(doc.id), function (slot) {
+      slot.textContent = '';
+
+      var box = el('div', 'quality-box');
+      box.setAttribute('role', 'alert');
+
+      box.appendChild(el('h4', 'quality-title',
+        result.verdict === 'unreadable' || result.verdict === 'too-big' ||
+        result.verdict === 'bad-type'
+          ? 'המסמך לא נשלח - הצילום אינו קריא'
+          : 'המסמך לא נשלח - כדאי לצלם שוב'));
+
+      var list = el('ul', 'quality-reasons');
+      result.reasons.forEach(function (r) {
+        var li = el('li');
+        li.appendChild(el('strong', null, r.title));
+        li.appendChild(el('span', 'quality-fix', r.fix));
+        list.appendChild(li);
+      });
+      box.appendChild(list);
+
+      var again = el('button', 'btn btn-primary', 'צילום מחדש');
+      again.type = 'button';
+      again.addEventListener('click', function () {
+        pendingDoc = doc;
+        cameraInput.click();
+      });
+      box.appendChild(again);
+
+      if (mayOverride) {
+        var note = el('p', 'quality-override-note',
+          'ניסיתם כמה פעמים. אם אין באפשרותכם לצלם טוב יותר, אפשר לשלוח ' +
+          'את הצילום הקיים - המשרד יבדוק אותו ויחזור אליכם.');
+        var force = el('button', 'btn btn-outline', 'שליחה בכל זאת');
+        force.type = 'button';
+        force.addEventListener('click', function () {
+          attempts[doc.id] = 0;
+          acceptFile(doc, file);
+        });
+        box.appendChild(note);
+        box.appendChild(force);
+      }
+
+      slot.appendChild(box);
+    });
+  }
 
   /* ---- הודעה צפה ---- */
 

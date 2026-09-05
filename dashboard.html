@@ -92,10 +92,14 @@
 
 </main>
 
-<input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" hidden>
+<!-- בחירת קובץ קיים מהמכשיר -->
+<input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" hidden>
+<!-- capture פותח ישירות את המצלמה בטלפון, בלי לעבור דרך הגלריה -->
+<input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="assets/js/data.js"></script>
+<script src="assets/js/quality.js"></script>
 <script src="assets/js/dashboard.js"></script>
 </body>
 </html>
