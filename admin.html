@@ -127,6 +127,44 @@
             <button type="button" class="btn btn-primary btn-sm" id="stageSave">שמירת השלב</button>
           </section>
 
+          <!-- החלטת הוועדה -->
+          <section class="block" aria-labelledby="h-decision">
+            <h2 id="h-decision">החלטת הוועדה</h2>
+            <p class="item-note" id="decisionNow"></p>
+            <div class="alert alert-error" id="decError" role="alert" hidden></div>
+
+            <form id="decForm" novalidate>
+              <div class="field">
+                <label for="decDate">תאריך ההחלטה</label>
+                <input type="date" id="decDate" required>
+              </div>
+              <div class="field">
+                <label for="decPercent">אחוזי נכות שנקבעו</label>
+                <input type="number" id="decPercent" min="0" max="100" required>
+              </div>
+              <div class="field">
+                <label for="decOutcome">סוג התוצאה</label>
+                <select id="decOutcome"></select>
+              </div>
+              <div class="field">
+                <label for="decDeadline">מועד אחרון להגשת ערר</label>
+                <p class="hint">מוזן ידנית. המערכת אינה מחשבת מועדי ערר.</p>
+                <input type="date" id="decDeadline">
+              </div>
+              <label class="check">
+                <input type="checkbox" id="decPermanent">
+                <span>נכות צמיתה</span>
+              </label>
+              <div class="field">
+                <label for="decNote">הערה אישית ללקוח</label>
+                <textarea id="decNote" rows="3" maxlength="400"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">שמירת ההחלטה</button>
+            </form>
+
+            <p class="demo-warning" id="rightsWarning"></p>
+          </section>
+
           <!-- דרישת מסמך מהלקוח -->
           <section class="block" aria-labelledby="h-request">
             <h2 id="h-request">דרישת מסמך מהלקוח</h2>
