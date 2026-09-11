@@ -8,15 +8,21 @@
 :root {
   --scale: 1;                      /* מוגדל ע"י כפתור "הגדלת טקסט" */
 
-  --bg:        #f4f6f9;
+  /* ---- מותג: שחור־גרפיט וזהב. כל יחס כאן נמדד, לא הוערך. ---- */
+  --bg:        #eef0f3;
   --surface:   #ffffff;
-  --border:    #c9d2de;
-  --text:      #14203a;            /* 14.9:1 על לבן */
-  --text-soft: #4d5a72;            /* 7.4:1 על לבן */
+  --border:    #d9dde3;            /* גבול דקורטיבי בלבד */
+  --border-ui: #545c6a;            /* 6.74:1 - גבול שמזהה רכיב (WCAG 1.4.11) */
+  --text:      #101319;            /* 18.6:1 על לבן */
+  --text-soft: #545c6a;            /* 6.74:1 על לבן */
 
-  --accent:      #0d47a1;          /* 8.6:1 על לבן */
-  --accent-dark: #08306b;
-  --accent-soft: #e8eff9;
+  --accent:      #101319;          /* 18.6:1 - דיו. הצבע הראשי של הכרומה */
+  --accent-dark: #262b33;          /* 14.2:1 - פחם, למצב hover */
+  --accent-soft: #e7eaee;          /* רקע נייטרלי להדגשה עדינה */
+
+  /* הזהב חי רק על כהה. על בהיר משתמשים בברונזה. */
+  --gold:      #c5a059;            /* 7.57:1 על --accent. נכשל על לבן (2.46:1) */
+  --bronze:    #816320;            /* 5.62:1 על לבן, 4.92:1 על --bg */
 
   --ok:        #1b5e20;            /* 7.9:1 */
   --ok-soft:   #e6f2e7;
@@ -445,3 +451,149 @@ p  { margin: 0 0 14px; }
   .topbar-actions, .btn, .toast { display: none !important; }
   body { background: #fff; font-size: 12pt; }
 }
+
+/* ==========================================================
+   שכבת המותג - Nahmani ben-dahan
+   ----------------------------------------------------------
+   נוספה בסוף בכוונה: היא מחילה את הזהות החזותית מעל הרכיבים
+   הקיימים בלי לשכתב אותם. כללי הנגישות לא נפתחים כאן מחדש -
+   סמל+טקסט, מטרות מגע, ו---scale נשארים כפי שהם.
+   ========================================================== */
+
+/* ---- פונטים: מאוחסנים מקומית ולא נטענים מצד שלישי ----
+   העמודים מציגים מידע רפואי, ולכן אין מהם בקשות החוצה.
+   שני הפונטים ברישיון SIL OFL. ---- */
+@font-face {
+  font-family: 'Frank Ruhl Libre';
+  src: url('../fonts/frankruhllibre-hebrew.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'Frank Ruhl Libre';
+  src: url('../fonts/frankruhllibre-latin.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122;
+}
+@font-face {
+  font-family: 'Heebo';
+  src: url('../fonts/heebo-hebrew.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'Heebo';
+  src: url('../fonts/heebo-latin.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122;
+}
+
+:root {
+  --serif: 'Frank Ruhl Libre', Georgia, 'Times New Roman', serif;
+  --sans:  'Heebo', 'Segoe UI', Arial, sans-serif;
+}
+
+body { font-family: var(--sans); }
+
+/* כותרות בסריף - שם מגיעה היוקרה, לא ממשקלים דקים */
+h1, h2, h3 { font-family: var(--serif); font-weight: 700; }
+h1 { letter-spacing: -0.01em; }
+
+/* ---- הלוגו ---- */
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo svg { flex: 0 0 auto; display: block; }
+.logo-wm { direction: ltr; text-align: left; line-height: 1.06; font-family: var(--serif); }
+.logo-wm b { display: block; font-size: calc(18px * var(--scale)); font-weight: 700; color: #fff; }
+.logo-wm i {
+  display: block; font-style: normal; margin-top: 3px;
+  font-size: calc(9px * var(--scale)); font-weight: 500;
+  letter-spacing: .22em; color: var(--gold);
+}
+
+/* ---- סרגל עליון: שחור עם קו זהב ---- */
+.topbar { border-bottom: 1px solid var(--gold); }
+.topbar .who { color: #c2c7d0; }
+.btn-quiet { border-color: #4a515c; font-weight: 500; }
+
+/* ---- מסך הכניסה ---- */
+.login-head .firm { color: var(--text); letter-spacing: .04em; }
+.login-brand { background: var(--accent); padding: 22px 18px; border-bottom: 1px solid var(--gold); }
+.login-brand .logo { justify-content: center; }
+
+/* ---- שדות: גבול שעובר את סף 3:1 של WCAG 1.4.11 ---- */
+.field input { border-color: var(--border-ui); border-radius: 6px; }
+.field input:focus-visible { border-color: var(--accent); }
+
+/* ---- כפתורים ---- */
+.btn { border-radius: 6px; letter-spacing: .04em; }
+
+/* ---- כרטיסים: קו מדויק במקום צל ---- */
+.block { border-radius: 6px; }
+
+/* ---- כרטיס הסטטוס ---- */
+.status .step-of {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--text); font-weight: 500;
+  font-size: calc(15px * var(--scale)); letter-spacing: .12em;
+}
+.status .step-name { font-family: var(--serif); }
+.bar { height: 6px; border: 0; border-radius: 0; background: #dfe3e8; }
+
+/* ==========================================================
+   מפת ההליך - הפריט המרכזי
+   הזהב מסמן כאן דבר אחד בלבד: איפה התיק נמצא עכשיו.
+   ========================================================== */
+.steps > li { border-top: 0; padding: 0; }
+.steps .mark { font-family: var(--serif); font-weight: 500; }
+.steps .done .mark { background: var(--accent); border-color: var(--accent); }
+.steps .now {
+  background: var(--accent); border-radius: 6px;
+  padding: 20px 22px; margin: 0 0 4px;
+}
+.steps .now .name  { font-family: var(--serif); font-size: calc(24px * var(--scale)); color: #fff; }
+.steps .now .when  { color: var(--gold); letter-spacing: .08em; }
+.steps .now .mark  { background: var(--accent); border-color: var(--gold); color: var(--gold); }
+
+/* שם המשתמש יושב מתחת לוורדמארק, בתוך הבלוק שלו */
+.logo-wm .who {
+  display: block; direction: rtl; text-align: start;
+  margin-top: 5px; font-family: var(--sans); font-weight: 400;
+  font-size: calc(15px * var(--scale)); color: #c2c7d0; letter-spacing: 0;
+}
+.login-brand .logo-wm b { font-size: calc(20px * var(--scale)); }
+.login { padding-top: 48px; }
+.login-head { margin-bottom: 32px; }
+
+/* ---- הקו המחבר: מה שהופך את הרשימה למסלול ----
+   הקו נצבע לפי מצב השלב, ולכן הוא כהה עד נקודת ההווה ובהיר
+   אחריה. הוא מצויר ב-::before ולא בתגית נפרדת, כדי לא לשנות
+   את ה-HTML שמייצר dashboard.js. */
+.steps > li {
+  position: relative;
+  padding: 0 0 26px;
+  border-top: 0;
+  align-items: flex-start;
+}
+.steps > li:last-child { padding-bottom: 0; }
+.steps > li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 19px;
+  top: 44px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.steps > li:last-child::before { content: none; }
+.steps > li.done::before { background: var(--accent); }
+
+/* השלב הנוכחי: הגוף הוא הקופסה הכהה, לא ה-li עצמו -
+   כך הסימן נשאר מיושר עם הקו. */
+.steps .now { background: transparent; border-radius: 0; padding-inline: 0; }
+.steps .now > div {
+  background: var(--accent); color: #fff;
+  border-radius: 6px; padding: 18px 20px;
+  margin-top: -2px;
+}
+.steps .now .name { display: block; margin: 0 0 4px; }
+.steps .now .mark { outline: 4px solid var(--surface); }
