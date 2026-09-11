@@ -1,5 +1,5 @@
 """
-app.py - שרת מינימלי לאזור הלקוחות NAHMANI-BENDAHAN.
+app.py - שרת מינימלי לאזור הלקוחות Nahmani ben-dahan.
 
 שתי אחריות בלבד:
   1. הגשת האתר הסטטי הקיים (אותו origin, בלי CORS).
@@ -29,7 +29,7 @@ from .policy import POLICY_MODE, assert_clean, build_context
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-app = FastAPI(title="NAHMANI-BENDAHAN portal")
+app = FastAPI(title="Nahmani ben-dahan portal")
 
 
 # ============================================================
