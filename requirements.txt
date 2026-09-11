@@ -1,3 +1,8 @@
 anthropic>=1.0
 fastapi>=0.115
 uvicorn[standard]>=0.30
+
+# מסד נתונים
+psycopg[binary]>=3.2
+bcrypt>=4.2
+cryptography>=43
