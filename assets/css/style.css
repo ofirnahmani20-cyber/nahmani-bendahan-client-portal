@@ -263,6 +263,75 @@ p  { margin: 0 0 14px; }
   border-radius: 6px; padding: 2px 8px; font-size: 1em;
 }
 
+/* ---- ההחלטה שהתקבלה ---- */
+.decision { border: 2px solid var(--accent); }
+
+.decision-headline {
+  font-size: calc(26px * var(--scale));
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0 0 6px;
+}
+.decision-when {
+  color: var(--text-soft);
+  font-size: calc(17px * var(--scale));
+  margin: 0 0 20px;
+}
+.decision-meaning { margin: 0 0 18px; }
+
+.decision-list { list-style: none; margin: 0 0 18px; padding: 0; }
+.decision-list > li {
+  position: relative;
+  padding: 8px 0 8px 0;
+  padding-inline-start: 28px;
+}
+.decision-list > li::before {
+  content: "•";
+  position: absolute;
+  inset-inline-start: 6px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.decision-pending {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+
+.decision-note {
+  background: var(--wait-soft);
+  border-inline-start: 5px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+.decision-note p { margin: 6px 0 0; }
+
+/* מועד הערר - הפריט הכי קריטי במסך */
+.decision-deadline {
+  border: 2px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 0 0 20px;
+}
+.decision-deadline strong { font-size: calc(20px * var(--scale)); display: block; }
+.decision-deadline p { margin: 6px 0 0; font-weight: 700; }
+.decision-deadline.urgent { border-color: var(--stop); background: var(--stop-soft); }
+.decision-deadline.urgent strong,
+.decision-deadline.urgent p { color: var(--stop); }
+.decision-deadline.passed { border-color: var(--wait); background: var(--wait-soft); }
+
+.decision-call { width: 100%; }
+
+.decision-legal {
+  color: var(--text-soft);
+  font-size: calc(16px * var(--scale));
+  margin: 16px 0 0;
+}
+
 /* ---- העלאה: צילום או בחירת קובץ ---- */
 .upload-actions {
   display: flex;

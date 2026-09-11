@@ -143,6 +143,99 @@
       'בשלב הזה מאז ' + formatDate(caseFile.stageEnteredAt) + ' · ' + pct + '% מהדרך';
   }
 
+  /* ---- 1ב. ההחלטה שהתקבלה ומה היא אומרת ---- */
+
+  /** מספר הימים מהיום עד תאריך. שלילי = התאריך חלף. */
+  function daysUntil(iso) {
+    if (!iso) return null;
+    var parts = iso.split('-');
+    var target = new Date(parts[0], parts[1] - 1, parts[2]);
+    var today  = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((target - today) / 86400000);
+  }
+
+  function renderDecision() {
+    var block = $('decisionBlock');
+    var body  = $('decisionBody');
+    var d     = caseFile.decision;
+
+    if (!d) { block.hidden = true; return; }
+
+    block.hidden = false;
+    body.textContent = '';
+
+    // מה נקבע - בשורה אחת גדולה וברורה
+    var head = el('p', 'decision-headline',
+      d.percent != null
+        ? 'הוועדה קבעה ' + d.percent + '% נכות' + (d.permanent ? ' צמיתה' : ' זמנית')
+        : 'התקבלה החלטה בעניינך');
+    body.appendChild(head);
+    body.appendChild(el('p', 'decision-when', 'ההחלטה התקבלה ב-' + formatDate(d.date)));
+
+    var info = RIGHTS_EXPLAINER[d.outcome];
+
+    if (info && info.approved) {
+      body.appendChild(el('h3', null, 'מה זה אומר'));
+      body.appendChild(el('p', 'decision-meaning', info.meaning));
+
+      if (info.entitlements && info.entitlements.length) {
+        body.appendChild(el('h3', null, 'מה מגיע לך'));
+        var ul = el('ul', 'decision-list');
+        info.entitlements.forEach(function (t) { ul.appendChild(el('li', null, t)); });
+        body.appendChild(ul);
+      }
+
+      if (info.whatNow && info.whatNow.length) {
+        body.appendChild(el('h3', null, 'מה אפשר לעשות עכשיו'));
+        var ol = el('ul', 'decision-list');
+        info.whatNow.forEach(function (t) { ol.appendChild(el('li', null, t)); });
+        body.appendChild(ol);
+      }
+    } else {
+      // ההסבר טרם אושר על ידי המשרד - לא מציגים תוכן משפטי לא מאושר
+      body.appendChild(el('p', 'decision-pending',
+        'עורך הדין שלך יסביר לך בדיוק מה ההחלטה אומרת ומה מגיע לך. ' +
+        'אפשר להתקשר למשרד בכל שאלה.'));
+    }
+
+    if (d.officeNote) {
+      var note = el('div', 'decision-note');
+      note.appendChild(el('strong', null, 'מהמשרד המטפל:'));
+      note.appendChild(el('p', null, d.officeNote));
+      body.appendChild(note);
+    }
+
+    // מועד הערר - הדבר הכי קריטי במסך הזה
+    var left = daysUntil(d.appealDeadline);
+    if (left !== null) {
+      var dl = el('div', 'decision-deadline');
+      if (left > 0) {
+        dl.className += left <= 14 ? ' urgent' : '';
+        dl.appendChild(el('strong', null,
+          'המועד האחרון להגשת ערר: ' + formatDate(d.appealDeadline)));
+        dl.appendChild(el('p', null,
+          left === 1 ? 'נותר יום אחד.' : 'נותרו ' + left + ' ימים.'));
+      } else {
+        dl.className += ' passed';
+        dl.appendChild(el('strong', null,
+          'המועד להגשת ערר (' + formatDate(d.appealDeadline) + ') חלף.'));
+        dl.appendChild(el('p', null,
+          'אם לא הוגש ערר, יש לפנות למשרד בהקדם כדי לבחון מה אפשר לעשות.'));
+      }
+      body.appendChild(dl);
+    }
+
+    var call = el('a', 'btn btn-primary decision-call',
+      'התקשרות למשרד: ' + caseFile.lawyer.phone);
+    call.href = 'tel:' + caseFile.lawyer.phone.replace(/[^0-9+]/g, '');
+    body.appendChild(call);
+
+    body.appendChild(el('p', 'decision-legal',
+      'ההסבר כאן נועד לעזור להבין את ההחלטה ואינו מהווה ייעוץ משפטי. ' +
+      'הזכויות המדויקות תלויות בנסיבות האישיות שלך.'));
+  }
+
   /* ---- 2. מה עליי לעשות עכשיו ---- */
 
   function renderTodo() {
@@ -512,6 +605,7 @@
   /* ---- הפעלה ---- */
 
   renderStatus();
+  renderDecision();
   renderTodo();
   renderDocs();
   renderNextSteps();

@@ -188,6 +188,7 @@
       ' · נפתח ב-' + formatDate(file.openedAt) + ' · מטפל: ' + file.lawyer.name;
 
     renderGap(file);
+    renderDecisionForm(file);
     renderStage(file);
     renderCatalog(file);
     renderReview(file);
@@ -293,6 +294,88 @@
     renderCase();
     toast('התיק עודכן לשלב ' + stage + ' - ' + CLAIM_STAGES[stage - 1].title + '.');
   });
+
+  /* ---- החלטת הוועדה ---- */
+
+  var OUTCOME_LABELS = {
+    'below-threshold': 'מתחת לסף המזכה',
+    'grant':           'מענק חד-פעמי',
+    'pension':         'קצבה חודשית',
+    'rejected':        'התביעה נדחתה'
+  };
+
+  function renderDecisionForm(file) {
+    var d = file.decision;
+
+    $('decisionNow').textContent = d
+      ? 'רשומה החלטה מ-' + formatDate(d.date) + ': ' + d.percent + '% ' +
+        (d.permanent ? 'צמיתה' : 'זמנית') + ' · ' + (OUTCOME_LABELS[d.outcome] || d.outcome)
+      : 'לא נרשמה עדיין החלטת ועדה בתיק זה.';
+
+    var sel = $('decOutcome');
+    if (!sel.options.length) {
+      Object.keys(OUTCOME_LABELS).forEach(function (key) {
+        var opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = OUTCOME_LABELS[key];
+        sel.appendChild(opt);
+      });
+    }
+
+    if (d) {
+      $('decDate').value      = d.date || '';
+      $('decPercent').value   = d.percent != null ? d.percent : '';
+      $('decOutcome').value   = d.outcome || 'below-threshold';
+      $('decDeadline').value  = d.appealDeadline || '';
+      $('decPermanent').checked = !!d.permanent;
+      $('decNote').value      = d.officeNote || '';
+    }
+
+    // מזכיר לצוות שההסבר ללקוח עדיין לא מאושר
+    var info = d && RIGHTS_EXPLAINER[d.outcome];
+    var warn = $('rightsWarning');
+    if (d && info && !info.approved) {
+      warn.hidden = false;
+      warn.textContent =
+        'הסבר הזכויות עבור "' + (OUTCOME_LABELS[d.outcome] || d.outcome) + '" ' +
+        'טרם אושר, ולכן הלקוח רואה הפניה לפנות למשרד במקום הסבר. ' +
+        'לאישור: מלאו את התוכן ב-RIGHTS_EXPLAINER וסמנו approved: true.';
+    } else {
+      warn.hidden = true;
+    }
+  }
+
+  var decForm = $('decForm');
+  var decErr  = $('decError');
+
+  decForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    decErr.hidden = true;
+
+    var date    = $('decDate').value;
+    var percent = $('decPercent').value;
+
+    if (!date)    return decFail('צריך תאריך החלטה.', $('decDate'));
+    if (percent === '') return decFail('צריך להזין אחוזי נכות.', $('decPercent'));
+
+    CaseStore.saveDecision(openId, {
+      date:           date,
+      percent:        parseInt(percent, 10),
+      outcome:        $('decOutcome').value,
+      permanent:      $('decPermanent').checked,
+      appealDeadline: $('decDeadline').value || null,
+      officeNote:     $('decNote').value.trim()
+    }, staff.name);
+
+    renderCase();
+    toast('החלטת הוועדה נשמרה והלקוח רואה אותה.');
+  });
+
+  function decFail(text, focusOn) {
+    decErr.textContent = text;
+    decErr.hidden = false;
+    focusOn.focus();
+  }
 
   /* ---- דרישת מסמך מהלקוח ---- */
 
