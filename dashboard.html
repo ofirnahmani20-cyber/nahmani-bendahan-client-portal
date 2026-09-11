@@ -12,6 +12,15 @@
 
 <header class="topbar">
   <div class="topbar-in">
+
+    <!-- כפתור התפריט ראשון בסדר הקריאה, ולכן בצד ימין ב-RTL -->
+    <button type="button" class="hamburger" id="menuBtn" aria-expanded="false" aria-controls="drawer">
+      <svg width="26" height="18" viewBox="0 0 26 18" fill="none" aria-hidden="true">
+        <path d="M1 1.5H25M1 9H25M1 16.5H25" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      <span>תפריט</span>
+    </button>
+
     <div class="logo">
       <!-- N∩H: לשתי האותיות אותו שלד. האלכסון הוא ה-N, קו הזהב הוא ה-H. -->
       <svg width="28" height="34" viewBox="0 0 34 42" fill="none" role="img" aria-label="Nahmani ben-dahan, עורכי דין">
@@ -25,6 +34,7 @@
         <span class="who" id="userName"></span>
       </div>
     </div>
+
     <div class="topbar-actions">
       <button type="button" class="btn btn-quiet" id="textSizeBtn" aria-pressed="false">
         הגדלת טקסט
@@ -34,71 +44,142 @@
   </div>
 </header>
 
+<!-- ===== התפריט הנשלף ===== -->
+<div class="drawer-overlay" id="drawerOverlay" hidden></div>
+
+<nav class="drawer" id="drawer" aria-label="תפריט ראשי" hidden>
+  <div class="drawer-head">
+    <span class="drawer-eyebrow">תפריט</span>
+    <button type="button" class="drawer-close" id="drawerClose" aria-label="סגירת התפריט">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <ul class="drawer-list">
+    <li>
+      <button type="button" class="drawer-link" data-view="home">
+        <span>האזור האישי שלי</span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="drawer-link" data-view="docs">
+        <span>מסמכים נדרשים</span>
+        <span class="drawer-badge" id="navDocsBadge" hidden></span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="drawer-link" data-view="roadmap">
+        <span>מפת הדרכים של ההליך</span>
+      </button>
+    </li>
+  </ul>
+
+  <hr class="drawer-rule">
+
+  <ul class="drawer-list">
+    <li><a class="drawer-link" href="info.html">מידע מקצועי ומאמרים</a></li>
+    <li><a class="drawer-link" href="info.html#faq">שאלות נפוצות</a></li>
+  </ul>
+
+  <hr class="drawer-rule">
+
+  <button type="button" class="drawer-link drawer-out" id="drawerLogout">יציאה מהאזור האישי</button>
+
+  <p class="drawer-foot">
+    לשאלות על התיק אפשר תמיד להתקשר למשרד.
+  </p>
+</nav>
+
+<!-- הכרזה על המסך שנפתח, לקוראי מסך -->
+<p class="visually-hidden" id="viewAnnounce" role="status" aria-live="polite"></p>
+
 <main class="page" id="main">
 
-  <h1 id="greeting">האזור האישי שלי</h1>
-  <p class="lead" id="caseSummary"></p>
+  <!-- ===================== האזור האישי ===================== -->
+  <div class="view" id="view-home">
 
-  <!-- 1. איפה התיק עומד -->
-  <section class="block status" aria-labelledby="h-status">
-    <h2 id="h-status" class="visually-hidden">מצב התביעה</h2>
-    <p class="step-of" id="stepOf"></p>
-    <p class="step-name" id="stepName"></p>
-    <p class="step-what" id="stepWhat"></p>
+    <h1 class="view-title" id="greeting" tabindex="-1">האזור האישי שלי</h1>
+    <p class="lead" id="caseSummary"></p>
 
-    <div class="bar" role="img" id="progressBar">
-      <i id="progressFill" style="width:0%"></i>
-    </div>
-    <p class="bar-note" id="progressNote"></p>
-  </section>
+    <!-- איפה התיק עומד -->
+    <section class="block status" aria-labelledby="h-status">
+      <h2 id="h-status" class="visually-hidden">מצב התביעה</h2>
+      <p class="step-of" id="stepOf"></p>
+      <p class="step-name" id="stepName"></p>
+      <p class="step-what" id="stepWhat"></p>
 
-  <!-- 1ב. ההחלטה שהתקבלה - מוצג רק אם יש החלטת ועדה -->
-  <section class="block decision" id="decisionBlock" aria-labelledby="h-decision" hidden>
-    <h2 id="h-decision">ההחלטה שהתקבלה בעניינך</h2>
-    <div id="decisionBody"></div>
-  </section>
+      <div class="bar" role="img" id="progressBar">
+        <i id="progressFill" style="width:0%"></i>
+      </div>
+      <p class="bar-note" id="progressNote"></p>
+    </section>
 
-  <!-- 2. מה עליי לעשות עכשיו -->
-  <section class="block todo" id="todoBlock" aria-labelledby="h-todo">
-    <h2 id="h-todo">מה עליי לעשות עכשיו</h2>
-    <div id="todoBody"></div>
-  </section>
+    <!-- ההחלטה שהתקבלה - מוצג רק אם יש החלטת ועדה -->
+    <section class="block decision" id="decisionBlock" aria-labelledby="h-decision" hidden>
+      <h2 id="h-decision">ההחלטה שהתקבלה בעניינך</h2>
+      <div id="decisionBody"></div>
+    </section>
 
-  <!-- 3. המסמכים שלי -->
-  <section class="block" aria-labelledby="h-docs">
-    <h2 id="h-docs">המסמכים שלי</h2>
-    <p id="docsIntro"></p>
-    <ul class="plain-list" id="docList"></ul>
-  </section>
+    <!-- מה עליי לעשות עכשיו -->
+    <section class="block todo" id="todoBlock" aria-labelledby="h-todo">
+      <h2 id="h-todo">מה עליי לעשות עכשיו</h2>
+      <div id="todoBody"></div>
+    </section>
 
-  <!-- 4. מה יקרה בהמשך -->
-  <section class="block" aria-labelledby="h-next">
-    <h2 id="h-next">מה יקרה בהמשך</h2>
-    <ul class="plain-list" id="nextSteps"></ul>
-  </section>
+    <!-- מה יקרה בהמשך -->
+    <section class="block" aria-labelledby="h-next">
+      <h2 id="h-next">מה יקרה בהמשך</h2>
+      <ul class="plain-list" id="nextSteps"></ul>
+    </section>
 
-  <!-- 5. כל שלבי התביעה -->
-  <section class="block" aria-labelledby="h-steps">
-    <h2 id="h-steps">כל שלבי התביעה</h2>
-    <ul class="steps" id="stepsList"></ul>
-  </section>
+    <!-- עדכונים מהמשרד -->
+    <section class="block" aria-labelledby="h-msgs">
+      <h2 id="h-msgs">עדכונים מהמשרד</h2>
+      <ul class="plain-list" id="messages"></ul>
+    </section>
 
-  <!-- 6. עדכונים מהמשרד -->
-  <section class="block" aria-labelledby="h-msgs">
-    <h2 id="h-msgs">עדכונים מהמשרד</h2>
-    <ul class="plain-list" id="messages"></ul>
-  </section>
+    <!-- יצירת קשר -->
+    <section class="block" aria-labelledby="h-contact">
+      <h2 id="h-contact">מי מטפל בתיק שלי</h2>
+      <p class="contact-name" id="lawyerName"></p>
+      <p class="contact-role" id="lawyerRole"></p>
+      <div class="contact-btns">
+        <a class="btn btn-primary" id="lawyerPhone" href="#"></a>
+        <a class="btn btn-outline" id="lawyerEmail" href="#">שליחת אימייל</a>
+      </div>
+    </section>
+  </div>
 
-  <!-- 7. יצירת קשר -->
-  <section class="block" aria-labelledby="h-contact">
-    <h2 id="h-contact">מי מטפל בתיק שלי</h2>
-    <p class="contact-name" id="lawyerName"></p>
-    <p class="contact-role" id="lawyerRole"></p>
-    <div class="contact-btns">
-      <a class="btn btn-primary" id="lawyerPhone" href="#"></a>
-      <a class="btn btn-outline" id="lawyerEmail" href="#">שליחת אימייל</a>
-    </div>
-  </section>
+  <!-- ===================== מסמכים נדרשים ===================== -->
+  <div class="view" id="view-docs" hidden>
+    <h1 class="view-title" id="docsTitle" tabindex="-1">מסמכים נדרשים</h1>
+
+    <section class="block" aria-labelledby="h-docs">
+      <h2 id="h-docs" class="visually-hidden">המסמכים שלי</h2>
+      <p id="docsIntro"></p>
+      <ul class="plain-list" id="docList"></ul>
+    </section>
+  </div>
+
+  <!-- ===================== מפת הדרכים ===================== -->
+  <div class="view" id="view-roadmap" hidden>
+    <h1 class="view-title" id="roadmapTitle" tabindex="-1">מפת הדרכים של ההליך</h1>
+    <p class="lead">איפה התיק שלך נמצא, מה נשאר, וכמה זמן זה כבר לוקח.</p>
+
+    <!-- משך ההליך + השוואה לממוצע -->
+    <section class="block" aria-labelledby="h-duration">
+      <h2 id="h-duration">כמה זמן ההליך שלך רץ</h2>
+      <div id="durationBody"></div>
+    </section>
+
+    <!-- 8 השלבים -->
+    <section class="block" aria-labelledby="h-steps">
+      <h2 id="h-steps">כל שלבי התביעה</h2>
+      <ul class="steps" id="stepsList"></ul>
+    </section>
+  </div>
 
   <p class="small-print">
     המידע כאן הוא למעקב בלבד ואינו ייעוץ משפטי. לשאלות על התיק יש לפנות לצוות המטפל.<br>
@@ -116,5 +197,6 @@
 <script src="assets/js/data.js"></script>
 <script src="assets/js/quality.js"></script>
 <script src="assets/js/dashboard.js"></script>
+<script src="assets/js/nav.js"></script>
 </body>
 </html>

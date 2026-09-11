@@ -602,6 +602,132 @@
     return node;
   }
 
+  /* ==========================================================
+     משך ההליך
+
+     שני התאריכים כבר קיימים בנתונים: openedAt הוא פתיחת התיק
+     במשרד, ו-stageDates[2] הוא יום הגשת התביעה לביטוח לאומי.
+     אלה שני דברים שונים והלקוח שואל על שניהם.
+     ========================================================== */
+
+  /** מספר הימים שעברו מתאריך נתון ועד היום */
+  function daysSince(iso) {
+    if (!iso) return null;
+    var then = new Date(iso + 'T00:00:00');
+    if (isNaN(then)) return null;
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((now - then) / 86400000));
+  }
+
+  /** "שנה ושלושה חודשים" קריא יותר מ-"438 ימים" */
+  function humanSpan(days) {
+    if (days == null) return '';
+    if (days < 31) return days === 1 ? 'יום אחד' : days + ' ימים';
+
+    var months = Math.floor(days / 30.44);
+    var years  = Math.floor(months / 12);
+    var rem    = months % 12;
+
+    var parts = [];
+    if (years)  parts.push(years === 1 ? 'שנה' : years + ' שנים');
+    if (rem)    parts.push(rem === 1 ? 'חודש' : rem + ' חודשים');
+    if (!parts.length) parts.push('חודש');
+    return parts.join(' ו');
+  }
+
+  function statLine(label, value, note) {
+    var box = el('div', 'stat');
+    box.appendChild(el('div', 'stat-label', label));
+    box.appendChild(el('div', 'stat-value', value));
+    if (note) box.appendChild(el('div', 'stat-note', note));
+    return box;
+  }
+
+  function renderDuration() {
+    var host = $('durationBody');
+    if (!host) return;
+    host.textContent = '';
+
+    var openedDays = daysSince(caseFile.openedAt);
+    var filedOn    = caseFile.stageDates && caseFile.stageDates[2];
+    var filedDays  = daysSince(filedOn);
+
+    var grid = el('div', 'stat-grid');
+    grid.appendChild(statLine(
+      'מאז פתיחת התיק במשרד',
+      humanSpan(openedDays),
+      caseFile.openedAt ? 'נפתח ב-' + formatDate(caseFile.openedAt) : ''
+    ));
+
+    if (filedDays != null) {
+      grid.appendChild(statLine(
+        'מאז הגשת התביעה לביטוח לאומי',
+        humanSpan(filedDays),
+        'הוגשה ב-' + formatDate(filedOn)
+      ));
+    } else {
+      grid.appendChild(statLine(
+        'הגשת התביעה לביטוח לאומי',
+        'טרם הוגשה',
+        'זה השלב שאנחנו עובדים עליו'
+      ));
+    }
+    host.appendChild(grid);
+
+    /* ---- השוואה לממוצע ---- */
+
+    var est = typeof durationEstimate === 'function'
+            ? durationEstimate(caseFile.claimType) : null;
+    if (!est || openedDays == null) return;
+
+    var estDays = Math.round(est.typicalMonths * 30.44);
+    var pct     = Math.min(100, Math.round((openedDays / estDays) * 100));
+
+    var cmp = el('div', 'compare');
+    cmp.appendChild(el('h3', null,
+      'מול משך טיפול אופייני בתביעת ' + caseFile.claimType));
+
+    var bar = el('div', 'compare-bar');
+    bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label',
+      'התיק שלך נמצא בכ-' + pct + ' אחוז ממשך הטיפול האופייני');
+    var fill = el('i');
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+    cmp.appendChild(bar);
+
+    cmp.appendChild(el('p', 'compare-note',
+      'טיפול אופייני בתביעה מסוג זה נמשך בערך ' + est.typicalMonths +
+      ' חודשים, ובדרך כלל בין ' + est.rangeMonths[0] + ' ל-' +
+      est.rangeMonths[1] + ' חודשים. ' + est.note));
+
+    /* הסייג מוצג ללקוח כל עוד המספרים לא אושרו על ידי המשרד.
+       זה מכוון: עדיף שהלקוח יידע שזו הערכה מאשר שיבנה עליה. */
+    if (!est.verified) {
+      var warn = el('p', 'estimate-warning');
+      warn.appendChild(el('strong', null, 'שימו לב: זו הערכה כללית בלבד. '));
+      warn.appendChild(document.createTextNode(
+        'המספרים כאן אינם נתונים רשמיים ואינם הבטחה לגבי התיק שלכם. ' +
+        'כל תיק מתנהל בקצב משלו. לשאלה על לוח הזמנים שלכם - דברו עם המשרד.'
+      ));
+      cmp.appendChild(warn);
+    }
+
+    host.appendChild(cmp);
+  }
+
+  /* ---- אנימציית מפת הדרכים ----
+     רצה פעם אחת בכניסה למסך. nav.js קורא לה.
+     ביטול תנועה מטופל ב-CSS, ולכן אין כאן בדיקה כפולה. */
+  window.playRoadmap = function () {
+    var list = $('stepsList');
+    if (!list) return;
+    list.classList.remove('steps-in');
+    void list.offsetWidth;          // מאלץ reflow כדי שהאנימציה תרוץ שוב
+    list.classList.add('steps-in');
+  };
+
   /* ---- הפעלה ---- */
 
   renderStatus();
@@ -610,6 +736,7 @@
   renderDocs();
   renderNextSteps();
   renderStages();
+  renderDuration();
   renderMessages();
   renderContact();
 })();

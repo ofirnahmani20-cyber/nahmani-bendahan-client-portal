@@ -597,3 +597,227 @@ h1 { letter-spacing: -0.01em; }
 }
 .steps .now .name { display: block; margin: 0 0 4px; }
 .steps .now .mark { outline: 4px solid var(--surface); }
+
+/* ==========================================================
+   קנבס כהה, תפריט נשלף, ומסכים
+   ----------------------------------------------------------
+   הרקע של העמוד עובר לגרפיט, אבל כרטיסי התוכן נשארים לבנים.
+   קהל היעד כולל אנשים עם ראייה ירודה, וטקסט קריאה ארוך על
+   רקע כהה קשה להם יותר. כך מתקבל המראה בלי לשלם בקריאוּת.
+   ========================================================== */
+:root {
+  --bg:        #272c34;            /* לבן עליו 14.04:1 */
+  --on-bg:     #e8eaee;            /* 11.65:1 על הקנבס */
+  --on-bg-dim: #b6bcc7;            /* 7.36:1 על הקנבס */
+}
+
+/* הטקסט נשאר כהה כברירת מחדל, כי רוב הטקסט יושב בתוך כרטיס לבן.
+   רק מה שנמצא באמת על הקנבס הכהה מקבל צבע בהיר - אחרת תוויות
+   בתוך הכרטיסים יורשות צבע של רקע אחר ונעלמות. */
+.small-print,
+.public-link,
+.login-head h1,
+.login-head .lead { color: var(--on-bg-dim); }
+.login-head h1 { color: var(--on-bg); }
+
+/* כותרת המסך יושבת על הקנבס הכהה ולכן היא בהירה */
+.view-title {
+  color: var(--on-bg);
+  font-size: calc(30px * var(--scale));
+  line-height: 1.25; margin: 0 0 8px;
+  font-family: var(--serif); font-weight: 700;
+}
+.view-title:focus-visible { outline: var(--focus); outline-offset: 6px; }
+.view > .lead { color: var(--on-bg-dim); }
+
+/* ---- כפתור שלושת הקווים ---- */
+.hamburger {
+  display: inline-flex; align-items: center; gap: 9px;
+  min-height: 48px; padding: 8px 14px;
+  background: transparent; color: #fff;
+  border: 1px solid #4a515c; border-radius: 6px;
+  font: inherit; font-size: calc(16px * var(--scale)); font-weight: 500;
+  cursor: pointer;
+}
+.hamburger:hover { background: #ffffff1a; }
+
+/* ---- המגירה ---- */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 90;
+  background: #0a0c10; opacity: 0;
+  transition: opacity .22s ease;
+}
+.drawer-open .drawer-overlay { opacity: .6; }
+
+.drawer {
+  position: fixed; z-index: 91;
+  inset-block: 0; inset-inline-end: auto; inset-inline-start: 0;
+  width: min(360px, 86vw);
+  background: var(--accent); color: #fff;
+  border-inline-end: 1px solid var(--gold);
+  padding: 20px 0 28px;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform .22s ease;
+}
+/* ב-RTL המגירה נשלפת מימין. inset-inline מטפל בכיוון, וה-transform
+   מתהפך יחד איתו בזכות הסימן השלילי בכיוון הכתיבה. */
+html[dir="rtl"] .drawer { transform: translateX(100%); }
+.drawer-open .drawer,
+html[dir="rtl"] .drawer-open .drawer { transform: translateX(0); }
+
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px 16px; margin: 0 0 12px;
+  border-bottom: 1px solid #3a414c;
+}
+.drawer-eyebrow {
+  font-size: calc(12px * var(--scale)); font-weight: 700;
+  letter-spacing: .18em; color: var(--gold);
+}
+.drawer-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px;
+  background: transparent; color: #fff;
+  border: 1px solid #4a515c; border-radius: 6px; cursor: pointer;
+}
+.drawer-close:hover { background: #ffffff1a; }
+
+.drawer-list { list-style: none; margin: 0; padding: 0; }
+
+.drawer-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-height: 56px; padding: 12px 20px;
+  background: transparent; color: #fff;
+  border: 0; border-inline-start: 4px solid transparent;
+  font: inherit; font-size: calc(18px * var(--scale)); font-weight: 500;
+  text-align: start; text-decoration: none; cursor: pointer;
+}
+.drawer-link:hover { background: #ffffff14; }
+.drawer-link[aria-current="page"] {
+  border-inline-start-color: var(--gold);
+  background: #ffffff14; font-weight: 700;
+}
+.drawer-badge {
+  flex: 0 0 auto; min-width: 28px; padding: 2px 9px;
+  background: var(--gold); color: var(--accent);
+  border-radius: 999px; text-align: center;
+  font-size: calc(15px * var(--scale)); font-weight: 700;
+}
+.drawer-rule { border: 0; border-top: 1px solid #3a414c; margin: 14px 20px; }
+.drawer-out { color: var(--on-bg-dim); }
+.drawer-foot {
+  margin: 18px 0 0; padding: 0 20px;
+  font-size: calc(15px * var(--scale)); color: var(--on-bg-dim); line-height: 1.6;
+}
+
+/* ==========================================================
+   מפת הדרכים - זמנים
+   ========================================================== */
+.stat-grid { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 8px; }
+.stat {
+  flex: 1 1 220px;
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 16px 18px;
+}
+.stat-label {
+  font-size: calc(14px * var(--scale)); font-weight: 700;
+  letter-spacing: .1em; color: var(--bronze); margin: 0 0 6px;
+}
+.stat-value {
+  font-family: var(--serif); font-weight: 700;
+  font-size: calc(26px * var(--scale)); line-height: 1.2;
+}
+.stat-note { font-size: calc(15px * var(--scale)); color: var(--text-soft); margin: 4px 0 0; }
+
+.compare { margin: 24px 0 0; padding: 20px 0 0; border-top: 1px solid var(--border); }
+.compare h3 { margin: 0 0 12px; }
+.compare-bar {
+  height: 10px; background: #e2e5ea; border-radius: 999px; overflow: hidden;
+  display: flex; flex-direction: row-reverse;
+}
+.compare-bar > i { display: block; height: 100%; background: var(--accent); }
+.compare-note { margin: 12px 0 0; font-size: calc(17px * var(--scale)); color: var(--text-soft); }
+
+/* הסייג על ההערכה - מוצג ללקוח, לא רק בקוד */
+.estimate-warning {
+  margin: 16px 0 0; padding: 14px 16px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-inline-start: 4px solid var(--warn);
+  border-radius: 6px;
+  font-size: calc(17px * var(--scale)); line-height: 1.6;
+}
+
+/* ---- אנימציית הכניסה למפה ---- */
+.steps-in > li {
+  opacity: 0;
+  animation: step-in .42s ease forwards;
+}
+.steps-in > li:nth-child(1) { animation-delay: .04s; }
+.steps-in > li:nth-child(2) { animation-delay: .10s; }
+.steps-in > li:nth-child(3) { animation-delay: .16s; }
+.steps-in > li:nth-child(4) { animation-delay: .22s; }
+.steps-in > li:nth-child(5) { animation-delay: .28s; }
+.steps-in > li:nth-child(6) { animation-delay: .34s; }
+.steps-in > li:nth-child(7) { animation-delay: .40s; }
+.steps-in > li:nth-child(8) { animation-delay: .46s; }
+
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* מי שביקש פחות תנועה מקבל את המסך מיד, בלי אנימציה ובלי מעברים */
+@media (prefers-reduced-motion: reduce) {
+  .steps-in > li { opacity: 1; animation: none; }
+  .drawer, .drawer-overlay { transition: none; }
+}
+
+@media (max-width: 560px) {
+  .hamburger span { position: absolute; width: 1px; height: 1px;
+    margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .hamburger { padding: 8px 12px; }
+}
+
+/* ==========================================================
+   הדף הציבורי
+   ========================================================== */
+.photo-row { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0 0; }
+.photo-ph { flex: 1 1 180px; margin: 0; }
+.photo-box {
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 4 / 3;
+  background: var(--wait-soft);
+  border: 1px dashed var(--border-ui); border-radius: 6px;
+  color: var(--text-soft); font-size: calc(15px * var(--scale));
+  letter-spacing: .1em;
+}
+.photo-ph figcaption {
+  margin: 8px 0 0; font-weight: 700;
+  font-size: calc(16px * var(--scale));
+}
+
+.faq-item { border-top: 1px solid var(--border); }
+.faq-item:first-child { border-top: 0; }
+.faq-q {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 56px; padding: 14px 0;
+  font-weight: 700; font-size: calc(19px * var(--scale));
+  cursor: pointer; list-style: none;
+}
+.faq-q::-webkit-details-marker { display: none; }
+.faq-q::before {
+  content: "+"; flex: 0 0 auto;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-ui); border-radius: 50%;
+  font-family: var(--sans); font-weight: 700; color: var(--bronze);
+}
+.faq-item[open] .faq-q::before { content: "\2212"; }
+.faq-q:focus-visible { outline: var(--focus); outline-offset: 3px; }
+.faq-a { margin: 0 0 18px; padding-inline-start: 38px; color: var(--text-soft); }
+
+.cta { border: 1px solid var(--accent); }
+.public-link { text-align: center; margin: 26px 0 0; font-size: calc(17px * var(--scale)); }
+.public-link a { color: var(--accent); font-weight: 700; }
