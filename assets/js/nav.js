@@ -26,9 +26,12 @@
   /* ---- התצוגות ---- */
 
   var VIEWS = {
-    home:    { el: 'view-home',    title: 'האזור האישי שלי' },
-    docs:    { el: 'view-docs',    title: 'מסמכים נדרשים' },
-    roadmap: { el: 'view-roadmap', title: 'מפת הדרכים של ההליך' }
+    home:     { el: 'view-home',     title: 'סקירה' },
+    todo:     { el: 'view-todo',     title: 'מה נדרש ממך' },
+    uploaded: { el: 'view-uploaded', title: 'המסמכים שהעלית' },
+    roadmap:  { el: 'view-roadmap',  title: 'מפת ההליך' },
+    updates:  { el: 'view-updates',  title: 'החלטות ועדכונים' },
+    contact:  { el: 'view-contact',  title: 'יצירת קשר' }
   };
 
   var current = null;
@@ -69,8 +72,15 @@
     }
   }
 
+  /* גם פריטי המגירה וגם התפריט האופקי שבסרגל. שניהם נושאים
+     data-view, ולכן showView מסמן aria-current על שניהם ואין
+     שני מקורות אמת למסך הפעיל. */
+  /* חשוף כדי שכפתור הפעולה בתמצית ינווט דרך אותו מסלול בדיוק -
+     אותה הכרזה לקורא מסך ואותו סימון aria-current. */
+  window.goToView = function (name) { showView(name, true); };
+
   var links = Array.prototype.slice.call(
-    drawer.querySelectorAll('.drawer-link[data-view]')
+    document.querySelectorAll('.drawer-link[data-view], .sitenav a[data-view]')
   );
 
   links.forEach(function (btn) {

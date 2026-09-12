@@ -6,8 +6,8 @@
 <title>ניהול תיקים | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/admin.css">
+<link rel="stylesheet" href="assets/css/style.css?v=202609121616">
+<link rel="stylesheet" href="assets/css/admin.css?v=202609121616">
 </head>
 <body class="admin">
 
@@ -45,29 +45,72 @@
   <p class="small-print"><a href="index.html">מעבר לאזור הלקוחות</a></p>
 </main>
 
+<footer class="sitefoot">
+  <div class="sitefoot-in">
+    <div class="foot-col foot-brand">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <div class="logo-wm">
+          <b><span>Nahmani</span><span>Ben-Dahan</span></b>
+          <i>Law Office</i>
+        </div>
+      </div>
+    </div>
+    <div class="foot-col">
+      <h2>ניווט</h2>
+      <ul>
+        <li><a href="info.html#h-about">על המשרד</a></li>
+        <li><a href="info.html#h-stages">שלבי הליווי</a></li>
+        <li><a href="info.html#h-articles">מרכז המדיה</a></li>
+        <li><a href="info.html#h-faq">שאלות נפוצות</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h2>יצירת קשר</h2>
+      <ul>
+        <li><a href="tel:035551234">03-5551234</a></li>
+        <li><a href="mailto:office@nahmani-bendahan.co.il">office@nahmani-bendahan.co.il</a></li>
+      </ul>
+      <p>ימים א׳–ה׳, 09:00–17:00</p>
+    </div>
+  </div>
+  <div class="sitefoot-legal">
+    מערכת פנימית לצוות המשרד. הנתונים בגרסה זו הם נתוני הדגמה.<br>
+    © 2026 משרד עורכי הדין Nahmani Ben-Dahan.
+  </div>
+</footer>
+
 <!-- ============ המערכת ============ -->
 <div id="appView" hidden>
 
   <a class="skip-link" href="#main">דילוג לתוכן</a>
 
   <header class="topbar">
-    <div class="topbar-in wide">
+    <div class="topbar-in">
       <div class="logo">
       <span class="logo-mark" aria-hidden="true"></span>
       <div class="logo-wm">
         <b><span>Nahmani</span><span>Ben-Dahan</span></b>
-        <i>Law Firm</i>
+        <i>Law Office</i>
         <span class="who" id="staffName"></span>
       </div>
     </div>
-      <div class="topbar-actions">
+  
+    <nav class="sitenav" aria-label="ניווט ראשי">
+      <ul>
+        <li><a href="admin.html">רשימת התיקים</a></li>
+        <li><a href="info.html">האתר הציבורי</a></li>
+      </ul>
+    </nav>
+
+    <div class="topbar-actions topbar-end">
         <button type="button" class="btn btn-quiet" id="backBtn" hidden>חזרה לרשימת התיקים</button>
         <button type="button" class="btn btn-quiet" id="staffLogout">יציאה</button>
       </div>
     </div>
   </header>
 
-  <main class="page wide" id="main">
+  <main class="page band-in" id="main">
 
     <p class="demo-warning" role="note">
       <strong>גרסת הדגמה.</strong> הנתונים נשמרים בדפדפן הזה בלבד ואינם מוגנים.
@@ -279,7 +322,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/data.js"></script>
-<script src="assets/js/admin.js"></script>
+<script src="assets/js/data.js?v=202609121616"></script>
+<script src="assets/js/admin.js?v=202609121616"></script>
 </body>
 </html>

@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>מידע מקצועי | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/style.css">
+<meta name="description" content="משרד עורכי דין המתמחה בתביעות ביטוח לאומי - נכות כללית ונכות מעבודה, מפתיחת התיק ועד ההחלטה.">
+<link rel="stylesheet" href="assets/css/style.css?v=202609121616">
 </head>
 <body>
 
@@ -17,10 +18,20 @@
       <span class="logo-mark" aria-hidden="true"></span>
       <div class="logo-wm">
         <b><span>Nahmani</span><span>Ben-Dahan</span></b>
-        <i>Law Firm</i>
+        <i>Law Office</i>
       </div>
     </div>
-    <div class="topbar-actions">
+
+    <nav class="sitenav" aria-label="ניווט ראשי">
+      <ul>
+        <li><a href="#h-about">על המשרד</a></li>
+        <li><a href="#h-stages">שלבי הליווי</a></li>
+        <li><a href="#h-articles">מרכז המדיה</a></li>
+        <li><a href="#h-faq">שאלות נפוצות</a></li>
+      </ul>
+    </nav>
+
+    <div class="topbar-end">
       <a class="btn btn-quiet" href="index.html">כניסה לאזור האישי</a>
     </div>
   </div>
@@ -28,88 +39,160 @@
 
 <main class="page" id="main">
 
-  <!-- ===== על המשרד ===== -->
-  <div class="hero">
-    <p class="hero-eyebrow">Nahmani Ben-Dahan &middot; Law Firm</p>
-    <h1 class="view-title hero-title">ביטוח לאומי, מההתחלה ועד ההחלטה</h1>
-    <p class="lead">
-      אנחנו מלווים נפגעי עבודה ואנשים עם מוגבלות מול המוסד לביטוח לאומי —
-      מפתיחת התיק, דרך הוועדה הרפואית, ועד הערר אם צריך.
-    </p>
+  <!-- ===== Hero ===== -->
+  <div class="band band-dark">
+    <div class="band-in">
+      <div class="hero">
+        <p class="hero-eyebrow">Nahmani Ben-Dahan &middot; Law Office</p>
+        <h1 class="view-title hero-title">ביטוח לאומי, מההתחלה ועד ההחלטה</h1>
+        <p class="lead">
+          אנחנו מלווים נפגעי עבודה ואנשים עם מוגבלות מול המוסד לביטוח לאומי —
+          מפתיחת התיק, דרך הוועדה הרפואית, ועד הערר אם צריך.
+        </p>
+      </div>
+    </div>
   </div>
 
-  <section class="block" aria-labelledby="h-about">
-    <div class="section-head">
-      <span class="ghost" aria-hidden="true">FIRM</span>
-      <h2 id="h-about">על המשרד</h2>
-    </div>
-    <p>
-      התביעה שלכם היא לא תיק אחד מיני רבים אצלנו. אנחנו עוסקים בביטוח לאומי בלבד,
-      ולכן אנחנו מכירים את הוועדות, את פקידי התביעות ואת מה שבאמת משנה תוצאה.
-    </p>
-    <p>
-      כל לקוח מקבל אזור אישי באתר הזה, שבו אפשר לראות בכל רגע איפה התיק עומד,
-      מה הוגש, מה חסר, ומה הצעד הבא — בלי להתקשר ובלי לחכות לתשובה.
-    </p>
+  <!-- ===== על המשרד ===== -->
+  <section class="band" aria-labelledby="h-about">
+    <div class="band-in">
+      <div class="section-head">
+        <span class="ghost" aria-hidden="true">FIRM</span>
+        <h2 id="h-about">על המשרד</h2>
+      </div>
+      <div class="measure">
+        <p>
+          התביעה שלכם היא לא תיק אחד מיני רבים אצלנו. אנחנו עוסקים בביטוח לאומי בלבד,
+          ולכן אנחנו מכירים את הוועדות, את פקידי התביעות ואת מה שבאמת משנה תוצאה.
+        </p>
+        <p>
+          כל לקוח מקבל אזור אישי באתר הזה, שבו אפשר לראות בכל רגע איפה התיק עומד,
+          מה הוגש, מה חסר, ומה הצעד הבא — בלי להתקשר ובלי לחכות לתשובה.
+        </p>
+      </div>
 
-    <div class="photo-row" id="photoRow">
-      <!-- מצייני מיקום. ראה ההערה בתחתית העמוד לגבי תמונות. -->
-      <figure class="photo-ph">
-        <div class="photo-box" aria-hidden="true">תמונה</div>
-        <figcaption>עו"ד אופיר נחמני</figcaption>
-      </figure>
-      <figure class="photo-ph">
-        <div class="photo-box" aria-hidden="true">תמונה</div>
-        <figcaption>עו"ד בן דהן</figcaption>
-      </figure>
-      <figure class="photo-ph">
-        <div class="photo-box" aria-hidden="true">תמונה</div>
-        <figcaption>המשרד</figcaption>
-      </figure>
+      <div class="photo-row" id="photoRow">
+        <!-- WebP עם JPEG כגיבוי. יחס 5:6 הוא יחס המקור, ולכן אין חיתוך.
+             width/height מפורשים מונעים קפיצת פריסה בזמן הטעינה. -->
+        <figure class="photo-ph">
+          <picture>
+            <source srcset="assets/img/team/ofir-nahmani.webp" type="image/webp">
+            <img class="ph ph-portrait" src="assets/img/team/ofir-nahmani.jpg"
+                 width="760" height="912" loading="lazy" decoding="async"
+                 alt="עו&quot;ד אופיר נחמני במשרד">
+          </picture>
+          <figcaption>עו"ד אופיר נחמני</figcaption>
+        </figure>
+        <figure class="photo-ph">
+          <picture>
+            <source srcset="assets/img/team/orel-ben-dahan.webp" type="image/webp">
+            <img class="ph ph-portrait" src="assets/img/team/orel-ben-dahan.jpg"
+                 width="760" height="912" loading="lazy" decoding="async"
+                 alt="עו&quot;ד אוראל בן דהן במשרד">
+          </picture>
+          <figcaption>עו"ד אוראל בן דהן</figcaption>
+        </figure>
+        <figure class="photo-ph">
+          <!-- טרם צולמה. מציין המקום נשאר עד אז. -->
+          <div class="ph ph-portrait" aria-hidden="true"></div>
+          <figcaption>המשרד</figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
-  <!-- ===== מאמרים ===== -->
-  <section class="block" aria-labelledby="h-articles">
-    <div class="section-head">
-      <span class="ghost" aria-hidden="true">INSIGHT</span>
-      <h2 id="h-articles">מאמרים מקצועיים</h2>
+  <!-- ===== שלבי הליווי ===== -->
+  <section class="band band-tint" aria-labelledby="h-stages">
+    <div class="band-in">
+      <div class="section-head">
+        <span class="ghost" aria-hidden="true">PROCESS</span>
+        <h2 id="h-stages">שלבי הליווי</h2>
+      </div>
+      <p class="measure">
+        אנחנו מלווים שני מסלולים — <strong>נכות כללית</strong> ו<strong>נכות מעבודה</strong> —
+        ובשניהם התיק עובר את שמונת השלבים הבאים. באזור האישי רואים בכל רגע באיזה שלב התיק שלכם.
+      </p>
+      <div class="acc" id="stageList"></div>
     </div>
-    <p id="articlesIntro">מה שכדאי לדעת לפני שמגישים, ומה שעושים כשההחלטה לא טובה.</p>
-    <ul class="plain-list" id="articleList"></ul>
+  </section>
+
+  <!-- ===== מרכז המדיה ===== -->
+  <section class="band" aria-labelledby="h-articles">
+    <div class="band-in">
+      <div class="section-head">
+        <span class="ghost" aria-hidden="true">INSIGHT</span>
+        <h2 id="h-articles">מרכז המדיה</h2>
+      </div>
+      <p class="measure" id="articlesIntro">מה שכדאי לדעת לפני שמגישים, ומה שעושים כשההחלטה לא טובה.</p>
+      <ul class="cards" id="articleList"></ul>
+    </div>
   </section>
 
   <!-- ===== שאלות נפוצות ===== -->
-  <section class="block" id="faq" aria-labelledby="h-faq">
-    <div class="section-head">
-      <span class="ghost" aria-hidden="true">Q &amp; A</span>
-      <h2 id="h-faq">שאלות נפוצות</h2>
+  <section class="band band-tint" id="faq" aria-labelledby="h-faq">
+    <div class="band-in">
+      <div class="section-head">
+        <span class="ghost" aria-hidden="true">Q &amp; A</span>
+        <h2 id="h-faq">שאלות נפוצות</h2>
+      </div>
+      <div class="measure" id="faqList"></div>
     </div>
-    <div id="faqList"></div>
   </section>
 
   <!-- ===== יצירת קשר ===== -->
-  <section class="block cta" aria-labelledby="h-cta">
-    <div class="section-head">
-      <span class="ghost" aria-hidden="true">CLIENTS</span>
-      <h2 id="h-cta">כבר לקוחות שלנו?</h2>
-    </div>
-    <p>הכניסה לאזור האישי היא עם מספר תעודת זהות והקוד שקיבלתם מהמשרד.</p>
-    <div class="contact-btns">
-      <a class="btn btn-primary" href="index.html">כניסה לאזור האישי</a>
-      <a class="btn btn-outline" href="tel:035551234">התקשרו אלינו: 03-5551234</a>
+  <section class="band band-tight" aria-labelledby="h-cta">
+    <div class="band-in">
+      <div class="section-head">
+        <span class="ghost" aria-hidden="true">CLIENTS</span>
+        <h2 id="h-cta">כבר לקוחות שלנו?</h2>
+      </div>
+      <p class="measure">הכניסה לאזור האישי היא עם מספר תעודת זהות והקוד שקיבלתם מהמשרד.</p>
+      <div class="cta-btns">
+        <a class="btn btn-primary" href="index.html">כניסה לאזור האישי</a>
+        <a class="btn btn-outline" href="tel:035551234">התקשרו אלינו: 03-5551234</a>
+      </div>
     </div>
   </section>
 
-  <p class="small-print">
-    המידע באתר זה הוא מידע כללי ואינו מהווה ייעוץ משפטי או תחליף לו.
-    כל מקרה נבחן לגופו.<br>
-    © 2026 משרד עורכי הדין Nahmani Ben-Dahan.
-  </p>
-
 </main>
 
-<script src="assets/js/data.js"></script>
-<script src="assets/js/info.js"></script>
+<footer class="sitefoot">
+  <div class="sitefoot-in">
+    <div class="foot-col foot-brand">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <div class="logo-wm">
+          <b><span>Nahmani</span><span>Ben-Dahan</span></b>
+          <i>Law Office</i>
+        </div>
+      </div>
+    </div>
+    <div class="foot-col">
+      <h2>ניווט</h2>
+      <ul>
+        <li><a href="info.html#h-about">על המשרד</a></li>
+        <li><a href="info.html#h-stages">שלבי הליווי</a></li>
+        <li><a href="info.html#h-articles">מרכז המדיה</a></li>
+        <li><a href="info.html#h-faq">שאלות נפוצות</a></li>
+        <li><a href="index.html">כניסה לאזור האישי</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h2>יצירת קשר</h2>
+      <ul>
+        <li><a href="tel:035551234">03-5551234</a></li>
+        <li><a href="mailto:office@nahmani-bendahan.co.il">office@nahmani-bendahan.co.il</a></li>
+      </ul>
+      <p>ימים א׳–ה׳, 09:00–17:00</p>
+    </div>
+  </div>
+  <div class="sitefoot-legal">
+    המידע באתר זה הוא מידע כללי ואינו מהווה ייעוץ משפטי או תחליף לו. כל מקרה נבחן לגופו.<br>
+    © 2026 משרד עורכי הדין Nahmani Ben-Dahan.
+  </div>
+</footer>
+
+<script src="assets/js/data.js?v=202609121616"></script>
+<script src="assets/js/info.js?v=202609121616"></script>
 </body>
 </html>

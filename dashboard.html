@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>האזור האישי שלי | מעקב תביעת ביטוח לאומי</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=202609121616">
 </head>
 <body>
 
@@ -26,12 +26,24 @@
       <span class="logo-mark" aria-hidden="true"></span>
       <div class="logo-wm">
         <b><span>Nahmani</span><span>Ben-Dahan</span></b>
-        <i>Law Firm</i>
+        <i>Law Office</i>
         <span class="who" id="userName"></span>
       </div>
     </div>
 
-    <div class="topbar-actions">
+
+    <nav class="sitenav" aria-label="ניווט ראשי">
+      <ul>
+        <li><a href="#home" data-view="home">סקירה</a></li>
+        <li><a href="#todo" data-view="todo">מה נדרש ממך</a></li>
+        <li><a href="#uploaded" data-view="uploaded">המסמכים שהעלית</a></li>
+        <li><a href="#roadmap" data-view="roadmap">מפת ההליך</a></li>
+        <li><a href="#updates" data-view="updates">עדכונים</a></li>
+        <li><a href="#contact" data-view="contact">יצירת קשר</a></li>
+      </ul>
+    </nav>
+
+    <div class="topbar-actions topbar-end">
       <button type="button" class="btn btn-quiet" id="textSizeBtn" aria-pressed="false">
         הגדלת טקסט
       </button>
@@ -56,18 +68,34 @@
   <ul class="drawer-list">
     <li>
       <button type="button" class="drawer-link" data-view="home">
-        <span>האזור האישי שלי</span>
+        <span>סקירה</span>
       </button>
     </li>
     <li>
-      <button type="button" class="drawer-link" data-view="docs">
-        <span>מסמכים נדרשים</span>
+      <button type="button" class="drawer-link" data-view="todo">
+        <span>מה נדרש ממך</span>
         <span class="drawer-badge" id="navDocsBadge" hidden></span>
       </button>
     </li>
     <li>
+      <button type="button" class="drawer-link" data-view="uploaded">
+        <span>המסמכים שהעלית</span>
+        <span class="drawer-badge" id="navDoneBadge" hidden></span>
+      </button>
+    </li>
+    <li>
       <button type="button" class="drawer-link" data-view="roadmap">
-        <span>מפת הדרכים של ההליך</span>
+        <span>מפת ההליך</span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="drawer-link" data-view="updates">
+        <span>החלטות ועדכונים</span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="drawer-link" data-view="contact">
+        <span>יצירת קשר</span>
       </button>
     </li>
   </ul>
@@ -93,96 +121,150 @@
 
 <main class="page" id="main">
 
-  <!-- ===================== האזור האישי ===================== -->
+  <!-- ===================== סקירה ===================== -->
   <div class="view" id="view-home">
-
-    <h1 class="view-title" id="greeting" tabindex="-1">האזור האישי שלי</h1>
-    <p class="lead" id="caseSummary"></p>
-
-    <!-- איפה התיק עומד -->
-    <section class="block status" aria-labelledby="h-status">
-      <h2 id="h-status" class="visually-hidden">מצב התביעה</h2>
-      <p class="step-of" id="stepOf"></p>
-      <p class="step-name" id="stepName"></p>
-      <p class="step-what" id="stepWhat"></p>
-
-      <div class="bar" role="img" id="progressBar">
-        <i id="progressFill" style="width:0%"></i>
+    <div class="band band-dark">
+      <div class="band-in">
+        <h1 class="view-title" id="greeting" tabindex="-1">האזור האישי שלי</h1>
+        <p class="lead" id="caseSummary"></p>
+        <div id="summaryBody"></div>
       </div>
-      <p class="bar-note" id="progressNote"></p>
-    </section>
-
-    <!-- ההחלטה שהתקבלה - מוצג רק אם יש החלטת ועדה -->
-    <section class="block decision" id="decisionBlock" aria-labelledby="h-decision" hidden>
-      <h2 id="h-decision">ההחלטה שהתקבלה בעניינך</h2>
-      <div id="decisionBody"></div>
-    </section>
-
-    <!-- מה עליי לעשות עכשיו -->
-    <section class="block todo" id="todoBlock" aria-labelledby="h-todo">
-      <h2 id="h-todo">מה עליי לעשות עכשיו</h2>
-      <div id="todoBody"></div>
-    </section>
-
-    <!-- מה יקרה בהמשך -->
-    <section class="block" aria-labelledby="h-next">
-      <h2 id="h-next">מה יקרה בהמשך</h2>
-      <ul class="plain-list" id="nextSteps"></ul>
-    </section>
-
-    <!-- עדכונים מהמשרד -->
-    <section class="block" aria-labelledby="h-msgs">
-      <h2 id="h-msgs">עדכונים מהמשרד</h2>
-      <ul class="plain-list" id="messages"></ul>
-    </section>
-
-    <!-- יצירת קשר -->
-    <section class="block" aria-labelledby="h-contact">
-      <h2 id="h-contact">מי מטפל בתיק שלי</h2>
-      <p class="contact-name" id="lawyerName"></p>
-      <p class="contact-role" id="lawyerRole"></p>
-      <div class="contact-btns">
-        <a class="btn btn-primary" id="lawyerPhone" href="#"></a>
-        <a class="btn btn-outline" id="lawyerEmail" href="#">שליחת אימייל</a>
-      </div>
-    </section>
+    </div>
   </div>
 
-  <!-- ===================== מסמכים נדרשים ===================== -->
-  <div class="view" id="view-docs" hidden>
-    <h1 class="view-title" id="docsTitle" tabindex="-1">מסמכים נדרשים</h1>
+  <!-- ===================== מה נדרש ממני ===================== -->
+  <div class="view" id="view-todo" hidden>
+    <div class="band band-in-wrap">
+      <div class="band-in">
+        <h1 class="view-title" id="todoTitle" tabindex="-1">מה נדרש ממך</h1>
+        <p class="lead measure">הפעולות הפתוחות בתיק, במקום אחד.</p>
 
-    <section class="block" aria-labelledby="h-docs">
-      <h2 id="h-docs" class="visually-hidden">המסמכים שלי</h2>
-      <p id="docsIntro"></p>
-      <ul class="plain-list" id="docList"></ul>
-    </section>
+        <section class="todo-panel" id="todoBlock" aria-labelledby="h-todo">
+          <h2 id="h-todo">הפעולות שבאחריותך</h2>
+          <div id="todoBody"></div>
+        </section>
+
+        <section aria-labelledby="h-docs-open">
+          <h2 id="h-docs-open">מסמכים להשלמה</h2>
+          <p id="docsOpenIntro" class="measure"></p>
+          <ul class="plain-list" id="docListOpen"></ul>
+        </section>
+      </div>
+    </div>
   </div>
 
-  <!-- ===================== מפת הדרכים ===================== -->
+  <!-- ===================== המסמכים שהעליתי ===================== -->
+  <div class="view" id="view-uploaded" hidden>
+    <div class="band">
+      <div class="band-in">
+        <h1 class="view-title" id="uploadedTitle" tabindex="-1">המסמכים שהעלית</h1>
+        <p class="lead measure" id="docsDoneIntro"></p>
+        <ul class="plain-list" id="docListDone"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== מפת ההליך ===================== -->
   <div class="view" id="view-roadmap" hidden>
-    <h1 class="view-title" id="roadmapTitle" tabindex="-1">מפת הדרכים של ההליך</h1>
-    <p class="lead">איפה התיק שלך נמצא, מה נשאר, וכמה זמן זה כבר לוקח.</p>
+    <div class="band">
+      <div class="band-in">
+        <h1 class="view-title" id="roadmapTitle" tabindex="-1">מפת ההליך</h1>
+        <p class="lead measure">איפה התיק שלך נמצא, מה נשאר, וכמה זמן זה כבר לוקח.</p>
 
-    <!-- משך ההליך + השוואה לממוצע -->
-    <section class="block" aria-labelledby="h-duration">
-      <h2 id="h-duration">כמה זמן ההליך שלך רץ</h2>
-      <div id="durationBody"></div>
-    </section>
+        <section aria-labelledby="h-duration">
+          <h2 id="h-duration">משך ההליך עד כה</h2>
+          <div id="durationBody"></div>
+        </section>
 
-    <!-- 8 השלבים -->
-    <section class="block" aria-labelledby="h-steps">
-      <h2 id="h-steps">כל שלבי התביעה</h2>
-      <ul class="steps" id="stepsList"></ul>
-    </section>
+        <section aria-labelledby="h-steps">
+          <h2 id="h-steps">שמונת שלבי התביעה</h2>
+          <ul class="steps" id="stepsList"></ul>
+        </section>
+
+        <section aria-labelledby="h-next">
+          <h2 id="h-next">מה יקרה בהמשך</h2>
+          <ul class="plain-list" id="nextSteps"></ul>
+        </section>
+      </div>
+    </div>
   </div>
 
-  <p class="small-print">
-    המידע כאן הוא למעקב בלבד ואינו ייעוץ משפטי. לשאלות על התיק יש לפנות לצוות המטפל.<br>
-    © 2026 משרד עורכי הדין Nahmani Ben-Dahan.
-  </p>
+  <!-- ===================== החלטות ועדכונים ===================== -->
+  <div class="view" id="view-updates" hidden>
+    <div class="band">
+      <div class="band-in">
+        <h1 class="view-title" id="updatesTitle" tabindex="-1">החלטות ועדכונים</h1>
+        <p class="lead measure">כל מה שהתקבל מהוועדה ומהמשרד, לפי סדר.</p>
+
+        <section class="decision-panel" id="decisionBlock" aria-labelledby="h-decision" hidden>
+          <h2 id="h-decision">ההחלטה שהתקבלה בעניינך</h2>
+          <div id="decisionBody"></div>
+        </section>
+
+        <section aria-labelledby="h-msgs">
+          <h2 id="h-msgs">עדכונים מהמשרד</h2>
+          <ul class="plain-list" id="messages"></ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== יצירת קשר ===================== -->
+  <div class="view" id="view-contact" hidden>
+    <div class="band">
+      <div class="band-in">
+        <h1 class="view-title" id="contactTitle" tabindex="-1">יצירת קשר</h1>
+        <p class="lead measure">הצוות שמטפל בתיק שלך זמין בטלפון ובאימייל.</p>
+
+        <section aria-labelledby="h-contact">
+          <h2 id="h-contact">מי מטפל בתיק שלי</h2>
+          <p class="contact-name" id="lawyerName"></p>
+          <p class="contact-role" id="lawyerRole"></p>
+          <div class="contact-btns">
+            <a class="btn btn-primary" id="lawyerPhone" href="#"></a>
+            <a class="btn btn-outline" id="lawyerEmail" href="#">שליחת אימייל</a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
 
 </main>
+
+<footer class="sitefoot">
+  <div class="sitefoot-in">
+    <div class="foot-col foot-brand">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <div class="logo-wm">
+          <b><span>Nahmani</span><span>Ben-Dahan</span></b>
+          <i>Law Office</i>
+        </div>
+      </div>
+    </div>
+    <div class="foot-col">
+      <h2>ניווט</h2>
+      <ul>
+        <li><a href="info.html#h-about">על המשרד</a></li>
+        <li><a href="info.html#h-stages">שלבי הליווי</a></li>
+        <li><a href="info.html#h-articles">מרכז המדיה</a></li>
+        <li><a href="info.html#h-faq">שאלות נפוצות</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h2>יצירת קשר</h2>
+      <ul>
+        <li><a href="tel:035551234">03-5551234</a></li>
+        <li><a href="mailto:office@nahmani-bendahan.co.il">office@nahmani-bendahan.co.il</a></li>
+      </ul>
+      <p>ימים א׳–ה׳, 09:00–17:00</p>
+    </div>
+  </div>
+  <div class="sitefoot-legal">
+    המידע כאן הוא למעקב בלבד ואינו ייעוץ משפטי. לשאלות על התיק יש לפנות לצוות המטפל.<br>
+    © 2026 משרד עורכי הדין Nahmani Ben-Dahan.
+  </div>
+</footer>
 
 <!-- בחירת קובץ קיים מהמכשיר -->
 <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" hidden>
@@ -190,9 +272,9 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/data.js"></script>
-<script src="assets/js/quality.js"></script>
-<script src="assets/js/dashboard.js"></script>
-<script src="assets/js/nav.js"></script>
+<script src="assets/js/data.js?v=202609121616"></script>
+<script src="assets/js/quality.js?v=202609121616"></script>
+<script src="assets/js/dashboard.js?v=202609121616"></script>
+<script src="assets/js/nav.js?v=202609121616"></script>
 </body>
 </html>

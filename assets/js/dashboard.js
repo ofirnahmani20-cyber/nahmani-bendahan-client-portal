@@ -113,6 +113,7 @@
       caseFile = CaseStore.load(user.idNumber);
       renderTodo();
       renderDocs();
+      renderSummary();
     });
 
     wrap.appendChild(row);
@@ -122,25 +123,138 @@
 
   /* ---- 1. כותרת ומצב התביעה ---- */
 
-  function renderStatus() {
-    var stage = CLAIM_STAGES[caseFile.currentStage - 1];
-    var total = CLAIM_STAGES.length;
-    var pct   = Math.round((caseFile.currentStage / total) * 100);
 
+  /* ==========================================================
+     סט הסמלים
+     ----------------------------------------------------------
+     SVG ולא אימוג'י: אימוג'י משתנה בין מערכות הפעלה, וקורא מסך
+     מקריא אותו בקול כחלק מהמשפט. כאן הסמל תמיד aria-hidden,
+     ותמיד יש טקסט גלוי לצידו - הוא מסייע להבנה ואינו מחליף אותה.
+     ========================================================== */
+
+  var ICON_PATHS = {
+    alert:    'M12 3 L22 20 H2 Z M12 9 v5 M12 17 v.6',
+    calendar: 'M4 6h16v15H4z M4 11h16 M8 3v5 M16 3v5',
+    check:    'M4 12.5 L9.5 18 L20 6',
+    doc:      'M6 3h8l4 4v14H6z M14 3v4h4 M9 12h6 M9 16h6',
+    clock:    'M12 3a9 9 0 100 18 9 9 0 000-18z M12 7v5.5l3.5 2',
+    message:  'M3 5h18v12H8l-5 4z',
+    phone:    'M5 4h4l2 5-2.5 1.5a12 12 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z'
+  };
+
+  /** סמל דקורטיבי. לעולם לא לבד - תמיד עם טקסט לצידו. */
+  function icon(name) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'icon');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    var p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', ICON_PATHS[name] || ICON_PATHS.doc);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor');
+    p.setAttribute('stroke-width', '1.6');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
+    return svg;
+  }
+
+  /** שורת סמל + טקסט. הטקסט הוא המידע; הסמל רק מסייע לסרוק אותו. */
+  function iconLine(name, text, tone) {
+    var row = el('p', 'icon-line' + (tone ? ' icon-line-' + tone : ''));
+    row.appendChild(icon(name));
+    row.appendChild(el('span', null, text));
+    return row;
+  }
+
+
+  /* ==========================================================
+     התמצית - המסך שהלקוח נוחת עליו
+     ----------------------------------------------------------
+     ארבע שורות ותו לא: איפה התיק, מה זה אומר, מה נדרש ממנו,
+     ומתי המועד הקרוב. כל השאר עבר לקטגוריות שבסרגל.
+     ========================================================== */
+
+  function renderSummary() {
+    var host = $('summaryBody');
+    if (!host) return;
+    host.textContent = '';
+
+    var total = CLAIM_STAGES.length;
+    var n     = caseFile.currentStage;
+    var stage = CLAIM_STAGES[n - 1];
+
+    /* המספר הגדול - אותה מחווה של 01-08 באקורדיון שבדף הציבורי */
+    var head = el('div', 'sum-head');
+    var num  = el('div', 'sum-num');
+    num.appendChild(el('span', 'sum-num-now', pad2(n)));
+    num.appendChild(el('span', 'sum-num-rule', '', true));
+    num.appendChild(el('span', 'sum-num-all', pad2(total)));
+    head.appendChild(num);
+
+    var title = el('div', 'sum-title');
+    title.appendChild(el('p', 'sum-eyebrow', 'השלב הנוכחי'));
+    title.appendChild(el('h2', 'sum-stage', stage.title));
+    head.appendChild(title);
+    host.appendChild(head);
+
+    /* מחוון מקוטע - שמונה משבצות שאפשר לספור בעין */
+    var track = el('div', 'ticks');
+    track.setAttribute('role', 'img');
+    track.setAttribute('aria-label',
+      'שלב ' + n + ' מתוך ' + total + ' בתביעה');
+    for (var i = 1; i <= total; i++) {
+      var cls = 'tick' + (i < n ? ' tick-done' : i === n ? ' tick-now' : '');
+      track.appendChild(el('span', cls, '', true));
+    }
+    host.appendChild(track);
+
+    host.appendChild(el('p', 'sum-what', stage.desc));
+
+    /* שורות הסמלים. אם אין פעולה פתוחה - אומרים זאת, לא משמיטים. */
+    var open = caseFile.documents.filter(function (d) {
+      return d.status === 'missing' || d.status === 'rejected';
+    }).length;
+
+    if (open) {
+      host.appendChild(iconLine('alert',
+        open === 1 ? 'נדרש ממך מסמך אחד' : 'נדרשים ממך ' + open + ' מסמכים', 'warn'));
+    } else {
+      host.appendChild(iconLine('check', 'כל המסמכים שביקשנו נמצאים אצלנו', 'ok'));
+    }
+
+    var when = caseFile.nextHearing;
+    if (when) {
+      var left = daysUntil(when);
+      var note = 'המועד הקרוב: ' + formatDate(when);
+      if (left != null && left >= 0) {
+        note += left === 0 ? ' (היום)' : ' (בעוד ' + left + (left === 1 ? ' יום)' : ' ימים)');
+      }
+      host.appendChild(iconLine('calendar', note));
+    } else {
+      host.appendChild(iconLine('clock', 'טרם נקבע מועד נוסף. נעדכן ברגע שייקבע.'));
+    }
+
+    var go = el('button', 'btn btn-primary sum-cta', open ? 'למה שנדרש ממני' : 'למסמכים שהעליתי');
+    go.type = 'button';
+    go.addEventListener('click', function () {
+      if (window.goToView) window.goToView(open ? 'todo' : 'uploaded');
+    });
+    host.appendChild(go);
+  }
+
+  /** "05" ולא "5" - המספר הדו-ספרתי הוא חלק מהעיצוב */
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  /* כותרת הזיהוי בלבד. מצב התביעה עצמו עבר ל-renderSummary,
+     שמחליף את כרטיס הסטטוס הישן ואת סרגל ההתקדמות הרציף. */
+  function renderStatus() {
     $('userName').textContent = user.name;
     $('greeting').textContent = 'שלום ' + user.name.split(' ')[0];
     $('caseSummary').textContent =
       'תביעת ' + caseFile.claimType + ' · תיק מספר ' + caseFile.caseNumber;
-
-    $('stepOf').textContent   = 'שלב ' + caseFile.currentStage + ' מתוך ' + total;
-    $('stepName').textContent = stage.title;
-    $('stepWhat').textContent = stage.desc;
-
-    $('progressFill').style.width = pct + '%';
-    $('progressBar').setAttribute('aria-label',
-      'התקדמות התביעה: ' + pct + ' אחוז, שלב ' + caseFile.currentStage + ' מתוך ' + total);
-    $('progressNote').textContent =
-      'בשלב הזה מאז ' + formatDate(caseFile.stageEnteredAt) + ' · ' + pct + '% מהדרך';
   }
 
   /* ---- 1ב. ההחלטה שהתקבלה ומה היא אומרת ---- */
@@ -281,48 +395,93 @@
 
   /* ---- 3. המסמכים שלי ---- */
 
+  /* ==========================================================
+     המסמכים - שתי רשימות מאותו מערך
+     ----------------------------------------------------------
+     "מה נדרש ממני" מציג רק את מה שיש עליו פעולה פתוחה.
+     "המסמכים שהעליתי" מציג את מה שכבר התקבל, כדי שהלקוח יראה
+     מה הוא כבר עשה ולא רק מה חסר.
+
+     מסמך נדחה מופיע ברשימה הפתוחה ולא ברשימת ההישגים: יש עליו
+     פעולה, והצגתו כ"הועלה" הייתה מטעה. שתי הרשימות יחד מכסות
+     את כל המסמכים בתיק, בלי חפיפה ובלי נשירה.
+     ========================================================== */
+
+  function isOpenDoc(d) {
+    return d.status === 'missing' || d.status === 'rejected';
+  }
+
+  /** שורת מסמך אחת. `withUpload` מוסיף את כפתור ההעלאה. */
+  function docRow(doc, withUpload) {
+    var s  = STATUS[doc.status];
+    var li = el('li');
+
+    var tag = el('span', 'tag ' + s.tag);
+    tag.appendChild(el('span', null, s.mark, true));
+    tag.appendChild(document.createTextNode(s.text));
+    li.appendChild(tag);
+
+    li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
+    li.appendChild(el('p', 'item-note', doc.note));
+
+    if (doc.file) {
+      li.appendChild(el('span', 'file-name',
+        'הקובץ שהתקבל: ' + doc.file + ' · ' + formatDate(doc.date)));
+    }
+
+    if (doc.status === 'rejected' && doc.rejectReason) {
+      li.appendChild(el('p', 'reject-note', 'סיבת הדחייה: ' + doc.rejectReason));
+    }
+
+    if (withUpload && DOC_NEEDS_UPLOAD(doc)) {
+      li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+      li.appendChild(qualitySlot(doc));
+    }
+
+    return li;
+  }
+
   function renderDocs() {
-    var docs = caseFile.documents.slice().sort(function (a, b) {
-      // הנדחים למעלה, אחריהם החסרים, אחר כך בבדיקה, ולבסוף המאושרים
-      var order = { 'rejected': 0, 'missing': 1, 'pending-review': 2, 'approved': 3 };
-      return order[a.status] - order[b.status];
-    });
+    var all  = caseFile.documents;
+    var open = all.filter(isOpenDoc);
+    var done = all.filter(function (d) { return !isOpenDoc(d) && d.file; });
 
-    var approved = docs.filter(function (d) { return d.status === 'approved'; }).length;
-    $('docsIntro').textContent =
-      approved + ' מתוך ' + docs.length + ' המסמכים כבר אצלנו. המסמכים שצריך להשלים מופיעים ראשונים.';
+    /* ---- מה נדרש ממני ---- */
+    var openList = $('docListOpen');
+    if (openList) {
+      openList.textContent = '';
+      $('docsOpenIntro').textContent = open.length
+        ? 'נותרו ' + open.length + ' מסמכים להשלמה מתוך ' + all.length + ' שביקשנו.'
+        : 'אין כרגע מסמכים להשלמה. קיבלנו את הכול.';
+      /* הנדחים ראשונים - עליהם הלקוח כבר עבד פעם אחת */
+      open.sort(function (a, b) {
+        return (a.status === 'rejected' ? 0 : 1) - (b.status === 'rejected' ? 0 : 1);
+      });
+      open.forEach(function (d) { openList.appendChild(docRow(d, true)); });
+    }
 
-    var list = $('docList');
-    list.textContent = '';
+    /* ---- המסמכים שהעליתי ---- */
+    var doneList = $('docListDone');
+    if (doneList) {
+      doneList.textContent = '';
+      $('docsDoneIntro').textContent = done.length
+        ? done.length + ' מסמכים כבר אצלנו, מתוך ' + all.length + ' שביקשנו.'
+        : 'עדיין לא התקבלו מסמכים. ברגע שתעלה מסמך הוא יופיע כאן.';
+      /* החדש למעלה - סדר כרונולוגי הפוך לפי מועד ההעלאה */
+      done.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+      done.forEach(function (d) { doneList.appendChild(docRow(d, false)); });
+    }
 
-    docs.forEach(function (doc) {
-      var s  = STATUS[doc.status];
-      var li = el('li');
+    /* תגי הספירה במגירה */
+    setBadge('navDocsBadge', open.length);
+    setBadge('navDoneBadge', done.length);
+  }
 
-      var tag = el('span', 'tag ' + s.tag);
-      tag.appendChild(el('span', null, s.mark, true));
-      tag.appendChild(document.createTextNode(s.text));
-      li.appendChild(tag);
-
-      li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
-      li.appendChild(el('p', 'item-note', doc.note));
-
-      if (doc.file) {
-        li.appendChild(el('span', 'file-name',
-          'הקובץ שהתקבל: ' + doc.file + ' · ' + formatDate(doc.date)));
-      }
-
-      if (doc.status === 'rejected' && doc.rejectReason) {
-        li.appendChild(el('p', 'reject-note', 'סיבת הדחייה: ' + doc.rejectReason));
-      }
-
-      if (DOC_NEEDS_UPLOAD(doc)) {
-        li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
-        li.appendChild(qualitySlot(doc));
-      }
-
-      list.appendChild(li);
-    });
+  function setBadge(id, n) {
+    var b = $(id);
+    if (!b) return;
+    b.textContent = n;
+    b.hidden = !n;
   }
 
   /* ---- 4. מה יקרה בהמשך ---- */
@@ -494,6 +653,7 @@
     pendingDoc = null;
     renderTodo();
     renderDocs();
+    renderSummary();
   }
 
   /* ---- משוב על איכות הצילום ---- */
@@ -731,6 +891,7 @@
   /* ---- הפעלה ---- */
 
   renderStatus();
+  renderSummary();
   renderDecision();
   renderTodo();
   renderDocs();

@@ -71,8 +71,35 @@ body {
 
 a { color: var(--accent); }
 
-/* ---- פריסה ---- */
-.page { max-width: 760px; margin: 0 auto; padding: 24px 18px 72px; }
+/* ==========================================================
+   פריסה - מערכת פסים ברוחב מלא
+   ----------------------------------------------------------
+   עד 12.09.2026 הפריסה הייתה טור יחיד ברוחב 760px, וכל תוכן
+   ישב בתוך כרטיס לבן ממוסגר. זה מה שגרם לאתר להיראות צר
+   ותבניתי לעומת אתרי משרדים גדולים.
+
+   המנגנון עכשיו: הפס נושא את הרקע ונמתח לרוחב המסך, ומכל
+   פנימי מחזיק את התוכן במרכז. ההפרדה בין אזורים מגיעה
+   מהחלפת רקע ולא ממסגרת.
+
+   .measure הוא מה שמונע את המחיר של הרוחב: מכל רחב עם טקסט
+   רץ נותן שורות ארוכות מדי לקריאה, ולכן טקסט רץ נשאר בתוכו.
+   ========================================================== */
+/* ברירת המחדל היא משטח בהיר. בלעדיה הפס נופל לרקע ה-body, שהוא
+   הקנבס הכהה, והטקסט הכהה שבתוכו הופך לבלתי קריא. */
+.band { width: 100%; background: var(--surface); color: var(--text); }
+.band-in {
+  max-width: 1180px; margin-inline: auto;
+  padding: 56px 32px;
+}
+.band-tint { background: var(--band); }
+.band-dark { background: var(--accent); color: var(--on-bg); }
+.band-tight .band-in { padding-block: 34px; }
+
+.measure { max-width: 68ch; }
+
+/* .page נשאר לתאימות עם המבנה הקיים, בלי מכל צר משלו */
+.page { padding: 0 0 72px; }
 
 h1 { font-size: calc(30px * var(--scale)); line-height: 1.3; margin: 0 0 8px; }
 h2 { font-size: calc(23px * var(--scale)); line-height: 1.35; margin: 0 0 14px; }
@@ -89,17 +116,21 @@ p  { margin: 0 0 14px; }
   margin: 0 0 20px;
 }
 
-/* ---- סרגל עליון ---- */
+/* ---- סרגל עליון: נדבק לראש המסך ---- */
 .topbar {
   background: var(--accent-dark);
   color: #fff;
-  padding: 14px 18px;
+  padding: 0 32px;
+  position: sticky; top: 0; z-index: 60;
 }
 .topbar-in {
-  max-width: 760px; margin: 0 auto;
+  max-width: 1180px; margin: 0 auto;
+  min-height: 84px;
   display: flex; flex-wrap: wrap; gap: 12px;
   align-items: center; justify-content: space-between;
 }
+/* עוגן שנגלל אליו לא ייחבא מאחורי הסרגל הנדבק */
+:target, [id] { scroll-margin-top: 100px; }
 .topbar .firm { font-weight: 700; font-size: calc(18px * var(--scale)); }
 .topbar .who  { font-size: calc(16px * var(--scale)); }
 .topbar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -530,7 +561,7 @@ h1 { letter-spacing: -0.01em; }
   line-height: 1.16; letter-spacing: .13em;
 }
 .logo-wm b span { display: block; }
-/* הקו התוחם משני צידי "Law Firm" - המחווה מהלוגו עצמו */
+/* הקו התוחם משני צידי "Law Office" - המחווה מהלוגו עצמו */
 .logo-wm i {
   display: flex; align-items: center; gap: 7px;
   font-style: normal; margin-top: 5px;
@@ -595,8 +626,10 @@ h1 { letter-spacing: -0.01em; }
   user-select: none;
 }
 
-/* פס סקשן חם - מחליף את הפס האפור-קר של שבלת */
-.band { background: var(--band); }
+/* הרקע של הפס נקבע ב-.band-tint / .band-dark שלמעלה.
+   כאן ישבה קודם ‎.band { background: var(--band) }‎ מסיבוב א׳, והיא
+   גברה על .band-dark בסדר המפל (אותה ספציפיות, מוגדרת מאוחר יותר)
+   וצבעה את ה-hero בבהיר. הוסרה. */
 
 /* עינית: טקסט זעיר ומרווח מעל כותרת, בין שני קווים.
    אותה מחווה של "LAW FIRM" בלוגו. */
@@ -767,15 +800,27 @@ h1 { letter-spacing: -0.01em; }
 .page > section > .lead { color: var(--on-bg); }
 .page > .lead, .page > section > .lead { color: var(--on-bg-dim); }
 
-/* כותרת המסך יושבת על הקנבס הכהה ולכן היא בהירה */
+/* ==========================================================
+   צבע הטקסט נקבע לפי הפס, לא לפי המסך
+   ----------------------------------------------------------
+   עד מעבר לפסים כל התצוגות ישבו על הקנבס הכהה, ולכן .view-title
+   היה בהיר תמיד. עכשיו רק "סקירה" יושבת על פס כהה וחמש האחרות
+   על פס בהיר - וכותרת בהירה עליהן נמדדה ב-1.26:1.
+
+   הכלל: ברירת המחדל כהה, ו-.band-dark הוא מה שמבהיר. כך כל פס
+   שייווצר בעתיד יקבל את הצבע הנכון בלי לזכור להוסיף חריג. */
 .view-title {
-  color: var(--on-bg);
+  color: var(--text);
   font-size: calc(30px * var(--scale));
   line-height: 1.25; margin: 0 0 8px;
   font-family: var(--serif); font-weight: 700;
 }
 .view-title:focus-visible { outline: var(--focus); outline-offset: 6px; }
-.view > .lead { color: var(--on-bg-dim); }
+.view .lead { color: var(--text-soft); }
+
+.band-dark .view-title { color: var(--on-bg); }
+.band-dark .lead,
+.band-dark .small-print { color: var(--on-bg-dim); }
 
 /* ---- כפתור שלושת הקווים ---- */
 .hamburger {
@@ -930,8 +975,8 @@ html[dir="rtl"] .drawer-open .drawer { transform: translateX(0); }
 /* ==========================================================
    הדף הציבורי
    ========================================================== */
-.photo-row { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0 0; }
-.photo-ph { flex: 1 1 180px; margin: 0; }
+.photo-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 32px 0 0; }
+.photo-ph { margin: 0; }
 .photo-box {
   display: flex; align-items: center; justify-content: center;
   aspect-ratio: 4 / 3;
@@ -968,3 +1013,277 @@ html[dir="rtl"] .drawer-open .drawer { transform: translateX(0); }
 .cta { border: 1px solid var(--accent); }
 .public-link { text-align: center; margin: 26px 0 0; font-size: calc(17px * var(--scale)); }
 .public-link a { color: var(--accent); font-weight: 700; }
+
+/* ==========================================================
+   תפריט אופקי בסרגל העליון
+   ----------------------------------------------------------
+   הקישורים גלויים בדסקטופ ומוסתרים במובייל, ושם המגירה של
+   nav.js חוזרת לתפקד. המגירה כבר מנהלת מיקוד ולוכדת אותו,
+   ולכן היא לא נכתבת כאן מחדש - רק מוסתרת כשאין בה צורך.
+   ========================================================== */
+.sitenav ul {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: center; flex-wrap: wrap;
+}
+.sitenav li { display: flex; align-items: center; }
+/* קו השיער המפריד - המחווה של שבלת. דקורטיבי, ולכן aria מתעלם */
+.sitenav li + li::before {
+  content: ""; width: 1px; height: 14px;
+  background: #6b6152; margin: 0 14px;
+}
+.sitenav a {
+  display: inline-flex; align-items: center;
+  min-height: 48px; padding: 0 2px;
+  color: #e9e5dd; text-decoration: none;
+  font-size: calc(16px * var(--scale)); font-weight: 400;
+  letter-spacing: .02em;
+  border-bottom: 2px solid transparent;
+}
+.sitenav a:hover { color: #fff; border-bottom-color: var(--bronze-light); }
+.sitenav a[aria-current="page"] {
+  font-weight: 700; color: #fff;
+  border-bottom-color: var(--bronze-light);
+}
+
+.topbar-end { display: flex; align-items: center; gap: 12px; }
+
+/* ==========================================================
+   פוטר
+   ========================================================== */
+.sitefoot { background: var(--accent); color: var(--on-bg); }
+.sitefoot-in {
+  max-width: 1180px; margin-inline: auto;
+  padding: 48px 32px 28px;
+  display: flex; flex-wrap: wrap; gap: 40px;
+}
+.foot-col { flex: 1 1 220px; }
+.foot-col h2 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: calc(13px * var(--scale)); letter-spacing: .22em;
+  color: var(--bronze-light); margin: 0 0 16px;
+}
+.foot-col ul { list-style: none; margin: 0; padding: 0; }
+.foot-col li { margin: 0 0 10px; }
+.foot-col a, .foot-col p {
+  color: var(--on-bg-dim); text-decoration: none;
+  font-size: calc(16px * var(--scale)); margin: 0 0 10px;
+}
+.foot-col a { display: inline-flex; align-items: center; min-height: 30px; }
+.foot-col a:hover { color: #fff; text-decoration: underline; }
+.foot-brand .logo-mark { width: calc(52px * var(--scale)); height: calc(32px * var(--scale)); }
+
+.sitefoot-legal {
+  max-width: 1180px; margin-inline: auto;
+  padding: 20px 32px 34px;
+  border-top: 1px solid #413a2f;
+  color: var(--on-bg-dim);
+  font-size: calc(15px * var(--scale));
+  line-height: 1.6;
+}
+
+/* ==========================================================
+   מציין מקום מעוצב
+   ----------------------------------------------------------
+   מחליף את המלבן המקווקו. בנוי כך שהחלפה לתמונה אמיתית היא
+   החלפת ה-div ב-img באותו class - בלי נגיעה ב-CSS.
+   ========================================================== */
+.ph {
+  position: relative;
+  display: block; width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--accent);
+  overflow: hidden;
+}
+.ph::after {
+  content: "";
+  position: absolute; inset: 26%;
+  background-color: var(--bronze-light); opacity: .17;
+  -webkit-mask: url('../logo.svg') no-repeat center / contain;
+  mask: url('../logo.svg') no-repeat center / contain;
+}
+/* height: auto חובה. בלעדיו תכונת ה-height="912" שב-HTML קובעת את
+   הגובה בפועל, aspect-ratio לא נכנס לתוקף, ו-cover חותך פרוסה אנכית
+   צרה מתוך התמונה במקום להציג אותה. */
+img.ph { object-fit: cover; height: auto; }
+img.ph::after { content: none; }
+
+/* פורטרט ביחס המקור של הצילומים (5:6). ביחס הזה cover אינו חותך
+   דבר, ולכן אין צורך לכייל object-position ואין סיכון לחתוך פנים. */
+.ph-portrait { aspect-ratio: 5 / 6; }
+
+/* ==========================================================
+   רשת כרטיסי מאמרים - מרכז המדיה
+   ========================================================== */
+.cards {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.card { display: flex; flex-direction: column; }
+/* גוף הכרטיס בגוון על פס לבן, ולבן על פס מגוון - כך הכרטיס
+   נבדל מהרקע בלי מסגרת, כמו אצל שבלת. */
+.card-body { background: var(--band); }
+.band-tint .card-body { background: var(--surface); }
+.card-media { position: relative; }
+/* תג הקטגוריה יושב על גבי התמונה, מרובע, בפינה */
+.card-cat {
+  position: absolute; top: 0; inset-inline-start: 0;
+  background: var(--accent); color: var(--bronze-light);
+  font-size: calc(14px * var(--scale)); font-weight: 700;
+  letter-spacing: .1em; padding: 7px 14px;
+}
+.card-rule { height: 6px; background: var(--bronze); }
+.card-body { padding: 22px 22px 24px; display: flex; flex-direction: column; flex: 1; }
+.card-when {
+  font-family: var(--serif); font-style: italic;
+  color: var(--bronze); font-size: calc(16px * var(--scale));
+  margin: 0 0 8px;
+}
+.card-title {
+  font-family: var(--serif); font-weight: 700;
+  font-size: calc(21px * var(--scale)); line-height: 1.35;
+  margin: 0 0 10px;
+}
+.card-sum { color: var(--text-soft); font-size: calc(17px * var(--scale)); margin: 0 0 18px; }
+.card-body .btn { margin-top: auto; align-self: flex-start; }
+
+/* ==========================================================
+   אקורדיון תחומי הטיפול
+   ----------------------------------------------------------
+   <details> ולא JavaScript: פתיחה במקלדת, aria-expanded
+   ומצב פתוח/סגור מגיעים מהדפדפן ולא נכתבים ביד.
+   ========================================================== */
+.acc {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  column-gap: 56px;
+}
+.acc-item { border-top: 1px solid var(--border); }
+.acc-q {
+  display: flex; align-items: center; gap: 14px;
+  min-height: 64px; padding: 16px 0;
+  cursor: pointer; list-style: none;
+  font-family: var(--serif); font-weight: 700;
+  font-size: calc(20px * var(--scale));
+}
+.acc-q::-webkit-details-marker { display: none; }
+.acc-q::after {
+  content: "+"; margin-inline-start: auto; flex: 0 0 auto;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-ui); border-radius: 50%;
+  font-family: var(--sans); font-weight: 700;
+  font-size: calc(17px * var(--scale)); color: var(--bronze);
+}
+.acc-item[open] .acc-q::after { content: "\2212"; }
+.acc-q:focus-visible { outline: var(--focus); outline-offset: 3px; }
+.acc-n {
+  flex: 0 0 auto; font-family: var(--serif);
+  color: var(--bronze); font-size: calc(15px * var(--scale));
+  letter-spacing: .08em;
+}
+.acc-a { margin: 0 0 20px; padding-inline-start: 44px; color: var(--text-soft); }
+
+/* מעל 860px התפריט האופקי גלוי, ולכן ההמבורגר מיותר. מתחת -
+   הפוך. שני הניווטים לעולם לא מוצגים יחד. */
+@media (min-width: 861px) {
+  .hamburger { display: none; }
+}
+
+@media (max-width: 860px) {
+  .sitenav { display: none; }
+  .cards { grid-template-columns: 1fr; gap: 28px; }
+  .photo-row { grid-template-columns: 1fr; gap: 22px; }
+  .acc { grid-template-columns: 1fr; column-gap: 0; }
+  .band-in { padding: 34px 18px; }
+  .topbar { padding: 0 18px; }
+  .sitefoot-in { padding: 34px 18px 20px; gap: 26px; }
+  .sitefoot-legal { padding: 18px 18px 28px; }
+}
+
+/* ==========================================================
+   התמצית - מסך הנחיתה של הלקוח
+   ----------------------------------------------------------
+   עד 12.09 מסך הכניסה החזיק שישה כרטיסים לבנים זהים זה מתחת
+   לזה, בלי היררכיה. עכשיו הוא נושא דבר אחד, והשאר עבר
+   לקטגוריות שבסרגל.
+   ========================================================== */
+.sum-head {
+  display: flex; align-items: center; gap: 28px;
+  margin: 26px 0 26px;
+}
+
+/* המספר הגדול - אותה מחווה של 01-08 באקורדיון שבדף הציבורי */
+.sum-num {
+  flex: 0 0 auto; text-align: center;
+  font-family: var(--serif); line-height: 1;
+  color: var(--bronze-light);
+}
+.sum-num-now { display: block; font-size: calc(52px * var(--scale)); font-weight: 700; }
+.sum-num-rule { display: block; height: 1px; background: currentColor; opacity: .5; margin: 8px 0; }
+.sum-num-all { display: block; font-size: calc(22px * var(--scale)); opacity: .75; }
+
+.sum-eyebrow {
+  font-family: var(--sans); font-weight: 700;
+  font-size: calc(13px * var(--scale)); letter-spacing: .22em;
+  color: var(--bronze-light); margin: 0 0 8px;
+}
+.sum-stage {
+  font-family: var(--serif); font-weight: 700;
+  font-size: calc(32px * var(--scale)); line-height: 1.2;
+  color: var(--on-bg); margin: 0;
+}
+
+/* מחוון מקוטע - אפשר לספור את השלבים בעין, בניגוד לסרגל רציף */
+.ticks { display: flex; gap: 6px; margin: 0 0 24px; }
+.tick {
+  flex: 1 1 0; height: 10px;
+  background: #4a4236;
+}
+.tick-done { background: var(--bronze-light); }
+.tick-now  { background: #fff; }
+
+.sum-what {
+  color: var(--on-bg); max-width: 60ch;
+  font-size: calc(20px * var(--scale)); margin: 0 0 22px;
+}
+
+/* ---- שורת סמל + טקסט ----
+   הסמל aria-hidden ותמיד לצד טקסט: הוא מסייע לסרוק, לא מחליף. */
+.icon-line {
+  display: flex; align-items: center; gap: 11px;
+  margin: 0 0 12px;
+  font-size: calc(18px * var(--scale));
+}
+.icon { width: 22px; height: 22px; flex: 0 0 auto; }
+.band-dark .icon-line { color: var(--on-bg); }
+.band-dark .icon-line-warn { color: #f0c98a; }
+.band-dark .icon-line-ok   { color: #a9d3ab; }
+.icon-line-warn { color: var(--warn); }
+.icon-line-ok   { color: var(--ok); }
+
+.sum-cta { margin: 22px 0 0; }
+.band-dark .sum-cta {
+  background: var(--bronze-light); color: var(--accent);
+  border-color: var(--bronze-light);
+}
+.band-dark .sum-cta:hover { background: #d8bb84; border-color: #d8bb84; }
+
+/* ---- פאנלים בקטגוריות ---- */
+.todo-panel {
+  border-inline-start: 3px solid var(--warn);
+  background: var(--warn-soft);
+  padding: 22px 24px; margin: 0 0 32px;
+}
+.decision-panel {
+  border-inline-start: 3px solid var(--bronze);
+  background: var(--band);
+  padding: 22px 24px; margin: 0 0 32px;
+}
+.view section + section { margin-top: 40px; }
+
+@media (max-width: 560px) {
+  .sum-head { gap: 18px; margin: 20px 0; }
+  .sum-num-now { font-size: calc(40px * var(--scale)); }
+  .sum-stage { font-size: calc(24px * var(--scale)); }
+  .ticks { gap: 4px; }
+}

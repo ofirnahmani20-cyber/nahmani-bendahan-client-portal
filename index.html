@@ -6,7 +6,7 @@
 <title>כניסה לאזור האישי | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="description" content="כניסה לאזור האישי - מעקב אחר תביעת הביטוח הלאומי שלך.">
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=202609121616">
 </head>
 <body>
 
@@ -17,12 +17,12 @@
       <span class="logo-mark" aria-hidden="true"></span>
       <div class="logo-wm">
         <b><span>Nahmani</span><span>Ben-Dahan</span></b>
-        <i>Law Firm</i>
+        <i>Law Office</i>
       </div>
     </div>
 </div>
 
-<main class="login" id="main">
+<main class="login band-in" id="main">
 
   <div class="login-head">
     <h1>כניסה לאזור האישי</h1>
@@ -63,10 +63,6 @@
 
   </div>
 
-  <p class="small-print">
-    לא מצליחים להיכנס? התקשרו למשרד: <a href="tel:035551234">03-5551234</a><br>
-    המידע באזור האישי חסוי ומיועד ללקוח בלבד.
-  </p>
 
 
   <p class="public-link">
@@ -75,7 +71,42 @@
 
 </main>
 
-<script src="assets/js/data.js"></script>
+<footer class="sitefoot">
+  <div class="sitefoot-in">
+    <div class="foot-col foot-brand">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <div class="logo-wm">
+          <b><span>Nahmani</span><span>Ben-Dahan</span></b>
+          <i>Law Office</i>
+        </div>
+      </div>
+    </div>
+    <div class="foot-col">
+      <h2>ניווט</h2>
+      <ul>
+        <li><a href="info.html#h-about">על המשרד</a></li>
+        <li><a href="info.html#h-stages">שלבי הליווי</a></li>
+        <li><a href="info.html#h-articles">מרכז המדיה</a></li>
+        <li><a href="info.html#h-faq">שאלות נפוצות</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h2>יצירת קשר</h2>
+      <ul>
+        <li><a href="tel:035551234">03-5551234</a></li>
+        <li><a href="mailto:office@nahmani-bendahan.co.il">office@nahmani-bendahan.co.il</a></li>
+      </ul>
+      <p>ימים א׳–ה׳, 09:00–17:00</p>
+    </div>
+  </div>
+  <div class="sitefoot-legal">
+    המידע באתר זה הוא מידע כללי ואינו מהווה ייעוץ משפטי או תחליף לו.<br>
+    © 2026 משרד עורכי הדין Nahmani Ben-Dahan.
+  </div>
+</footer>
+
+<script src="assets/js/data.js?v=202609121616"></script>
 <script>
   // מי שכבר מחובר מועבר ישירות לאזור האישי
   if (Auth.current()) location.replace('dashboard.html');
