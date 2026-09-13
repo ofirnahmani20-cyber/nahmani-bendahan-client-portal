@@ -3,6 +3,13 @@
 
 זו נקודת הקצה היחידה שעולה כסף, והיא הייתה פתוחה לחלוטין: בלי
 אימות, בלי הגבלת קצב, ובלי בדיקת מקור.
+
+היסטוריה של החוזה
+------------------
+מנה א' סגרה אותה מאחורי היתר loopback - שער זמני, כי עוד לא היה
+אימות. מנה ב' החליפה אותו ב-staff session אמיתי מה-DB. הבדיקות
+כאן בודקות את החוזה הנוכחי, שהוא חזק יותר: מיקום ברשת כבר אינו
+מזכה בגישה.
 """
 
 import importlib
@@ -10,75 +17,124 @@ import importlib
 import pytest
 from starlette.testclient import TestClient
 
-CASE = {"claimType": "נכות כללית", "currentStage": 3, "documents": []}
+from server.db.pool import cursor
 
-
-# TestClient שולח host="testclient" ולא כתובת IP, והשער - בצדק -
-# דוחה כל מקור שאינו IP חוקי. לכן כל בדיקה מציינת כתובת במפורש.
 LOCAL = ("127.0.0.1", 45123)
 REMOTE = ("203.0.113.9", 51234)
 
+CASE = {"claimType": "נכות כללית", "currentStage": 3, "documents": []}
+BODY = {"case": CASE, "preset": "next"}
 
-def _app_with_mode(monkeypatch, mode):
-    """טוען מחדש את app.py עם PORTAL_MODE אחר - הדגל נקרא בזמן ייבוא."""
-    monkeypatch.setenv("PORTAL_MODE", mode)
-    import server.app
-    return importlib.reload(server.app)
-
-
-def test_production_blocks_ai_entirely(monkeypatch):
-    """בפרודקשן ה-AI חסום, גם מ-localhost. אין fallback ל-demo."""
-    module = _app_with_mode(monkeypatch, "production")
-    with TestClient(module.app, client=LOCAL) as c:
-        for path in ("/api/office/assist", "/api/office/assist/preview"):
-            r = c.post(path, json={"case": CASE, "preset": "next"})
-            assert r.status_code == 503, path
+STAFF_EMAIL = "nahmani@nahmani-bendahan.co.il"
+STAFF_PASSWORD = "office2026"
 
 
-def test_non_loopback_is_refused(monkeypatch):
-    """בקשה שאינה מ-loopback נדחית גם ב-demo."""
-    module = _app_with_mode(monkeypatch, "demo")
-    with TestClient(module.app, client=REMOTE) as c:
-        r = c.post("/api/office/assist/preview", json={"case": CASE, "preset": "next"})
-        assert r.status_code == 503
+@pytest.fixture
+def api():
+    from server.app import app
+    with TestClient(app, client=LOCAL, base_url="http://127.0.0.1") as c:
+        yield c
 
 
-def test_foreign_origin_is_refused(monkeypatch):
-    module = _app_with_mode(monkeypatch, "demo")
-    with TestClient(module.app, client=LOCAL) as c:
-        r = c.post(
-            "/api/office/assist/preview",
-            json={"case": CASE, "preset": "next"},
-            headers={"Origin": "https://evil.example.com"},
-        )
-        assert r.status_code == 403
+def _staff_login(api):
+    r = api.post("/api/office/auth/login",
+                 json={"email": STAFF_EMAIL, "password": STAFF_PASSWORD})
+    assert r.status_code == 200, r.text
+    return api.cookies.get("portal_csrf")
 
 
-def test_local_demo_preview_is_allowed(monkeypatch):
-    """ההיתר המקומי עדיין עובד - לא שברנו את הפיתוח."""
-    module = _app_with_mode(monkeypatch, "demo")
-    with TestClient(module.app, client=LOCAL) as c:
-        r = c.post("/api/office/assist/preview", json={"case": CASE, "preset": "next"})
-        assert r.status_code == 200
-        assert r.json()["blocked"] is False
+# ================================================================
+#  ללא זהות
+# ================================================================
+
+@pytest.mark.parametrize("path", ["/api/office/assist", "/api/office/assist/preview"])
+def test_anonymous_is_refused(api, path):
+    """מיקום ברשת כבר אינו מספיק - זה מה שהשתנה במנה ב'."""
+    assert api.post(path, json=BODY).status_code == 401
 
 
-def test_rate_limit_kicks_in(monkeypatch):
-    """הגבלת הקצב עוצרת הצפה של נקודת הקצה שעולה כסף."""
-    monkeypatch.setenv("PORTAL_AI_RATE_LIMIT", "3")
-    module = _app_with_mode(monkeypatch, "demo")
-    with TestClient(module.app, client=LOCAL) as c:
-        codes = [
-            c.post("/api/office/assist", json={"case": CASE, "preset": "next"}).status_code
-            for _ in range(5)
-        ]
+def test_client_session_is_refused(api):
+    """לקוח מחובר אינו רשאי להפעיל את הכלי של המשרד."""
+    from server import auth
+    with cursor() as cur:
+        cur.execute("select id, firm_id from clients limit 1")
+        client = cur.fetchone()
+
+    class _Req:
+        client = type("c", (), {"host": "127.0.0.1"})()
+        headers = {}
+
+    class _Resp:
+        def __init__(self): self.jar = {}
+        def set_cookie(self, name, value, **kw): self.jar[name] = value
+
+    resp = _Resp()
+    auth.create_session(resp, firm_id=client["firm_id"], subject_type="client",
+                        subject_id=client["id"], request=_Req(),
+                        hours=auth.CLIENT_SESSION_HOURS)
+    for name, value in resp.jar.items():
+        api.cookies.set(name, value)
+
+    assert api.post("/api/office/assist/preview", json=BODY).status_code == 403
+
+
+# ================================================================
+#  עם זהות צוות
+# ================================================================
+
+def test_staff_preview_is_allowed(api):
+    csrf = _staff_login(api)
+    r = api.post("/api/office/assist/preview", json=BODY,
+                 headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 200, r.text
+    assert r.json()["blocked"] is False
+
+
+def test_staff_without_csrf_is_refused(api):
+    _staff_login(api)
+    assert api.post("/api/office/assist/preview", json=BODY).status_code == 403
+
+
+def test_foreign_origin_is_refused(api):
+    csrf = _staff_login(api)
+    r = api.post("/api/office/assist/preview", json=BODY,
+                 headers={"X-CSRF-Token": csrf,
+                          "Origin": "https://evil.example.com"})
+    assert r.status_code == 403
+
+
+def test_rate_limit_kicks_in(api, monkeypatch):
+    """הגבלת הקצב עוצרת הצפה של הנקודה שעולה כסף."""
+    import server.app as app_module
+    monkeypatch.setattr(app_module, "AI_MAX_CALLS", 3)
+    app_module._ai_calls.clear()
+
+    csrf = _staff_login(api)
+    codes = [api.post("/api/office/assist", json=BODY,
+                      headers={"X-CSRF-Token": csrf}).status_code
+             for _ in range(5)]
     assert 429 in codes, "הגבלת הקצב לא נאכפה: %s" % codes
 
 
-def test_health_does_not_leak_internals(monkeypatch):
-    """health אינו חושף את שם המודל או את מצב המדיניות."""
-    module = _app_with_mode(monkeypatch, "demo")
-    with TestClient(module.app, client=LOCAL) as c:
-        body = c.get("/api/health").json()
+# ================================================================
+#  פרודקשן
+# ================================================================
+
+def test_production_blocks_ai_entirely(monkeypatch):
+    """בפרודקשן ה-AI חסום גם לצוות מחובר. אין fallback."""
+    monkeypatch.setenv("PORTAL_MODE", "production")
+    import server.app
+    module = importlib.reload(server.app)
+    try:
+        with TestClient(module.app, client=LOCAL, base_url="http://127.0.0.1") as c:
+            for path in ("/api/office/assist", "/api/office/assist/preview"):
+                assert c.post(path, json=BODY).status_code == 503, path
+    finally:
+        monkeypatch.setenv("PORTAL_MODE", "demo")
+        importlib.reload(server.app)
+
+
+def test_health_does_not_leak_internals(api):
+    body = api.get("/api/health").json()
     assert "model" not in body
     assert "policy" not in body

@@ -26,6 +26,9 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import api_auth, api_client, api_office, audit
+from .auth import require_csrf, require_staff
+from .db.pool import healthy as db_healthy
 from .policy import POLICY_MODE, assert_clean, build_context
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -43,6 +46,10 @@ PORTAL_MODE = os.environ.get("PORTAL_MODE", "demo").strip().lower()
 IS_PRODUCTION = PORTAL_MODE == "production"
 
 app = FastAPI(title="Nahmani Ben-Dahan portal")
+
+app.include_router(api_auth.router)
+app.include_router(api_client.router)
+app.include_router(api_office.router)
 
 
 # ============================================================
@@ -143,14 +150,20 @@ def _origin_is_local(request: Request) -> bool:
     return _is_loopback(urlparse(raw).hostname)
 
 
-def require_ai_allowed(request: Request) -> None:
-    """נכשל סגור. בפרודקשן תמיד חסום עד למנה ב'."""
+def require_ai_allowed(request: Request):
+    """
+    נכשל סגור, ומחייב זהות אמיתית.
+
+    עד מנה ב' זה היה היתר פיתוח מבוסס loopback. עכשיו זה staff
+    session מה-DB, בדיוק כמו כל נקודת office אחרת. נשמר גם תנאי
+    ה-loopback בפרודקשן, כי הפיצ'ר עדיין לא אושר לייצור.
+    """
     if IS_PRODUCTION:
         raise HTTPException(status_code=503, detail=AI_DISABLED_MESSAGE)
-    if not _is_loopback(request.client.host if request.client else None):
-        raise HTTPException(status_code=503, detail=AI_DISABLED_MESSAGE)
+    identity = require_staff(request)
     if not _origin_is_local(request):
         raise HTTPException(status_code=403, detail="מקור הבקשה אינו מורשה.")
+    return identity
 
 
 # ---- הגבלת קצב -------------------------------------------------
@@ -179,17 +192,13 @@ def enforce_rate_limit(request: Request) -> None:
 def health(request: Request):
     """ליבנס בלבד. שם המודל ומצב המדיניות הוסרו - הם מידע על
     המערכת הפנימית ואין לממשק צורך בהם."""
-    try:
-        require_ai_allowed(request)
-        ai_ready = _client() is not None
-    except HTTPException:
-        ai_ready = False
-    return {"ok": True, "ai": ai_ready}
+    return {"ok": True, "db": db_healthy()}
 
 
 @app.post("/api/office/assist/preview")
 def assist_preview(req: AssistRequest, request: Request):
     require_ai_allowed(request)
+    require_csrf(request)
     """
     מחזיר בדיוק את מה שהיה נשלח לניתוח - בלי לשלוח דבר.
 
@@ -211,8 +220,12 @@ def assist_preview(req: AssistRequest, request: Request):
 
 @app.post("/api/office/assist")
 def assist(req: AssistRequest, request: Request):
-    require_ai_allowed(request)
+    identity = require_ai_allowed(request)
+    require_csrf(request)
     enforce_rate_limit(request)
+
+    audit.record(identity, "office.ai_invoked", request=request,
+                 metadata={"preset": req.preset or "free-text"})
 
     client = _client()
     if client is None:
