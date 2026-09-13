@@ -12,6 +12,8 @@ policy.py - מה מותר לשלוח לניתוח החיצוני.
   3. ברירת המחדל היא המצב המצומצם.
 """
 
+from .redact import find_pii, redact
+
 # ============================================================
 #  מתג המדיניות
 # ------------------------------------------------------------
@@ -39,15 +41,19 @@ ALLOWED_PATHS = frozenset({
 
 
 def _clean_document(doc):
-    """מסמך מדווח לפי שמו וסטטוסו בלבד - אף פעם לא לפי תוכנו."""
+    """מסמך מדווח לפי שמו וסטטוסו בלבד - אף פעם לא לפי תוכנו.
+
+    note ו-rejectReason הם טקסט חופשי שהמשרד מקליד, ולכן הם עוברים
+    דרך redact() לפני היציאה. בדיקה לפי שם שדה בלבד לא הייתה תופסת
+    ת"ז שנכתבה בתוך משפט."""
     return {
-        "name":     doc.get("name"),
+        "name":     redact(doc.get("name")),
         "required": bool(doc.get("required")),
         "status":   doc.get("status"),
-        "note":     doc.get("note"),
+        "note":     redact(doc.get("note")),
         # סיבת דחייה נשלחת: היא נכתבה על ידי המשרד, לא מידע רפואי,
         # והיא מסבירה למודל למה המסמך עדיין פתוח.
-        "rejectReason": doc.get("rejectReason") or None,
+        "rejectReason": redact(doc.get("rejectReason")) or None,
         "hasFile":  bool(doc.get("file")),
     }
 
@@ -80,10 +86,21 @@ def assert_clean(payload):
     """
     בדיקת רשת ביטחון אחרונה לפני היציאה החוצה.
 
-    עוברת על המבנה כולו ומוודאת שאף שדה מזהה לא נכנס בטעות.
+    שתי בדיקות, לא אחת:
+      1. לפי *שם השדה* - שדה מזהה שנכנס בטעות למבנה.
+      2. לפי *ערך השדה* - ת"ז, טלפון, אימייל או מספר כרטיס שנכתבו
+         בתוך טקסט חופשי מותר. עד 13.09 הבדיקה הייתה על שמות בלבד,
+         ומחרוזת כמו "ת\"ז 123456782" בשדה note עברה בשלום.
+
     מוטב להיכשל בקול מאשר לשלוח פרט מזהה בשקט.
     """
     def walk(node, path="context"):
+        if isinstance(node, str):
+            found = find_pii(node)
+            if found:
+                raise ValueError(
+                    "נמצא מזהה מסוג %s בערך של %s" % (", ".join(found), path)
+                )
         if isinstance(node, dict):
             for key, value in node.items():
                 child = path + "." + key

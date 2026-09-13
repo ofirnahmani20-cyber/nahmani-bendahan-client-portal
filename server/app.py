@@ -1,27 +1,28 @@
 """
-app.py - שרת מינימלי לאזור הלקוחות Nahmani ben-dahan.
+app.py - שרת אזור הלקוחות Nahmani Ben-Dahan.
 
-שתי אחריות בלבד:
-  1. הגשת האתר הסטטי הקיים (אותו origin, בלי CORS).
-  2. נקודת קצה אחת שמדברת עם Claude - כדי שמפתח ה-API יישאר בשרת
-     ולא ייחשף ב-JavaScript בצד הלקוח.
+אחריות:
+  1. הגשת קובצי האתר - ברשימת היתר מפורשת בלבד.
+  2. נקודת קצה שמדברת עם Claude, כדי שמפתח ה-API יישאר בשרת.
 
-זהו שלב ביניים מכוון: אין כאן מסד נתונים ואין אימות בצד שרת.
-מסד הנתונים והאימות הם שלב 1 באפיון (ראה 06 - מודל נתונים ו-API).
+מצב נוכחי: אין כאן עדיין מסד נתונים ואין אימות בצד שרת. אלה מנה ב'
+בתוכנית ההקשחה. עד אז נקודות ה-AI מושבתות כברירת מחדל.
 
 הפעלה:
     pip install -r requirements.txt
-    set ANTHROPIC_API_KEY=...
     uvicorn server.app:app --host 127.0.0.1 --port 8777
 """
 
+import ipaddress
 import json
 import os
 import pathlib
+import time
+from collections import deque
 
 import anthropic
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -29,7 +30,19 @@ from .policy import POLICY_MODE, assert_clean, build_context
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-app = FastAPI(title="Nahmani ben-dahan portal")
+# ============================================================
+#  מצב ההרצה
+# ------------------------------------------------------------
+#  demo       - נתוני הדגמה, נוחות פיתוח, ה-AI מותר מ-localhost.
+#  production - שער שנכשל סגור. ראה _require_production_ready.
+#
+#  ברירת המחדל היא demo בכוונה: מי ששכח להגדיר לא מקבל בטעות
+#  מערכת שמתנהגת כאילו היא בייצור.
+# ============================================================
+PORTAL_MODE = os.environ.get("PORTAL_MODE", "demo").strip().lower()
+IS_PRODUCTION = PORTAL_MODE == "production"
+
+app = FastAPI(title="Nahmani Ben-Dahan portal")
 
 
 # ============================================================
@@ -87,18 +100,96 @@ def _client():
     return anthropic.Anthropic()
 
 
+
+# ============================================================
+#  שער ה-AI
+# ------------------------------------------------------------
+#  זו נקודת הקצה היחידה שעולה כסף, והיא הייתה פתוחה לחלוטין.
+#
+#  במכוון אין כאן "סוד זמני" שה-JavaScript שולח: כל סוד שהדפדפן
+#  צריך להחזיק הוא סוד חשוף, וזו בדיוק התקלה שאנחנו סוגרים.
+#  במקום זאת שלושה תנאים שאף אחד מהם אינו סוד:
+#
+#    1. PORTAL_MODE=demo
+#    2. הבקשה הגיעה מ-loopback
+#    3. Origin/Referer מקומי, אם נשלחו
+#
+#  ⚠️ זהו היתר פיתוח, לא אימות. במנה ב' הוא מוחלף ב-staff
+#     session אמיתי מה-DB, והבלוק הזה יורד.
+# ============================================================
+
+AI_DISABLED_MESSAGE = (
+    "הניתוח המקצועי מושבת. הוא ייפתח כשאימות הצוות בצד השרת יושלם "
+    "(מנה ב' בתוכנית ההקשחה)."
+)
+
+
+def _is_loopback(host: str | None) -> bool:
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _origin_is_local(request: Request) -> bool:
+    """Origin/Referer זר נדחה. היעדרם מותר - בקשות same-origin רבות
+    אינן שולחות Origin, ובדיקת loopback כבר הגבילה את המקור."""
+    raw = request.headers.get("origin") or request.headers.get("referer")
+    if not raw:
+        return True
+    from urllib.parse import urlparse
+    return _is_loopback(urlparse(raw).hostname)
+
+
+def require_ai_allowed(request: Request) -> None:
+    """נכשל סגור. בפרודקשן תמיד חסום עד למנה ב'."""
+    if IS_PRODUCTION:
+        raise HTTPException(status_code=503, detail=AI_DISABLED_MESSAGE)
+    if not _is_loopback(request.client.host if request.client else None):
+        raise HTTPException(status_code=503, detail=AI_DISABLED_MESSAGE)
+    if not _origin_is_local(request):
+        raise HTTPException(status_code=403, detail="מקור הבקשה אינו מורשה.")
+
+
+# ---- הגבלת קצב -------------------------------------------------
+#  לפי IP במנה א'; יעבור ל-session במנה ב'. בזיכרון בלבד - מספיק
+#  לתהליך יחיד, ואינו תלות חדשה.
+AI_MAX_CALLS = int(os.environ.get("PORTAL_AI_RATE_LIMIT", "20"))
+AI_WINDOW_SECONDS = 300
+_ai_calls: dict[str, deque] = {}
+
+
+def enforce_rate_limit(request: Request) -> None:
+    key = (request.client.host if request.client else "unknown")
+    now = time.monotonic()
+    hits = _ai_calls.setdefault(key, deque())
+    while hits and now - hits[0] > AI_WINDOW_SECONDS:
+        hits.popleft()
+    if len(hits) >= AI_MAX_CALLS:
+        raise HTTPException(
+            status_code=429,
+            detail="יותר מדי בקשות ניתוח. נסה שוב בעוד מספר דקות.",
+        )
+    hits.append(now)
+
+
 @app.get("/api/health")
-def health():
-    """מאפשר לממשק לדעת מראש אם הניתוח זמין, במקום להיכשל באמצע."""
-    return {
-        "ready": _client() is not None,
-        "policy": POLICY_MODE,
-        "model": "claude-opus-5",
-    }
+def health(request: Request):
+    """ליבנס בלבד. שם המודל ומצב המדיניות הוסרו - הם מידע על
+    המערכת הפנימית ואין לממשק צורך בהם."""
+    try:
+        require_ai_allowed(request)
+        ai_ready = _client() is not None
+    except HTTPException:
+        ai_ready = False
+    return {"ok": True, "ai": ai_ready}
 
 
 @app.post("/api/office/assist/preview")
-def assist_preview(req: AssistRequest):
+def assist_preview(req: AssistRequest, request: Request):
+    require_ai_allowed(request)
     """
     מחזיר בדיוק את מה שהיה נשלח לניתוח - בלי לשלוח דבר.
 
@@ -119,7 +210,10 @@ def assist_preview(req: AssistRequest):
 
 
 @app.post("/api/office/assist")
-def assist(req: AssistRequest):
+def assist(req: AssistRequest, request: Request):
+    require_ai_allowed(request)
+    enforce_rate_limit(request)
+
     client = _client()
     if client is None:
         return StreamingResponse(
@@ -188,5 +282,35 @@ def assist(req: AssistRequest):
     return StreamingResponse(stream(), media_type="text/plain; charset=utf-8")
 
 
-# האתר הסטטי נרשם אחרון, כדי שלא יבלע את נתיבי ה-API.
-app.mount("/", StaticFiles(directory=str(ROOT), html=True), name="site")
+# ============================================================
+#  הגשת האתר
+# ------------------------------------------------------------
+#  עד 13.09 היה כאן StaticFiles על שורש הפרויקט. lookup_path של
+#  Starlette חוסם רק directory traversal - הוא אינו מסנן קבצי
+#  נקודה ואינו מסנן לפי סיומת. כלומר /.env, /server/policy.py
+#  ו-/docs/* היו כולם ניתנים להגשה.
+#
+#  התיקון אינו "להסתיר" אלא להוציא מהתחום: רק assets/ נמצא
+#  ב-static root, ודפי ה-HTML מוגשים מרשימה קשיחה. server/,
+#  docs/, scripts/, .git ו-.env אינם בתוך שום תיקייה מוגשת,
+#  ולכן אין על מה לסמוך שיסנן אותם.
+# ============================================================
+
+app.mount("/assets", StaticFiles(directory=str(ROOT / "assets")), name="assets")
+
+PAGES = {
+    "":               "index.html",
+    "index.html":     "index.html",
+    "dashboard.html": "dashboard.html",
+    "admin.html":     "admin.html",
+    "info.html":      "info.html",
+}
+
+
+@app.get("/{page:path}")
+def serve_page(page: str):
+    """מגיש דף מהרשימה הקשיחה בלבד. כל שאר הנתיבים הם 404."""
+    name = PAGES.get(page)
+    if name is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(ROOT / name, media_type="text/html; charset=utf-8")

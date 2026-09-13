@@ -1,0 +1,6 @@
+# תלויות פיתוח ובדיקות בלבד. אינן נדרשות להרצת השרת.
+#   pip install -r requirements.txt -r requirements-dev.txt
+pytest==9.1.1
+
+# httpx2 נדרש ל-starlette.testclient והוא כבר מגיע עם anthropic,
+# ולכן אינו מופיע כאן בנפרד.

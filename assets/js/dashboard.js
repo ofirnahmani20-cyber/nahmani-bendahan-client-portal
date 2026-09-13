@@ -139,7 +139,8 @@
     doc:      'M6 3h8l4 4v14H6z M14 3v4h4 M9 12h6 M9 16h6',
     clock:    'M12 3a9 9 0 100 18 9 9 0 000-18z M12 7v5.5l3.5 2',
     message:  'M3 5h18v12H8l-5 4z',
-    phone:    'M5 4h4l2 5-2.5 1.5a12 12 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z'
+    phone:    'M5 4h4l2 5-2.5 1.5a12 12 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z',
+    upload:   'M12 16V4 M7 9l5-5 5 5 M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2'
   };
 
   /** סמל דקורטיבי. לעולם לא לבד - תמיד עם טקסט לצידו. */
@@ -352,48 +353,49 @@
 
   /* ---- 2. מה עליי לעשות עכשיו ---- */
 
-  function renderTodo() {
-    var required = caseFile.documents.filter(function (d) {
-      return d.required && DOC_NEEDS_UPLOAD(d);
-    });
-    var block = $('todoBlock');
-    var body  = $('todoBody');
+  /* ==========================================================
+     רצועת הסיכום של "מה נדרש ממך"
+     ----------------------------------------------------------
+     עד 12.09 הפונקציה הזו רינדרה את המסמכים בעצמה, ובמקביל
+     docListOpen רינדר אותם שוב - אותם מסמכים הופיעו פעמיים באותו
+     מסך. כאן נשאר רק הסיכום, והרשימה היא של docListOpen בלבד.
+     ========================================================== */
 
+  function renderTodo() {
+    var body = $('todoBody');
+    if (!body) return;
     body.textContent = '';
 
-    if (required.length === 0) {
-      block.classList.add('done');
-      body.appendChild(el('p', null,
-        'אין כרגע משימות פתוחות. כל המסמכים הדרושים התקבלו - המשרד ממשיך לטפל בתיק ויעדכן אותך.'));
+    var all  = caseFile.documents;
+    var done = all.filter(function (d) { return !isOpenDoc(d) && d.file; }).length;
+    var open = all.filter(isOpenDoc).length;
+
+    if (!open) {
+      body.appendChild(iconLine('check',
+        'אין כרגע משימות פתוחות. כל המסמכים הדרושים התקבלו, והמשרד ממשיך לטפל בתיק.', 'ok'));
       return;
     }
 
-    block.classList.remove('done');
-    body.appendChild(el('p', null,
-      'צריך להשלים ' + countDocs(required.length) + ' כדי שנוכל להמשיך בתביעה. אפשר להעלות אותם כאן באתר.'));
+    /* מד התקדמות - כמה כבר נמסר מתוך מה שביקשנו */
+    var meter = el('div', 'meter');
+    var fill  = el('span', 'meter-fill', '', true);
+    fill.style.width = Math.round((done / all.length) * 100) + '%';
+    meter.appendChild(fill);
 
-    var list = el('ul', 'plain-list');
-    required.forEach(function (doc) {
-      var li = el('li');
-      li.appendChild(el('h3', null, doc.name));
-      li.appendChild(el('p', 'item-note', doc.note));
-      if (doc.status === 'rejected' && doc.rejectReason) {
-        li.appendChild(el('p', 'reject-note', 'המשרד ביקש להעלות מחדש: ' + doc.rejectReason));
-      }
-      li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
-      li.appendChild(qualitySlot(doc));
-      li.appendChild(replyBox(doc));
-      list.appendChild(li);
-    });
-    body.appendChild(list);
+    var strip = el('div', 'todo-strip');
+    var lead  = el('div', 'todo-strip-main');
+    lead.appendChild(el('p', 'todo-count', countDocs(open) + ' עוד ממתינים לך'));
+    lead.appendChild(el('p', 'todo-sub', done + ' מתוך ' + all.length + ' כבר אצלנו'));
+    lead.appendChild(meter);
+    strip.appendChild(lead);
 
     if (caseFile.nextHearing) {
-      body.appendChild(el('p', 'item-when',
-        'חשוב להשלים לפני הדיון הקרוב ב-' + formatDate(caseFile.nextHearing) + '.'));
+      var d = el('div', 'todo-strip-when');
+      d.appendChild(iconLine('calendar', 'לפני הדיון ב-' + formatDate(caseFile.nextHearing)));
+      strip.appendChild(d);
     }
+    body.appendChild(strip);
   }
-
-  /* ---- 3. המסמכים שלי ---- */
 
   /* ==========================================================
      המסמכים - שתי רשימות מאותו מערך
@@ -411,22 +413,31 @@
     return d.status === 'missing' || d.status === 'rejected';
   }
 
-  /** שורת מסמך אחת. `withUpload` מוסיף את כפתור ההעלאה. */
+  /** שורת מסמך אחת. `withUpload` מוסיף את אזור ההעלאה. */
   function docRow(doc, withUpload) {
-    var s  = STATUS[doc.status];
-    var li = el('li');
+    var st = STATUS[doc.status];
+    var li = el('li', 'doc-task' + (withUpload ? '' : ' doc-task-done'));
 
-    var tag = el('span', 'tag ' + s.tag);
-    tag.appendChild(el('span', null, s.mark, true));
-    tag.appendChild(document.createTextNode(s.text));
-    li.appendChild(tag);
+    /* כותרת: שם המסמך, ולצידו הסטטוס בסמל ובטקסט */
+    var head = el('div', 'doc-head');
+    var name = el('div', 'doc-name');
+    name.appendChild(el('h3', null, doc.name));
+    if (!doc.required) name.appendChild(el('span', 'doc-optional', 'לא חובה'));
+    head.appendChild(name);
 
-    li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
+    var tag = el('span', 'tag ' + st.tag);
+    tag.appendChild(el('span', null, st.mark, true));
+    tag.appendChild(document.createTextNode(st.text));
+    head.appendChild(tag);
+    li.appendChild(head);
+
     li.appendChild(el('p', 'item-note', doc.note));
 
     if (doc.file) {
-      li.appendChild(el('span', 'file-name',
-        'הקובץ שהתקבל: ' + doc.file + ' · ' + formatDate(doc.date)));
+      var got = el('p', 'doc-file');
+      got.appendChild(icon('doc'));
+      got.appendChild(el('span', null, doc.file + ' · התקבל ב-' + formatDate(doc.date)));
+      li.appendChild(got);
     }
 
     if (doc.status === 'rejected' && doc.rejectReason) {
@@ -434,8 +445,17 @@
     }
 
     if (withUpload && DOC_NEEDS_UPLOAD(doc)) {
-      li.appendChild(uploadButton(doc, uploadLabel(doc) + ': ' + doc.name));
+      li.appendChild(uploadButton(doc, 'בחירת קובץ עבור ' + doc.name));
       li.appendChild(qualitySlot(doc));
+
+      /* התגובות המהירות מקופלות. פתוחות לכל מסמך הן ארבע תיבות
+         כפולות במספר המסמכים, וזה מה שהפך את המסך לרועש.
+         <details> נותן פתיחה נגישה במקלדת בלי JavaScript. */
+      var more = el('details', 'doc-more');
+      var sum  = el('summary', 'doc-more-q', 'לא מצליחים להעלות?');
+      more.appendChild(sum);
+      more.appendChild(replyBox(doc));
+      li.appendChild(more);
     }
 
     return li;
@@ -588,30 +608,79 @@
   }
 
   /** שתי דרכים להגיש: צילום ישיר, או קובץ שכבר קיים במכשיר */
-  function uploadButton(doc, label) {
-    var wrap = el('div', 'upload-actions');
+  /* ==========================================================
+     אזור ההעלאה
+     ----------------------------------------------------------
+     גרירה היא תוספת, לא התחליף: שני הכפתורים נשארים בתוך האזור
+     ונגישים למקלדת ולקורא מסך. מי שלא יכול לגרור לא מאבד דבר.
 
-    var cam = el('button', 'btn btn-primary', 'צילום המסמך');
+     האזור כולו לחיץ ופותח את בוחר הקבצים, ולכן מטרת המגע היא
+     הריבוע השלם ולא כפתור בגודל אצבע.
+     ========================================================== */
+  function uploadButton(doc, label) {
+    var zone = el('div', 'dropzone');
+
+    var head = el('div', 'dz-head');
+    head.appendChild(icon('upload'));
+    head.appendChild(el('span', 'dz-title', 'גררו לכאן קובץ, או בחרו מהמכשיר'));
+    zone.appendChild(head);
+
+    zone.appendChild(el('p', 'dz-hint', 'קובץ PDF או תמונה, עד 12MB'));
+
+    var acts = el('div', 'dz-actions');
+
+    var cam = el('button', 'btn btn-primary dz-btn', 'צילום המסמך');
     cam.type = 'button';
     cam.setAttribute('aria-label', 'צילום המסמך ' + doc.name);
-    cam.addEventListener('click', function () {
+    cam.addEventListener('click', function (e) {
+      e.stopPropagation();
       pendingDoc = doc;
       cameraInput.click();
     });
 
-    var pick = el('button', 'btn btn-outline', 'בחירת קובץ');
+    var pick = el('button', 'btn btn-outline dz-btn', 'בחירת קובץ');
     pick.type = 'button';
     pick.setAttribute('aria-label', label);
-    pick.addEventListener('click', function () {
+    pick.addEventListener('click', function (e) {
+      e.stopPropagation();
       pendingDoc = doc;
       fileInput.click();
     });
 
-    wrap.appendChild(cam);
-    wrap.appendChild(pick);
-    return wrap;
+    acts.appendChild(cam);
+    acts.appendChild(pick);
+    zone.appendChild(acts);
+
+    /* לחיצה על השטח עצמו - קיצור למי שלא מכוון לכפתור קטן */
+    zone.addEventListener('click', function () {
+      pendingDoc = doc;
+      fileInput.click();
+    });
+
+    /* גרירה. preventDefault על dragover חובה, אחרת הדפדפן פותח
+       את הקובץ בלשונית במקום למסור אותו לנו. */
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      zone.addEventListener(ev, function (e) {
+        e.preventDefault();
+        zone.classList.add('dz-over');
+      });
+    });
+    ['dragleave', 'dragend'].forEach(function (ev) {
+      zone.addEventListener(ev, function () { zone.classList.remove('dz-over'); });
+    });
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      zone.classList.remove('dz-over');
+      var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      processFile(doc, file);
+    });
+
+    return zone;
   }
 
+  /* חיווט בוררי הקבצים. שתי השורות האלה נמחקו בטעות בקומיט 07a20d0
+     כשהכפתורים הוחלפו באזור גרירה, ומאז בחירת קובץ נפתחה אך הקובץ
+     נזרק בשקט - רק הגרירה עבדה. */
   fileInput.addEventListener('change', function () { handlePick(fileInput); });
   cameraInput.addEventListener('change', function () { handlePick(cameraInput); });
 
@@ -619,6 +688,13 @@
     var file = input.files[0];
     var doc  = pendingDoc;
     input.value = '';
+    processFile(doc, file);
+  }
+
+  /* אותו מסלול בדיוק לבחירת קובץ, לצילום ולגרירה - כולל בדיקת
+     האיכות. גרירה שעוקפת את הבדיקה הייתה מחזירה אותנו לצילומים
+     לא קריאים, וזה מה שהפיצ'ר הזה נועד למנוע מלכתחילה. */
+  function processFile(doc, file) {
     if (!file || !doc) return;
 
     showChecking(doc);

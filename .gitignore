@@ -12,7 +12,11 @@ uploads/
 *.tmp
 
 # secrets / python
+# כל וריאנט של .env נחסם, למעט התבנית. .env.local ו-.env.production
+# נחסמים מראש ולא רק אחרי שמישהו ייצור אותם.
 .env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 venv/
@@ -25,5 +29,4 @@ venv/
 .pgtools/
 .pgdata/
 
-# סודות. לעולם לא ב-git.
-.env
+# סודות. לעולם לא ב-git. (הכלל עצמו למעלה, תחת secrets/python.)

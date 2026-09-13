@@ -1269,11 +1269,9 @@ img.ph::after { content: none; }
 .band-dark .sum-cta:hover { background: #d8bb84; border-color: #d8bb84; }
 
 /* ---- פאנלים בקטגוריות ---- */
-.todo-panel {
-  border-inline-start: 3px solid var(--warn);
-  background: var(--warn-soft);
-  padding: 22px 24px; margin: 0 0 32px;
-}
+/* .todo-panel הוסר ב-12.09: משטח כתום מלא על פני סקשן שלם הוא
+   דפוס התרעה ישן, והוא צבע את כל המשימות באותו דחף. הדחיפות
+   מסומנת עכשיו במקום אחד - תג הסטטוס של המסמך עצמו. */
 .decision-panel {
   border-inline-start: 3px solid var(--bronze);
   background: var(--band);
@@ -1286,4 +1284,115 @@ img.ph::after { content: none; }
   .sum-num-now { font-size: calc(40px * var(--scale)); }
   .sum-stage { font-size: calc(24px * var(--scale)); }
   .ticks { gap: 4px; }
+}
+
+/* ==========================================================
+   העלאת מסמכים
+   ----------------------------------------------------------
+   הגרסה הקודמת: משטח כתום על פני הסקשן כולו, וכל מסמך עם שני
+   כפתורים וארבע תיבות תגובה פתוחות. ארבע התיבות כפול מספר
+   המסמכים הן מה שהפך את המסך לרועש וזול.
+
+   עכשיו: כל מסמך הוא כרטיס משימה אחד, עם אזור העלאה יחיד
+   שאפשר לגרור אליו, והתגובות המהירות מקופלות עד שצריך אותן.
+   ========================================================== */
+
+/* ---- רצועת הסיכום ---- */
+.todo-strip {
+  display: flex; flex-wrap: wrap; gap: 24px;
+  align-items: center; justify-content: space-between;
+  background: var(--band);
+  border-inline-start: 3px solid var(--bronze);
+  padding: 20px 24px; margin: 0 0 30px;
+}
+.todo-count {
+  font-family: var(--serif); font-weight: 700;
+  font-size: calc(23px * var(--scale)); margin: 0;
+}
+.todo-sub { color: var(--text-soft); font-size: calc(16px * var(--scale)); margin: 2px 0 10px; }
+.todo-strip-main { flex: 1 1 260px; }
+.todo-strip-when .icon-line { margin: 0; font-size: calc(17px * var(--scale)); }
+
+.meter { height: 6px; background: #e2dbd0; max-width: 340px; }
+.meter-fill { display: block; height: 100%; background: var(--bronze); }
+
+/* ---- כרטיס משימה ---- */
+.doc-tasks { list-style: none; margin: 0; padding: 0; }
+.doc-task {
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--bronze);
+  background: var(--surface);
+  padding: 22px 24px;
+  margin: 0 0 18px;
+}
+/* מה שכבר התקבל אינו משימה, ולכן הוא שקט יותר */
+.doc-task-done { border-top-color: var(--border); background: transparent; }
+
+.doc-head {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  align-items: flex-start; justify-content: space-between;
+  margin: 0 0 6px;
+}
+.doc-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.doc-name h3 { font-family: var(--serif); margin: 0; }
+.doc-optional {
+  font-size: calc(14px * var(--scale)); color: var(--text-soft);
+  border: 1px solid var(--border); padding: 1px 8px;
+}
+.doc-head .tag { margin: 0; flex: 0 0 auto; }
+
+.doc-file {
+  display: flex; align-items: center; gap: 9px;
+  color: var(--text-soft); font-size: calc(16px * var(--scale));
+  margin: 10px 0 0; word-break: break-all;
+}
+.doc-file .icon { width: 19px; height: 19px; flex: 0 0 auto; }
+
+/* ---- אזור הגרירה ---- */
+.dropzone {
+  margin: 16px 0 0; padding: 22px 20px;
+  background: var(--band);
+  border: 1px dashed var(--border-ui);
+  text-align: center; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.dropzone:hover { background: #efe9e0; }
+/* מצב הגרירה מסומן גם בצבע וגם בעובי הקו - לא בצבע בלבד */
+.dropzone.dz-over {
+  background: var(--accent-soft);
+  border-style: solid; border-width: 2px; border-color: var(--bronze);
+}
+.dz-head {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin: 0 0 4px;
+}
+.dz-head .icon { width: 24px; height: 24px; color: var(--bronze); }
+.dz-title { font-weight: 700; font-size: calc(18px * var(--scale)); }
+.dz-hint { color: var(--text-soft); font-size: calc(15px * var(--scale)); margin: 0 0 16px; }
+.dz-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.dz-btn { min-height: 50px; }
+
+/* ---- התגובות המהירות, מקופלות ---- */
+.doc-more { margin: 14px 0 0; }
+.doc-more-q {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; cursor: pointer; list-style: none;
+  color: var(--bronze); font-weight: 700;
+  font-size: calc(17px * var(--scale));
+}
+.doc-more-q::-webkit-details-marker { display: none; }
+.doc-more-q::before {
+  content: "+"; width: 24px; height: 24px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid currentColor; border-radius: 50%;
+  font-family: var(--sans);
+}
+.doc-more[open] .doc-more-q::before { content: "\2212"; }
+.doc-more-q:focus-visible { outline: var(--focus); outline-offset: 3px; }
+.doc-more .reply-box { border-top: 0; margin-top: 4px; padding-top: 0; }
+
+@media (max-width: 560px) {
+  .doc-task { padding: 18px 16px; }
+  .dz-actions .btn { width: 100%; }
+  .todo-strip { padding: 16px 18px; }
 }
