@@ -166,3 +166,82 @@ def test_client_of_firm_b_cannot_read_firm_a_case(api, second_firm):
         other_case = cur.fetchone()["id"]
 
     assert api.get("/api/client/cases/%s" % other_case).status_code == 404
+
+
+# ================================================================
+#  היכולות שהוחזרו - אותו בידוד, גם עליהן
+# ================================================================
+
+def test_firm_a_cannot_record_a_decision_on_firm_b_case(api, second_firm):
+    csrf = _login_seed_staff(api)
+    r = api.post("/api/office/cases/%s/decisions" % second_firm["case_id"],
+                 json={"decided_at": "2026-09-01", "outcome": "grant",
+                       "percent": 30, "is_permanent": False},
+                 headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 404, "משרד רשם החלטה בתיק של משרד אחר"
+
+
+def test_firm_a_cannot_cancel_firm_b_document(api, second_firm):
+    csrf = _login_seed_staff(api)
+    r = api.post("/api/office/documents/%s/cancel" % second_firm["document_id"],
+                 headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 404
+
+
+def test_firm_a_cannot_read_firm_b_catalog(api, second_firm):
+    _login_seed_staff(api)
+    r = api.get("/api/office/cases/%s/document-templates" % second_firm["case_id"])
+    assert r.status_code == 404
+
+
+def test_audit_log_does_not_leak_across_firms(api, second_firm):
+    """
+    היומן הוא הנקודה שהכי קל לשכוח בה סינון: הוא נשאל בלי
+    מזהה תיק, ולכן שאילתה בלי firm_id הייתה מחזירה את הכול.
+    """
+    with cursor(commit=True) as cur:
+        cur.execute(
+            """insert into audit_log (firm_id, actor_type, actor_id, action,
+                                      entity_type, case_id)
+               values (%s, 'user', %s, 'office.case_viewed', 'case', %s)""",
+            (second_firm["firm_id"], second_firm["user_id"], second_firm["case_id"]),
+        )
+
+    _login_seed_staff(api)
+    entries = api.get("/api/office/audit-log?limit=200").json()["entries"]
+
+    with cursor() as cur:
+        cur.execute("""select count(*) as n from audit_log
+                        where firm_id = %s""", (second_firm["firm_id"],))
+        assert cur.fetchone()["n"] >= 1, "שורת הבדיקה לא נוצרה"
+
+    # השורה של משרד ב' קיימת במסד אך אינה בתשובה למשרד א'.
+    assert all(e["entity"] != "case" or e["actor"] != "עו\"ד בדיקה"
+               for e in entries), "יומן של משרד אחד הכיל שורה של משרד אחר"
+
+
+def test_client_of_firm_b_cannot_reply_to_firm_a_document(api, second_firm):
+    class _Req:
+        client = type("c", (), {"host": "127.0.0.1"})()
+        headers = {}
+
+    class _Resp:
+        def __init__(self): self.jar = {}
+        def set_cookie(self, name, value, **kw): self.jar[name] = value
+
+    resp = _Resp()
+    auth.create_session(resp, firm_id=second_firm["firm_id"], subject_type="client",
+                        subject_id=second_firm["client_id"], request=_Req(),
+                        hours=auth.CLIENT_SESSION_HOURS)
+    for name, value in resp.jar.items():
+        api.cookies.set(name, value)
+
+    with cursor() as cur:
+        cur.execute("""select id from case_documents
+                        where firm_id <> %s limit 1""", (second_firm["firm_id"],))
+        other_doc = cur.fetchone()["id"]
+
+    r = api.post("/api/client/documents/%s/replies" % other_doc,
+                 json={"kind": "dont-have"},
+                 headers={"X-CSRF-Token": resp.jar["portal_csrf"]})
+    assert r.status_code == 404

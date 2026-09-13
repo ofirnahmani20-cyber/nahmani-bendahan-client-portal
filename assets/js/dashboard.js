@@ -115,15 +115,16 @@
 
     send.addEventListener('click', function () {
       if (!chosen) return;
-      /* ⚠️ אין עדיין endpoint לתגובת לקוח (docs/06 לא הגדיר אחד).
-         הפעולה מושבתת במקום להיכתב ל-localStorage ולהיראות
-         כאילו נשלחה למשרד. */
-      toast('שליחת תגובה תתאפשר בקרוב. בינתיים אפשר להתקשר למשרד.');
-      return;
-      toast('העדכון נשלח למשרד. ניצור קשר בהקדם.');
-      renderTodo();
-      renderDocs();
-      renderSummary();
+      send.disabled = true;
+      /* התגובה נשלחת לשרת. הוא מוודא שהמסמך שייך לתיק של הלקוח
+         המחובר - client_id מגיע מה-session ולא מהבקשה. */
+      Api.replyToDocument(doc.id, chosen, area.value.trim())
+         .then(function () { return reload(); })
+         .then(function () { toast('העדכון נשלח למשרד. ניצור קשר בהקדם.'); })
+         .catch(function (err) {
+           send.disabled = false;
+           toast(err.message || 'שליחת התגובה נכשלה. אפשר לנסות שוב.');
+         });
     });
 
     wrap.appendChild(row);

@@ -73,6 +73,147 @@
       });
   }
 
+
+  /* ================= החלטת הוועדה ================= */
+
+  var OUTCOMES = [
+    ['below-threshold', 'נקבעו אחוזים מתחת לסף הזכאות'],
+    ['grant',           'מענק חד-פעמי'],
+    ['pension',         'קצבה חודשית'],
+    ['rejected',        'התביעה נדחתה'],
+  ];
+
+  var decForm = $('decForm');
+  var decErr  = $('decError');
+
+  function renderDecisionForm(file) {
+    var sel = $('decOutcome');
+    if (!sel.options.length) {
+      OUTCOMES.forEach(function (pair) {
+        var opt = document.createElement('option');
+        opt.value = pair[0];
+        opt.textContent = pair[1];
+        sel.appendChild(opt);
+      });
+    }
+    var d = file.decision;
+    $('decisionNow').textContent = d
+      ? 'נרשמה החלטה מ-' + formatDate(d.date) +
+        (d.percent != null ? ' · ' + d.percent + '% נכות' : '') +
+        '. רישום חדש יתווסף לצידה ולא ידרוס אותה.'
+      : 'טרם נרשמה החלטה בתיק.';
+  }
+
+  decForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    decErr.hidden = true;
+
+    var date = $('decDate').value;
+    if (!date) return decFail('צריך תאריך החלטה.', $('decDate'));
+
+    var percent = $('decPercent').value;
+    if (percent === '') return decFail('צריך להזין אחוזי נכות.', $('decPercent'));
+
+    Api.recordDecision(openId, {
+      decided_at:      date,
+      outcome:         $('decOutcome').value,
+      percent:         parseInt(percent, 10),
+      is_permanent:    $('decPermanent').checked,
+      appeal_deadline: $('decDeadline').value || null,
+      office_note:     $('decNote').value.trim() || null,
+    }).then(function () { return renderCase(); })
+      .then(function () {
+        decForm.reset();
+        toast('ההחלטה נרשמה והלקוח יראה אותה.');
+      })
+      .catch(function (err) { decFail(err.message || 'רישום ההחלטה נכשל.'); });
+  });
+
+  function decFail(text, focusOn) {
+    decErr.textContent = text;
+    decErr.hidden = false;
+    if (focusOn) focusOn.focus();
+  }
+
+  /* ================= קטלוג המסמכים ================= */
+
+  /* הקטלוג מגיע מ-required_document_templates במסד. עד 13.09 הוא
+     היה קבוע ב-data.js, כלומר עותק בדפדפן שיכול לסטות מהמסד. */
+  var templates = [];
+
+  function renderCatalog(file) {
+    var sel = $('reqPick');
+    sel.textContent = '';
+    var first = document.createElement('option');
+    first.value = '';
+    first.textContent = 'בחירה מהקטלוג…';
+    sel.appendChild(first);
+
+    return Api.documentTemplates(file.id).then(function (data) {
+      templates = data.templates;
+      var have = {};
+      (file.documents || []).forEach(function (d) { have[d.name] = true; });
+
+      templates.forEach(function (t, i) {
+        var opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = t.name + (have[t.name] ? ' (כבר בתיק)' : '');
+        opt.disabled = !!have[t.name];
+        sel.appendChild(opt);
+      });
+    }).catch(function () {
+      first.textContent = 'לא הצלחנו לטעון את הקטלוג';
+    });
+  }
+
+  $('reqPick').addEventListener('change', function () {
+    var t = templates[parseInt(this.value, 10)];
+    if (!t) return;
+    $('reqName').value = t.name;
+    $('reqNote').value = t.guidance || '';
+    $('reqRequired').checked = !!t.required;
+  });
+
+  /* ================= יומן הפעולות ================= */
+
+  var ACTION_LABELS = {
+    'office.stage_changed':      'עודכן שלב',
+    'office.document_reviewed':  'נבדק מסמך',
+    'office.document_requested': 'נדרש מסמך',
+    'office.document_cancelled': 'נסגרה דרישה',
+    'office.decision_recorded':  'נרשמה החלטה',
+    'office.message_sent':       'נשלח עדכון',
+    'office.case_viewed':        'צפייה בתיק',
+    'office.ai_invoked':         'הופעל ניתוח',
+    'client.file_uploaded':      'הלקוח העלה מסמך',
+    'client.document_replied':   'הלקוח הגיב',
+    'client.case_viewed':        'הלקוח צפה בתיק',
+  };
+
+  function renderLog(caseId) {
+    var list = $('logList');
+    if (!list) return Promise.resolve();
+    return Api.auditLog(caseId).then(function (data) {
+      list.textContent = '';
+      if (!data.entries.length) {
+        list.appendChild(el('li', 'item-note', 'אין עדיין פעולות רשומות.'));
+        return;
+      }
+      data.entries.forEach(function (entry) {
+        var li = el('li');
+        li.appendChild(el('h3', null,
+          ACTION_LABELS[entry.action] || entry.action));
+        li.appendChild(el('p', 'item-note',
+          (entry.actor || 'המערכת') + ' · ' + stamp(entry.at)));
+        list.appendChild(li);
+      });
+    }).catch(function () {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note', 'לא הצלחנו לטעון את היומן.'));
+    });
+  }
+
+
   /* ================= רשימת התיקים ================= */
 
   function showList() {
@@ -178,10 +319,10 @@
         (file.stageTitle ? ' - ' + file.stageTitle : '');
 
       renderStage(file);
-      /* renderCatalog הוסר: הוא הציג את REQUIRED_DOC_CATALOG
-         מ-data.js. אין endpoint ל-required_document_templates,
-         והוספת מסמך נעשית כעת בטקסט חופשי בלבד. */
+      renderDecisionForm(file);
+      renderCatalog(file);
       renderReview(file);
+      renderLog(openId);
     }).catch(function (err) {
       $('caseMeta').textContent = err.message || 'לא הצלחנו לטעון את התיק.';
     });
@@ -272,7 +413,8 @@
     'approved':       { tag: 'tag-ok',   mark: '✓', text: 'אושר' },
     'pending_review': { tag: 'tag-warn', mark: '●', text: 'ממתין לבדיקה' },
     'missing':        { tag: 'tag-wait', mark: '!', text: 'הלקוח עוד לא העלה' },
-    'rejected':       { tag: 'tag-stop', mark: '✗', text: 'נדחה - הלקוח התבקש להעלות מחדש' }
+    'rejected':       { tag: 'tag-stop', mark: '✗', text: 'נדחה - הלקוח התבקש להעלות מחדש' },
+    'cancelled':      { tag: 'tag-wait', mark: '–', text: 'הדרישה נסגרה' }
   };
 
   function reviewStatus(value) {
@@ -282,7 +424,8 @@
 
   function renderReview(file) {
     // מה שממתין לבדיקה קודם - זו העבודה הפתוחה של הצוות
-    var order = { 'pending_review': 0, 'rejected': 1, 'missing': 2, 'approved': 3 };
+    var order = { 'pending_review': 0, 'rejected': 1, 'missing': 2,
+                  'approved': 3, 'cancelled': 4 };
     var docs  = file.documents.slice().sort(function (a, b) {
       return order[a.status] - order[b.status];
     });
@@ -318,9 +461,25 @@
         li.appendChild(reviewControls(doc));
       }
 
-      /* ביטול דרישה הוסר: docs/06 מגדיר DELETE /api/office/documents/:id
-         אך הוא טרם מומש. כפתור שכותב ל-localStorage היה נראה כאילו
-         הדרישה בוטלה בזמן שהלקוח עדיין רואה אותה. */
+      /* סגירת דרישה שהלקוח טרם מילא. השורה נשארת במסד עם סטטוס
+         cancelled - מחיקה הייתה מוחקת בקסקייד גם קבצים שכבר
+         הועלו תחתיה. */
+      if (doc.status === 'missing' || doc.status === 'rejected') {
+        var cancel = el('button', 'btn btn-outline btn-sm doc-actions', 'סגירת הדרישה');
+        cancel.type = 'button';
+        cancel.setAttribute('aria-label', 'סגירת הדרישה למסמך ' + doc.name);
+        cancel.addEventListener('click', function () {
+          cancel.disabled = true;
+          Api.cancelDocument(doc.id)
+             .then(function () { return renderCase(); })
+             .then(function () { toast('הדרישה למסמך "' + doc.name + '" נסגרה.'); })
+             .catch(function (err) {
+               cancel.disabled = false;
+               toast(err.message || 'סגירת הדרישה נכשלה.');
+             });
+        });
+        li.appendChild(cancel);
+      }
 
       list.appendChild(li);
     });

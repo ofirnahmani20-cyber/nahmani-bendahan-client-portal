@@ -218,9 +218,11 @@ CREATE TABLE IF NOT EXISTS case_documents (
   name               text NOT NULL,
   guidance           text,
   is_required        boolean NOT NULL DEFAULT true,
+  -- cancelled: המשרד סגר את הדרישה. השורה נשארת, ולכן ההיסטוריה
+  -- ומי שכבר הועלה תחתיה נשמרים. מחיקה הייתה מוחקת גם אותם.
   status             text NOT NULL DEFAULT 'missing'
                      CHECK (status IN ('missing', 'pending_review',
-                                       'approved', 'rejected')),
+                                       'approved', 'rejected', 'cancelled')),
   reject_reason      text,
   reviewed_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at        timestamptz,

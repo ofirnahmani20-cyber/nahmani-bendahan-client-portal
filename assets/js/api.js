@@ -111,6 +111,12 @@
     clientCases:  function () { return Api.get('/api/client/cases'); },
     clientCase:   function (id) { return Api.get('/api/client/cases/' + encodeURIComponent(id)); },
 
+    replyToDocument: function (documentId, kind, text) {
+      return Api.post('/api/client/documents/' +
+                      encodeURIComponent(documentId) + '/replies',
+                      { kind: kind, text: text || null });
+    },
+
     uploadFile: function (documentId, file) {
       var form = new FormData();
       form.append('file', file);
@@ -143,6 +149,22 @@
     sendMessage: function (caseId, title, body, important) {
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/messages',
                       { title: title, body: body, is_important: !!important });
+    },
+    recordDecision: function (caseId, decision) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/decisions',
+                      decision);
+    },
+    cancelDocument: function (documentId) {
+      return Api.post('/api/office/documents/' +
+                      encodeURIComponent(documentId) + '/cancel');
+    },
+    documentTemplates: function (caseId) {
+      return Api.get('/api/office/cases/' + encodeURIComponent(caseId) +
+                     '/document-templates');
+    },
+    auditLog: function (caseId) {
+      return Api.get('/api/office/audit-log' +
+                     (caseId ? '?case_id=' + encodeURIComponent(caseId) : ''));
     },
   };
 

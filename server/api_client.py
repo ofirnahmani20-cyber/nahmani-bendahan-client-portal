@@ -13,6 +13,7 @@ JavaScript - יקבל את התיקים שלו בלבד, כי השאילתה ל�
 """
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
+from pydantic import BaseModel, Field
 
 from . import audit, scan, storage
 from .auth import require_client, require_csrf
@@ -27,6 +28,7 @@ STATUS_TO_UI = {
     "pending_review": "pending-review",
     "approved": "approved",
     "rejected": "rejected",
+    "cancelled": "cancelled",
 }
 
 
@@ -123,11 +125,37 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
         )
         stages = cur.fetchall()
 
+        # ההחלטה האחרונה. ההיסטוריה נשמרת, אך ללקוח מוצגת
+        # ההחלטה העדכנית - היא זו שממנה נגזר מה עליו לעשות.
+        cur.execute(
+            """select decided_at, outcome, percent, is_permanent,
+                      appeal_deadline, office_note
+                 from case_decisions
+                where case_id = %s and firm_id = %s
+                order by decided_at desc, created_at desc limit 1""",
+            (case_id, identity.firm_id),
+        )
+        decision = cur.fetchone()
+
+        cur.execute(
+            """select r.document_id, r.kind, r.text, r.created_at
+                 from document_replies r
+                 join case_documents d on d.id = r.document_id
+                where d.case_id = %s and r.firm_id = %s
+                order by r.created_at desc""",
+            (case_id, identity.firm_id),
+        )
+        replies = cur.fetchall()
+
     audit.record(identity, "client.case_viewed", entity_type="case",
                  entity_id=case_id, case_id=case_id, request=request)
 
     docs_out = []
     for d in documents:
+        # דרישה שהמשרד סגר אינה מוצגת ללקוח: היא כבר לא נדרשת
+        # ממנו, והצגתה הייתה רק מבלבלת. השורה נשמרת במסד.
+        if d["status"] == "cancelled":
+            continue
         f = files.get(str(d["id"]))
         docs_out.append({
             "id": str(d["id"]),
@@ -167,6 +195,19 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
             "desc": s["description"], "isTerminal": s["is_terminal"],
             "occurredAt": s["occurred_at"].date().isoformat() if s["occurred_at"] else None,
         } for s in stages],
+        "decision": ({
+            "date": decision["decided_at"].isoformat(),
+            "outcome": decision["outcome"],
+            "percent": decision["percent"],
+            "permanent": decision["is_permanent"],
+            "appealDeadline": (decision["appeal_deadline"].isoformat()
+                               if decision["appeal_deadline"] else None),
+            "officeNote": decision["office_note"],
+        } if decision else None),
+        "clientReplies": [{
+            "documentId": str(r["document_id"]), "kind": r["kind"],
+            "text": r["text"], "date": r["created_at"].date().isoformat(),
+        } for r in replies],
     }
 
 
@@ -300,3 +341,60 @@ def download_file(document_id: str, file_id: str, request: Request,
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+# ================================================================
+#  תגובת לקוח למסמך
+# ================================================================
+
+REPLY_KINDS = {
+    "dont-have":   "אין לי את המסמך",
+    "need-help":   "צריך עזרה בהשגתו",
+    "sent-mail":   "שלחתי בדואר",
+    "gave-office": "כבר מסרתי למשרד",
+}
+
+
+class DocumentReply(BaseModel):
+    kind: str
+    text: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/api/client/documents/{document_id}/replies")
+def add_reply(document_id: str, body: DocumentReply, request: Request,
+              identity=Depends(require_client)):
+    """
+    תגובת לקוח על מסמך שביקשו ממנו.
+
+    המסמך נבדק מול התיק של הלקוח המחובר: client_id מגיע מה-session
+    ולא מהבקשה, ולכן אי אפשר להגיב על מסמך של מישהו אחר.
+    """
+    require_csrf(request)
+
+    if body.kind not in REPLY_KINDS:
+        raise HTTPException(status_code=400, detail="סוג תגובה לא מוכר.")
+
+    with cursor(commit=True) as cur:
+        cur.execute(
+            """select d.id, d.case_id
+                 from case_documents d
+                 join cases c on c.id = d.case_id
+                where d.id = %s and c.client_id = %s and d.firm_id = %s""",
+            (document_id, identity.subject_id, identity.firm_id),
+        )
+        doc = cur.fetchone()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="המסמך לא נמצא.")
+
+        cur.execute(
+            """insert into document_replies (firm_id, document_id, kind, text)
+               values (%s, %s, %s, %s) returning id""",
+            (identity.firm_id, document_id, body.kind,
+             (body.text or "").strip() or None),
+        )
+        reply_id = cur.fetchone()["id"]
+
+    audit.record(identity, "client.document_replied", entity_type="document",
+                 entity_id=document_id, case_id=str(doc["case_id"]),
+                 request=request)
+    return {"ok": True, "replyId": str(reply_id)}

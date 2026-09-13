@@ -110,6 +110,16 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         )
         stages = cur.fetchall()
 
+        cur.execute(
+            """select decided_at, outcome, percent, is_permanent,
+                      appeal_deadline, office_note
+                 from case_decisions
+                where case_id = %s and firm_id = %s
+                order by decided_at desc, created_at desc limit 1""",
+            (case_id, identity.firm_id),
+        )
+        decision = cur.fetchone()
+
     audit.record(identity, "office.case_viewed", entity_type="case",
                  entity_id=case_id, case_id=case_id, request=request)
 
@@ -127,6 +137,11 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         "stageOptions": [{
             "id": str(s["id"]), "position": s["position"], "title": s["title"],
         } for s in stages],
+        "decision": ({
+            "date": decision["decided_at"].isoformat(),
+            "outcome": decision["outcome"],
+            "percent": decision["percent"],
+        } if decision else None),
     }
 
 
@@ -271,3 +286,160 @@ def add_message(case_id: str, body: NewMessage, request: Request,
     audit.record(identity, "office.message_sent", entity_type="message",
                  entity_id=str(message_id), case_id=case_id, request=request)
     return {"ok": True, "messageId": str(message_id)}
+
+
+# ================================================================
+#  החלטת ועדה
+# ================================================================
+
+class Decision(BaseModel):
+    decided_at: str
+    outcome: str = Field(pattern="^(below-threshold|grant|pension|rejected)$")
+    percent: int | None = Field(default=None, ge=0, le=100)
+    is_permanent: bool = False
+    appeal_deadline: str | None = None
+    office_note: str | None = Field(default=None, max_length=2000)
+
+
+@router.post("/api/office/cases/{case_id}/decisions")
+def record_decision(case_id: str, body: Decision, request: Request,
+                    identity=Depends(require_staff)):
+    """
+    רישום החלטה הוא *הוספת שורה*, לא עדכון.
+
+    לתיק יכולות להיות כמה החלטות - ועדה ראשונה, ועדת עררים,
+    ועדה חוזרת. דריסה הייתה מוחקת את מה שקדם, ובתיק משפטי זו
+    בדיוק ההיסטוריה שצריך לשמור.
+    """
+    require_csrf(request)
+    with cursor(commit=True) as cur:
+        _owned_case(cur, case_id, identity)
+        cur.execute(
+            """insert into case_decisions
+                 (firm_id, case_id, decided_at, outcome, percent,
+                  is_permanent, appeal_deadline, office_note,
+                  recorded_by_user_id)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+            (identity.firm_id, case_id, body.decided_at, body.outcome,
+             body.percent, body.is_permanent, body.appeal_deadline,
+             body.office_note, identity.subject_id),
+        )
+        decision_id = cur.fetchone()["id"]
+
+    audit.record(identity, "office.decision_recorded", entity_type="decision",
+                 entity_id=str(decision_id), case_id=case_id, request=request,
+                 metadata={"outcome": body.outcome})
+    return {"ok": True, "decisionId": str(decision_id)}
+
+
+# ================================================================
+#  סגירת דרישת מסמך
+# ================================================================
+
+@router.post("/api/office/documents/{document_id}/cancel")
+def cancel_document(document_id: str, request: Request,
+                    identity=Depends(require_staff)):
+    """
+    סוגר דרישה בלי למחוק אותה.
+
+    המחיקה הייתה מוחקת גם את document_files שתלויים בשורה
+    (ON DELETE CASCADE) - כלומר קובץ שהלקוח כבר העלה. לכן
+    הסטטוס עובר ל-cancelled, השורה נשארת, וההיסטוריה איתה.
+    """
+    require_csrf(request)
+    with cursor(commit=True) as cur:
+        doc = _owned_document(cur, document_id, identity)
+        if doc["status"] == "approved":
+            raise HTTPException(
+                status_code=400,
+                detail="לא ניתן לסגור דרישה למסמך שכבר אושר.")
+        cur.execute(
+            """update case_documents
+                  set status = 'cancelled',
+                      reviewed_by_user_id = %s,
+                      reviewed_at = now()
+                where id = %s and firm_id = %s""",
+            (identity.subject_id, document_id, identity.firm_id),
+        )
+
+    audit.record(identity, "office.document_cancelled", entity_type="document",
+                 entity_id=document_id, case_id=str(doc["case_id"]),
+                 request=request, metadata={"from_stage": doc["status"]})
+    return {"ok": True, "status": "cancelled"}
+
+
+# ================================================================
+#  קטלוג המסמכים
+# ================================================================
+
+@router.get("/api/office/cases/{case_id}/document-templates")
+def document_templates(case_id: str, request: Request,
+                       identity=Depends(require_staff)):
+    """
+    הקטלוג של סוג התביעה של התיק, מהמסד.
+
+    היה קבוע ב-JavaScript עד 13.09. שם הוא לא היה ניתן לעריכה
+    בלי פריסה, והדפדפן החזיק עותק שיכול לסטות מהמסד.
+    """
+    with cursor() as cur:
+        case = _owned_case(cur, case_id, identity)
+        cur.execute(
+            """select id, name, guidance, is_required, position
+                 from required_document_templates
+                where claim_type_id = %s and firm_id = %s
+                order by position""",
+            (case["claim_type_id"], identity.firm_id),
+        )
+        rows = cur.fetchall()
+    return {"templates": [{
+        "id": str(r["id"]), "name": r["name"], "guidance": r["guidance"],
+        "required": r["is_required"], "position": r["position"],
+    } for r in rows]}
+
+
+# ================================================================
+#  יומן פעולות
+# ================================================================
+
+@router.get("/api/office/audit-log")
+def audit_log(request: Request, case_id: str | None = None,
+              limit: int = 50, identity=Depends(require_staff)):
+    """
+    יומן הפעולות של המשרד, מ-audit_log.
+
+    עד 13.09 הממשק הציג יומן שנשמר ב-localStorage של הדפדפן -
+    כלומר כל עובד ראה רק את מה שהוא עצמו עשה באותו מחשב.
+    """
+    limit = max(1, min(limit, 200))
+    with cursor() as cur:
+        if case_id:
+            _owned_case(cur, case_id, identity)
+            cur.execute(
+                """select a.action, a.entity_type, a.created_at, a.metadata,
+                          coalesce(u.full_name, '') as actor_name
+                     from audit_log a
+                     left join users u on u.id = a.actor_id
+                                      and a.actor_type = 'user'
+                    where a.firm_id = %s and a.case_id = %s
+                    order by a.created_at desc limit %s""",
+                (identity.firm_id, case_id, limit),
+            )
+        else:
+            cur.execute(
+                """select a.action, a.entity_type, a.created_at, a.metadata,
+                          coalesce(u.full_name, '') as actor_name
+                     from audit_log a
+                     left join users u on u.id = a.actor_id
+                                      and a.actor_type = 'user'
+                    where a.firm_id = %s
+                    order by a.created_at desc limit %s""",
+                (identity.firm_id, limit),
+            )
+        rows = cur.fetchall()
+    return {"entries": [{
+        "action": r["action"],
+        "actor": r["actor_name"],
+        "entity": r["entity_type"],
+        "at": r["created_at"].isoformat(),
+        "metadata": r["metadata"],
+    } for r in rows]}
