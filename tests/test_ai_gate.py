@@ -126,9 +126,12 @@ def test_production_blocks_ai_entirely(monkeypatch):
     import server.app
     module = importlib.reload(server.app)
     try:
-        with TestClient(module.app, client=LOCAL, base_url="http://127.0.0.1") as c:
-            for path in ("/api/office/assist", "/api/office/assist/preview"):
-                assert c.post(path, json=BODY).status_code == 503, path
+        # בלי context manager במכוון: lifespan מפעיל את שער הייצור,
+        # שמסרב לעלות כל עוד חשבונות ההדגמה במסד. הסירוב הזה נבדק
+        # ב-test_production_gate; כאן נבדק שער ה-AI עצמו.
+        c = TestClient(module.app, client=LOCAL, base_url="http://127.0.0.1")
+        for path in ("/api/office/assist", "/api/office/assist/preview"):
+            assert c.post(path, json=BODY).status_code == 503, path
     finally:
         monkeypatch.setenv("PORTAL_MODE", "demo")
         importlib.reload(server.app)

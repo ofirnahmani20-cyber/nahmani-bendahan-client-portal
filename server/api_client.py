@@ -12,10 +12,10 @@ JavaScript - יקבל את התיקים שלו בלבד, כי השאילתה ל�
 תיק מלא, גם בלי התחברות.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 
-from . import audit
-from .auth import require_client
+from . import audit, scan, storage
+from .auth import require_client, require_csrf
 from .db.pool import cursor
 
 router = APIRouter()
@@ -167,3 +167,135 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
             "occurredAt": s["occurred_at"].date().isoformat() if s["occurred_at"] else None,
         } for s in stages],
     }
+
+
+# ================================================================
+#  העלאת מסמך
+# ================================================================
+
+@router.post("/api/client/documents/{document_id}/files")
+async def upload_file(document_id: str, request: Request,
+                      file: UploadFile = File(...),
+                      identity=Depends(require_client)):
+    """
+    מקבל קובץ מהלקוח.
+
+    סדר הפעולות מכוון: קודם הרשאה, אחר כך זמינות סורק, ורק
+    בסוף קריאת הקובץ. אין טעם לקרוא 12MB לזיכרון לפני שברור
+    שמותר לקבל אותם.
+    """
+    require_csrf(request)
+
+    try:
+        scan.assert_upload_allowed()
+    except scan.ScannerNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    with cursor() as cur:
+        # המסמך חייב להיות של תיק ששייך ללקוח המחובר.
+        cur.execute(
+            """select d.id, d.case_id, d.name
+                 from case_documents d
+                 join cases c on c.id = d.case_id
+                where d.id = %s and c.client_id = %s and d.firm_id = %s""",
+            (document_id, identity.subject_id, identity.firm_id),
+        )
+        doc = cur.fetchone()
+    if doc is None:
+        raise HTTPException(status_code=404, detail="המסמך לא נמצא.")
+
+    data = await file.read()
+    try:
+        meta = storage.validate_and_store(
+            data, firm_id=identity.firm_id, case_id=doc["case_id"],
+            original_name=file.filename,
+        )
+    except storage.RejectedFile as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    result = scan.get_scanner().scan(data)
+
+    with cursor(commit=True) as cur:
+        # גרסה חדשה מחליפה את הקודמת כנוכחית, אך ההיסטוריה נשמרת.
+        cur.execute(
+            "update document_files set is_current = false where document_id = %s",
+            (document_id,),
+        )
+        cur.execute(
+            """insert into document_files
+                 (firm_id, document_id, storage_key, original_filename,
+                  mime_type, size_bytes, checksum, scan_status,
+                  uploaded_by_client_id)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+            (identity.firm_id, document_id, meta["storage_key"],
+             meta["original_filename"], meta["mime_type"], meta["size_bytes"],
+             meta["checksum"], result.status, identity.subject_id),
+        )
+        file_id = cur.fetchone()["id"]
+        cur.execute(
+            "update case_documents set status = 'pending_review' where id = %s",
+            (document_id,),
+        )
+
+    audit.record(identity, "client.file_uploaded", entity_type="document",
+                 entity_id=document_id, case_id=str(doc["case_id"]),
+                 request=request,
+                 metadata={"mime_type": meta["mime_type"],
+                           "size_bytes": meta["size_bytes"],
+                           "scan_status": result.status})
+
+    return {
+        "ok": True,
+        "fileId": str(file_id),
+        "filename": meta["original_filename"],
+        "scanStatus": result.status,
+        # הלקוח צריך לדעת שהקובץ התקבל אך טרם נסרק, כדי שלא
+        # יופתע מכך שאינו יכול לפתוח אותו.
+        "note": result.detail,
+    }
+
+
+@router.get("/api/client/documents/{document_id}/files/{file_id}")
+def download_file(document_id: str, file_id: str, request: Request,
+                  identity=Depends(require_client)):
+    """
+    הורדה. שתי בדיקות לפני שבייט אחד יוצא: בעלות וסטטוס סריקה.
+    """
+    with cursor() as cur:
+        cur.execute(
+            """select f.storage_key, f.original_filename, f.mime_type,
+                      f.scan_status, d.case_id
+                 from document_files f
+                 join case_documents d on d.id = f.document_id
+                 join cases c on c.id = d.case_id
+                where f.id = %s and f.document_id = %s
+                  and c.client_id = %s and f.firm_id = %s""",
+            (file_id, document_id, identity.subject_id, identity.firm_id),
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="הקובץ לא נמצא.")
+
+    if not scan.downloadable(row["scan_status"]):
+        # 409 ולא 403: הקובץ שלך, פשוט עדיין לא נסרק.
+        raise HTTPException(
+            status_code=409,
+            detail="הקובץ טרם עבר סריקת אבטחה ואינו זמין להורדה.",
+        )
+
+    audit.record(identity, "client.file_downloaded", entity_type="document",
+                 entity_id=document_id, case_id=str(row["case_id"]),
+                 request=request)
+
+    return Response(
+        content=storage.read(row["storage_key"]),
+        media_type=row["mime_type"],
+        headers={
+            # attachment + nosniff: הדפדפן לא ינחש סוג ולא יריץ
+            # תוכן שהועלה כאילו הוא חלק מהאתר.
+            "Content-Disposition": 'attachment; filename="%s"'
+                                   % row["original_filename"],
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

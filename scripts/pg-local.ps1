@@ -1,4 +1,4 @@
-<#
+﻿<#
     pg-local.ps1 - PostgreSQL מקומי לפיתוח, בלי התקנה.
 
         .\scripts\pg-local.ps1 setup    הורדה, פריסה ואתחול (פעם אחת, ~330MB)

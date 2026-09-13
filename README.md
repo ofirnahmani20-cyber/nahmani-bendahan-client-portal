@@ -2,39 +2,78 @@
 
 אתר מעקב ללקוחות המשרד בתביעות ביטוח לאומי, וממשק ניהול פנימי לצוות.
 
+## מצב הפרויקט — implemented / demo / planned
+
+| שכבה | מצב |
+|---|---|
+| מסד נתונים PostgreSQL | **implemented** — 18 טבלאות, `firm_id` בכולן, מחובר לאפליקציה |
+| אימות בצד שרת (sessions ב-DB) | **implemented** — cookie HttpOnly, hash של הטוקן בלבד |
+| הרשאות ובידוד בין לקוחות ובין משרדים | **implemented** — נאכף בשאילתה, מכוסה בבדיקות |
+| CSRF (double-submit + Origin) | **implemented** |
+| יומן ביקורת והיסטוריית שלבים | **implemented** |
+| העלאת קבצים (magic bytes, checksum, אחסון מחוץ ל-webroot) | **implemented** |
+| **הממשק בדפדפן** | ⚠️ **demo** — עדיין קורא ל-`data.js` ולא ל-API |
+| סריקת וירוסים | ❌ **planned** — יש ממשק, אין מנוע. קובץ נשאר `pending` ואינו ניתן להורדה |
+| שליחת SMS ל-OTP | ❌ **planned** — יש ממשק, אין ספק. ב-demo הקוד נכתב ללוג |
+| Object storage ו-signed URLs | ❌ **planned** — כרגע דיסק מקומי |
+| HTTPS ו-HSTS | ❌ **planned** |
+
+> ⚠️ **המערכת מחזיקה כרגע שני מסלולים במקביל.** ה-API החדש מאובטח,
+> אבל דפי ה-HTML עדיין טוענים את `assets/js/data.js` שמכיל את נתוני
+> ההדגמה ואת סיסמת הצוות. **כל עוד זה כך אין להעלות לאוויר עם נתוני
+> לקוחות אמיתיים**, גם אם ה-API עצמו תקין.
+
 ## הפעלה
 
-**אזור הלקוחות וממשק הניהול בלבד** (בלי הניתוח המקצועי):
+### 1. מסד נתונים
 
-```bash
-python -m http.server 8777
+```powershell
+.\scripts\pg-local.ps1 setup     # פעם אחת, ~330MB
+.\scripts\pg-local.ps1 start
+python -m server.db.keygen        # מדפיס מפתחות ל-.env
+python -m server.db.apply         # סכמה + נתוני הדגמה
 ```
 
-**עם הניתוח המקצועי** — נדרש שרת, כי מפתח ה-API לא יכול לשבת ב-JavaScript:
+### 2. משתני סביבה (`.env` בשורש, אינו נכנס ל-git)
+
+| משתנה | חובה | תפקיד |
+|---|---|---|
+| `PORTAL_ID_HMAC_KEY` | כן | HMAC ל-`national_id_lookup`. **שינויו פוסל את כל הלקוחות הקיימים** |
+| `PORTAL_ID_ENC_KEY` | כן | הצפנת ת״ז לתצוגה. חייב להיות שונה מהקודם |
+| `DATABASE_URL` | לא | ברירת מחדל: `postgresql://postgres@127.0.0.1:55432/portal` |
+| `PORTAL_MODE` | לא | `demo` (ברירת מחדל) או `production` |
+| `ANTHROPIC_API_KEY` | לא | בלעדיו הניתוח המקצועי מושבת |
+| `PORTAL_STORAGE_DIR` | לא | ברירת מחדל: `var/uploads` |
+| `PORTAL_ALLOWED_ORIGINS` | בייצור | רשימת מקורות מותרים ל-CSRF |
+
+### 3. הרצה
 
 ```bash
 pip install -r requirements.txt
-set ANTHROPIC_API_KEY=sk-ant-...          # ב-PowerShell: $env:ANTHROPIC_API_KEY="..."
 python -m uvicorn server.app:app --host 127.0.0.1 --port 8777
 ```
 
 ואז: <http://127.0.0.1:8777>
 
+> `python -m http.server` כבר **אינו** דרך הרצה תקפה: הוא מגיש את כל
+> עץ הפרויקט כולל `.env` ו-`server/`, ואין בו API.
+
+### 4. בדיקות
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
+
 ## חשבונות הדגמה
 
-**לקוחות** — `index.html`
+**קיימים רק כש-`PORTAL_MODE=demo`.**
 
-| ת״ז | קוד | תרחיש |
+| תפקיד | זיהוי | סוד |
 |---|---|---|
-| `123456782` | `1234` | נכות כללית — שלב 5 מתוך 8 (ועדה רפואית) |
-| `987654321` | `1234` | נכות מעבודה — שלב 7 מתוך 8 (ועדת עררים) |
-
-**צוות המשרד** — `admin.html`
-
-| משתמש | סיסמה |
-|---|---|
-| `nahmani` | `office2026` |
-| `bendahan` | `office2026` |
+| צוות (admin) | `nahmani@nahmani-bendahan.co.il` | `office2026` |
+| צוות | `bendahan@nahmani-bendahan.co.il` | `office2026` |
+| לקוחות | ת״ז מנתוני הזרע | קוד OTP — נכתב ללוג השרת |
 
 ## מה יש במערכת
 

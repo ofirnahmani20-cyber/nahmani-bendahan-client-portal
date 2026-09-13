@@ -346,8 +346,10 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 -- יומן ביקורת. חובה לרשום גם צפייה ולא רק שינוי - נדרש
 -- לחובת החיסיון המקצועית.
--- אין UPDATE ואין DELETE על הטבלה הזו; ההרשאות נאכפות בנפרד
--- (ראה grants.sql) ולא רק בהסכמה שלא לגעת.
+-- אין UPDATE ואין DELETE על הטבלה הזו.
+-- ⚠️ נכון ל-13.09 זו עדיין הסכמה שלא לגעת ולא אילוץ: הקוד כותב
+--    בלבד (server/audit.py), אך אין REVOKE ברמת המסד. grants.sql
+--    טרם נכתב - ראה "מצב הפרויקט" ב-README.
 CREATE TABLE IF NOT EXISTS audit_log (
   id          bigserial PRIMARY KEY,
   firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,

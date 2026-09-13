@@ -13,6 +13,7 @@ app.py - שרת אזור הלקוחות Nahmani Ben-Dahan.
     uvicorn server.app:app --host 127.0.0.1 --port 8777
 """
 
+import contextlib
 import ipaddress
 import json
 import os
@@ -46,6 +47,44 @@ PORTAL_MODE = os.environ.get("PORTAL_MODE", "demo").strip().lower()
 IS_PRODUCTION = PORTAL_MODE == "production"
 
 app = FastAPI(title="Nahmani Ben-Dahan portal")
+
+# ============================================================
+#  כותרות אבטחה
+# ------------------------------------------------------------
+#  CSP מוגדרת כאן ולא ב-meta כדי שתחול גם על תשובות API.
+#  'unsafe-inline' לסגנונות נדרש כי הקוד הקיים מציב style
+#  ישירות (רוחב סרגל התקדמות למשל); לסקריפטים אין היתר כזה.
+# ============================================================
+
+CSP = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "object-src 'none'",
+])
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = CSP
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(self)"
+    # מידע רפואי ומשפטי - לא בקאש של הדפדפן או של proxy.
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    if IS_PRODUCTION:
+        response.headers["Strict-Transport-Security"] =             "max-age=31536000; includeSubDomains"
+    return response
+
 
 app.include_router(api_auth.router)
 app.include_router(api_client.router)
@@ -106,6 +145,63 @@ def _client():
         return None
     return anthropic.Anthropic()
 
+
+
+# ============================================================
+#  שער הייצור - נכשל סגור
+# ------------------------------------------------------------
+#  PORTAL_MODE=production אינו "אותו קוד עם דגל". זהו שער
+#  שמסרב לעלות כשחסר לו משהו, במקום ליפול חזרה להתנהגות demo.
+#
+#  הבדיקה על חשבונות ההדגמה היא הסעיף החשוב כאן: משתמש
+#  nahmani@... עם הסיסמה office2026 ששרד לייצור הוא בדיוק
+#  התרחיש שהדגל הזה נועד למנוע.
+# ============================================================
+
+NEWLINE_BULLET = chr(10) + "  - "
+
+DEMO_EMAIL_MARKERS = ("nahmani@nahmani-bendahan.co.il",
+                      "bendahan@nahmani-bendahan.co.il")
+
+
+def _assert_production_ready():
+    problems = []
+
+    for key in ("PORTAL_ID_HMAC_KEY", "PORTAL_ID_ENC_KEY", "DATABASE_URL"):
+        if not os.environ.get(key):
+            problems.append("משתנה הסביבה %s חסר" % key)
+
+    if not os.environ.get("PORTAL_ALLOWED_ORIGINS"):
+        problems.append("PORTAL_ALLOWED_ORIGINS חסר - בדיקת CSRF תחסום הכול")
+
+    try:
+        from .db.pool import cursor as _cur
+        with _cur() as cur:
+            cur.execute("select email from users where lower(email) = any(%s)",
+                        (list(DEMO_EMAIL_MARKERS),))
+            found = [r["email"] for r in cur.fetchall()]
+            if found:
+                problems.append(
+                    "חשבונות הדגמה פעילים במסד: %s" % ", ".join(found))
+    except Exception as exc:
+        problems.append("אין חיבור למסד: %s" % exc)
+
+    if problems:
+        raise RuntimeError(
+            "עלייה במצב production נחסמה:" + NEWLINE_BULLET
+            + NEWLINE_BULLET.join(problems)
+        )
+
+
+@contextlib.asynccontextmanager
+async def _lifespan(_app):
+    """נבדק בעלייה, לפני שהשרת מקבל בקשה ראשונה."""
+    if IS_PRODUCTION:
+        _assert_production_ready()
+    yield
+
+
+app.router.lifespan_context = _lifespan
 
 
 # ============================================================

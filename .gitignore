@@ -8,6 +8,8 @@ desktop.ini
 
 # uploads / temp
 uploads/
+# קבצים שהועלו. מחוץ ל-webroot ומחוץ ל-git.
+var/
 *.log
 *.tmp
 
