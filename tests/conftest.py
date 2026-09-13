@@ -41,3 +41,44 @@ def _reset_throttles():
     except Exception:
         pass
     yield
+
+
+@pytest.fixture
+def temp_case():
+    """
+    תיק זמני במשרד הזרע, שנמחק בסוף הבדיקה.
+
+    בדיקות שמשנות מצב לא ירוצו על תיקי ההדגמה: הן היו גורמות
+    לנתוני הדמו להיסחף בכל הרצה, ולבלבל כל מי שבודק ידנית
+    בדפדפן באותו רגע.
+    """
+    from server.db.pool import cursor as _cursor
+    import uuid as _uuid
+
+    marker = _uuid.uuid4().hex[:8]
+    with _cursor(commit=True) as cur:
+        cur.execute("""select c.firm_id, c.client_id, c.claim_type_id
+                         from cases c limit 1""")
+        base = cur.fetchone()
+        cur.execute("""insert into cases (firm_id, client_id, claim_type_id,
+                                          case_number, opened_at)
+                       values (%s, %s, %s, %s, current_date) returning id""",
+                    (base["firm_id"], base["client_id"], base["claim_type_id"],
+                     "TMP-%s" % marker))
+        case_id = cur.fetchone()["id"]
+        cur.execute("""insert into case_documents (firm_id, case_id, name,
+                                                   guidance, position)
+                       values (%s, %s, 'מסמך זמני', 'הנחיה זמנית', 1)
+                       returning id""", (base["firm_id"], case_id))
+        document_id = cur.fetchone()["id"]
+
+    yield {"case_id": case_id, "document_id": document_id,
+           "firm_id": base["firm_id"], "claim_type_id": base["claim_type_id"]}
+
+    with _cursor(commit=True) as cur:
+        cur.execute("delete from case_stage_events where case_id = %s", (case_id,))
+        cur.execute("delete from messages where case_id = %s", (case_id,))
+        cur.execute("delete from document_files where document_id = %s", (document_id,))
+        cur.execute("delete from case_documents where case_id = %s", (case_id,))
+        cur.execute("delete from audit_log where case_id = %s", (case_id,))
+        cur.execute("delete from cases where id = %s", (case_id,))

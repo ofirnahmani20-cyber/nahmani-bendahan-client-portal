@@ -30,12 +30,17 @@
     loginErr.hidden = true;
 
     if (!u || !p) {
-      return loginFail('צריך להזין שם משתמש וסיסמה.');
+      return loginFail('צריך להזין אימייל וסיסמה.');
     }
-    if (!StaffAuth.login(u, p)) {
-      return loginFail('שם המשתמש או הסיסמה אינם נכונים.');
-    }
-    start();
+
+    /* ההשוואה בשרת, מול bcrypt. הדפדפן אינו מחזיק סיסמאות. */
+    Api.staffLogin(u, p)
+       .then(function () { start(); })
+       .catch(function (err) {
+         loginFail(err.status === 429
+           ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
+           : 'האימייל או הסיסמה אינם נכונים.');
+       });
   });
 
   function loginFail(msg) {
@@ -44,386 +49,184 @@
     $('staffUser').focus();
   }
 
-  $('staffLogout').addEventListener('click', function () { StaffAuth.logout(); });
+  $('staffLogout').addEventListener('click', function () {
+    Api.staffLogout().then(reloadPage, reloadPage);
+  });
+
+  function reloadPage() { location.reload(); }
 
   /* ================= הפעלה ================= */
 
+  /* התיק הפתוח, כפי שהתקבל מהשרת. אין מצב מקומי שנכתב אליו -
+     כל שינוי נשלח לשרת ואז נטען מחדש ממנו. */
+  var currentCase = null;
+
   function start() {
-    staff = StaffAuth.current();
-    if (!staff) return;
-
-    $('loginView').hidden = true;
-    $('appView').hidden   = false;
-    $('staffName').textContent = staff.name + ' · ' + staff.role;
-
-    showList();
+    return Api.me()
+      .then(function (who) {
+        if (who.type !== 'user') { location.replace('index.html'); return; }
+        staff = who;
+        $('loginView').hidden = true;
+        $('appView').hidden   = false;
+        $('staffName').textContent = who.name + (who.role ? ' · ' + who.role : '');
+        return showList();
+      });
   }
 
   /* ================= רשימת התיקים ================= */
 
   function showList() {
     openId = null;
+    currentCase = null;
     $('listView').hidden = false;
     $('caseView').hidden = true;
     $('backBtn').hidden  = true;
 
-    var cases   = CaseStore.list();
-    var waiting = cases.reduce(function (n, c) { return n + c.waiting; }, 0);
+    return Api.officeCases().then(function (data) {
+      var cases   = data.cases;
+      var waiting = cases.reduce(function (n, c) { return n + c.awaitingReview; }, 0);
 
-    $('listSummary').textContent = waiting === 0
-      ? cases.length + ' תיקים פעילים. אין מסמכים שממתינים לבדיקה.'
-      : cases.length + ' תיקים פעילים · ' +
-        (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') + ' לבדיקת המשרד.';
+      $('listSummary').textContent = waiting === 0
+        ? cases.length + ' תיקים פעילים. אין מסמכים שממתינים לבדיקה.'
+        : cases.length + ' תיקים פעילים · ' +
+          (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') +
+          ' לבדיקת המשרד.';
 
-    var rows = $('caseRows');
-    rows.textContent = '';
+      var rows = $('caseRows');
+      rows.textContent = '';
 
-    cases.forEach(function (c) {
-      var tr = document.createElement('tr');
+      cases.forEach(function (c) {
+        var tr = document.createElement('tr');
 
-      var who = document.createElement('td');
-      who.appendChild(el('div', 'client', c.name));
-      who.appendChild(el('div', 'sub num', 'ת״ז ' + c.idNumber + ' · ' + c.phone));
-      tr.appendChild(who);
+        var who = document.createElement('td');
+        who.appendChild(el('div', 'client', c.clientName));
+        who.appendChild(el('div', 'sub num', c.caseNumber));
+        tr.appendChild(who);
 
-      tr.appendChild(cell(c.caseNumber, 'num'));
-      tr.appendChild(cell(c.claimType));
+        tr.appendChild(cell(c.caseNumber, 'num'));
+        tr.appendChild(cell(c.claimType));
 
-      var stage = document.createElement('td');
-      stage.appendChild(el('div', null, c.currentStage + ' מתוך ' + CLAIM_STAGES.length));
-      stage.appendChild(el('div', 'sub', c.stageTitle));
-      tr.appendChild(stage);
+        var stage = document.createElement('td');
+        stage.appendChild(el('div', null, (c.currentStage || '-') + ''));
+        stage.appendChild(el('div', 'sub', c.stageTitle || ''));
+        tr.appendChild(stage);
 
-      tr.appendChild(countCell(c.waiting, c.waiting > 0 ? 'hot' : 'calm'));
-      tr.appendChild(countCell(c.open,    c.open    > 0 ? 'hot' : 'calm'));
-      tr.appendChild(countCell(c.unread,  c.unread  > 0 ? 'hot' : 'calm'));
-      tr.appendChild(countCell(c.blocking, c.blocking > 0 ? 'hot' : 'calm'));
+        tr.appendChild(countCell(c.awaitingReview, 'wait'));
+        tr.appendChild(countCell(c.openForClient, 'warn'));
 
-      var act = document.createElement('td');
-      var btn = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק');
-      btn.type = 'button';
-      btn.setAttribute('aria-label', 'פתיחת התיק של ' + c.name);
-      btn.addEventListener('click', function () { showCase(c.idNumber); });
-      act.appendChild(btn);
-      tr.appendChild(act);
+        var act = document.createElement('td');
+        var open = el('button', 'btn btn-outline btn-small', 'פתיחת התיק');
+        open.type = 'button';
+        open.addEventListener('click', function () { openCase(c.id); });
+        act.appendChild(open);
+        tr.appendChild(act);
 
-      rows.appendChild(tr);
+        rows.appendChild(tr);
+      });
+    }).catch(function (err) {
+      $('listSummary').textContent =
+        err.message || 'לא הצלחנו לטעון את רשימת התיקים.';
     });
-
-    renderLog();
   }
 
   function cell(text, cls) {
     var td = document.createElement('td');
     if (cls) td.className = cls;
-    td.textContent = text;
+    td.textContent = text == null ? '' : text;
     return td;
   }
 
   function countCell(n, tone) {
     var td = document.createElement('td');
-    td.appendChild(el('span', 'count ' + tone, String(n)));
+    var box = el('span', 'count' + (n ? ' count-' + tone : ''), String(n || 0));
+    td.appendChild(box);
     return td;
-  }
-
-  /* ================= יומן פעולות ================= */
-
-  function renderLog() {
-    var log  = CaseStore.log();
-    var list = $('logList');
-    list.textContent = '';
-
-    $('logIntro').textContent = log.length === 0
-      ? ''
-      : 'כל שינוי שהצוות מבצע נרשם כאן. מוצגות ' + Math.min(log.length, 20) + ' הפעולות האחרונות.';
-
-    if (log.length === 0) {
-      list.appendChild(el('li', 'empty', 'עוד לא בוצעו פעולות במערכת.'));
-      return;
-    }
-
-    log.slice(0, 20).forEach(function (entry) {
-      var li = el('li');
-      li.appendChild(el('div', 'log-when', stamp(entry.at)));
-
-      var line = el('p', 'log-text');
-      line.appendChild(el('b', null, entry.staff));
-      line.appendChild(document.createTextNode(
-        ' ' + entry.text + ' · בתיק של ' + entry.client));
-      li.appendChild(line);
-
-      list.appendChild(li);
-    });
   }
 
   /* ================= תיק בודד ================= */
 
-  function showCase(idNumber) {
-    openId = idNumber;
+  function openCase(caseId) {
+    openId = caseId;
     $('listView').hidden = true;
     $('caseView').hidden = false;
     $('backBtn').hidden  = false;
 
-    // הניתוח שייך לתיק - אסור שישאר על המסך כשעוברים לתיק אחר
+    /* הניתוח שייך לתיק - אסור שיישאר על המסך כשעוברים לתיק אחר */
     assistHistory = [];
     $('assistLog').textContent = '';
     $('assistInput').value = '';
 
-    renderCase();
-    $('caseClient').focus();
+    renderCase().then(function () { $('caseClient').focus(); });
   }
 
   $('backBtn').addEventListener('click', showList);
 
+  /** טוען את התיק מהשרת ומצייר. מוחזר Promise כדי שפעולות
+      יוכלו להמתין לרענון לפני שהן מודיעות שהצליחו. */
   function renderCase() {
-    var file   = CaseStore.load(openId);
-    var client = DEMO_CLIENTS[openId].profile;
+    return Api.officeCase(openId).then(function (file) {
+      currentCase = file;
 
-    var head = $('caseClient');
-    head.textContent = client.name;
-    head.tabIndex = -1;
+      var head = $('caseClient');
+      head.textContent = file.clientName;
+      head.tabIndex = -1;
 
-    $('caseMeta').textContent =
-      'תיק ' + file.caseNumber + ' · ' + file.claimType + ' · ' + file.branch +
-      ' · נפתח ב-' + formatDate(file.openedAt) + ' · מטפל: ' + file.lawyer.name;
+      $('caseMeta').textContent =
+        'תיק ' + file.caseNumber + ' · ' + file.claimType +
+        (file.branch ? ' · ' + file.branch : '') +
+        ' · שלב ' + (file.currentStage || '-') +
+        (file.stageTitle ? ' - ' + file.stageTitle : '');
 
-    renderGap(file);
-    renderDecisionForm(file);
-    renderStage(file);
-    renderCatalog(file);
-    renderReview(file);
-    renderReplies();
-    renderSent(file);
+      renderStage(file);
+      /* renderCatalog הוסר: הוא הציג את REQUIRED_DOC_CATALOG
+         מ-data.js. אין endpoint ל-required_document_templates,
+         והוספת מסמך נעשית כעת בטקסט חופשי בלבד. */
+      renderReview(file);
+    }).catch(function (err) {
+      $('caseMeta').textContent = err.message || 'לא הצלחנו לטעון את התיק.';
+    });
   }
 
   /* ---- מצב טכני: מה חוסם ומה חסר ---- */
 
-  function renderGap(file) {
-    var gap  = analyzeGap(file);
-    var body = $('gapBody');
-    body.textContent = '';
 
-    if (!gap.hasRules) {
-      body.appendChild(el('p', 'empty',
-        'לא הוגדרו דרישות מסמכים לסוג התביעה "' + file.claimType + '".'));
-      return;
-    }
-
-    var head = el('p', 'gap-head');
-    if (gap.canAdvance) {
-      head.className += ' ok';
-      head.textContent = 'כל המסמכים הנדרשים לשלב ' + gap.stage + ' התקבלו. אין חסם טכני להתקדמות.';
-    } else {
-      head.className += ' stop';
-      head.textContent = gap.blocking.length === 1
-        ? 'מסמך אחד חוסם את המעבר מהשלב הנוכחי.'
-        : gap.blocking.length + ' מסמכים חוסמים את המעבר מהשלב הנוכחי.';
-    }
-    body.appendChild(head);
-
-    if (gap.blocking.length) {
-      body.appendChild(gapList('חוסם עכשיו', gap.blocking, 'stop'));
-    }
-    if (gap.inReview.length) {
-      body.appendChild(gapList('נדרש, ואצלנו בבדיקה', gap.inReview, 'wait'));
-    }
-    if (gap.upcoming.length) {
-      body.appendChild(gapList('ייחסם בשלבים הבאים', gap.upcoming, 'soon'));
-    }
-  }
-
-  function gapList(title, items, tone) {
-    var wrap = el('div', 'gap-group ' + tone);
-    wrap.appendChild(el('h3', null, title));
-
-    var ul = el('ul', 'gap-items');
-    items.forEach(function (item) {
-      var li = el('li');
-      li.appendChild(el('span', 'gap-name', item.name));
-
-      var why = item.state === 'not-requested' ? 'עוד לא נדרש מהלקוח'
-              : item.state === 'in-review'     ? 'הועלה וממתין לבדיקה'
-              : item.doc && item.doc.status === 'rejected' ? 'נדחה - הלקוח התבקש להעלות מחדש'
-              : 'הלקוח עוד לא העלה';
-      if (item.stage) why += ' · נדרש בשלב ' + item.stage;
-      li.appendChild(el('span', 'gap-why', why));
-
-      // מסמך שכלל לא נדרש - קיצור דרך לדרוש אותו
-      if (item.state === 'not-requested') {
-        var btn = el('button', 'btn btn-outline btn-sm gap-req', 'דרישה מהלקוח');
-        btn.type = 'button';
-        btn.addEventListener('click', function () { prefillRequest(item.name); });
-        li.appendChild(btn);
-      }
-      ul.appendChild(li);
-    });
-
-    wrap.appendChild(ul);
-    return wrap;
-  }
-
-  /* ---- שלב התביעה ---- */
-
+  /* השלבים מגיעים מהשרת (stage_templates של סוג התביעה של התיק)
+     ולא מקבוע מקומי. כך תיק נכות מעבודה מקבל את המסלול שלו ולא
+     את זה של נכות כללית - הפער שתועד ב-"05 - אפיון מוצר". */
   function renderStage(file) {
-    $('stageNow').textContent =
-      'כרגע: שלב ' + file.currentStage + ' מתוך ' + CLAIM_STAGES.length +
-      ' - ' + CLAIM_STAGES[file.currentStage - 1].title +
-      ' (מאז ' + formatDate(file.stageEnteredAt) + ').';
+    var stages = file.stageOptions || [];
+
+    $('stageNow').textContent = file.currentStage
+      ? 'כרגע: שלב ' + file.currentStage + ' מתוך ' + stages.length +
+        (file.stageTitle ? ' - ' + file.stageTitle : '') + '.'
+      : 'טרם נרשם שלב לתיק.';
 
     var sel = $('stageSelect');
     sel.textContent = '';
 
-    CLAIM_STAGES.forEach(function (stage) {
+    stages.forEach(function (stage) {
       var opt = document.createElement('option');
-      opt.value = String(stage.id);
-      opt.textContent = stage.id + '. ' + stage.title;
-      if (stage.id === file.currentStage) opt.selected = true;
+      /* הערך הוא המזהה מהמסד, לא מספר סידורי. */
+      opt.value = stage.id;
+      opt.textContent = stage.position + '. ' + stage.title;
+      if (stage.position === file.currentStage) opt.selected = true;
       sel.appendChild(opt);
     });
   }
 
   $('stageSave').addEventListener('click', function () {
-    var stage = parseInt($('stageSelect').value, 10);
-    var file  = CaseStore.load(openId);
+    var select = $('stageSelect');
+    var stage  = select.options[select.selectedIndex];
+    if (!stage || !stage.value) return;
 
-    if (stage === file.currentStage) {
-      return toast('התיק כבר נמצא בשלב הזה.');
-    }
-
-    CaseStore.setStage(openId, stage, staff.name);
-    renderCase();
-    toast('התיק עודכן לשלב ' + stage + ' - ' + CLAIM_STAGES[stage - 1].title + '.');
+    /* המזהה הוא stage_template_id מהשרת, לא מספר סידורי מקומי.
+       השרת מוודא שהשלב שייך למסלול של התיק. */
+    Api.setStage(openId, stage.value, null)
+       .then(function () { return renderCase(); })
+       .then(function () { toast('התיק עודכן ל' + stage.textContent + '.'); })
+       .catch(function (err) { toast(err.message || 'עדכון השלב נכשל.'); });
   });
 
-  /* ---- החלטת הוועדה ---- */
-
-  var OUTCOME_LABELS = {
-    'below-threshold': 'מתחת לסף המזכה',
-    'grant':           'מענק חד-פעמי',
-    'pension':         'קצבה חודשית',
-    'rejected':        'התביעה נדחתה'
-  };
-
-  function renderDecisionForm(file) {
-    var d = file.decision;
-
-    $('decisionNow').textContent = d
-      ? 'רשומה החלטה מ-' + formatDate(d.date) + ': ' + d.percent + '% ' +
-        (d.permanent ? 'צמיתה' : 'זמנית') + ' · ' + (OUTCOME_LABELS[d.outcome] || d.outcome)
-      : 'לא נרשמה עדיין החלטת ועדה בתיק זה.';
-
-    var sel = $('decOutcome');
-    if (!sel.options.length) {
-      Object.keys(OUTCOME_LABELS).forEach(function (key) {
-        var opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = OUTCOME_LABELS[key];
-        sel.appendChild(opt);
-      });
-    }
-
-    if (d) {
-      $('decDate').value      = d.date || '';
-      $('decPercent').value   = d.percent != null ? d.percent : '';
-      $('decOutcome').value   = d.outcome || 'below-threshold';
-      $('decDeadline').value  = d.appealDeadline || '';
-      $('decPermanent').checked = !!d.permanent;
-      $('decNote').value      = d.officeNote || '';
-    }
-
-    // מזכיר לצוות שההסבר ללקוח עדיין לא מאושר
-    var info = d && RIGHTS_EXPLAINER[d.outcome];
-    var warn = $('rightsWarning');
-    if (d && info && !info.approved) {
-      warn.hidden = false;
-      warn.textContent =
-        'הסבר הזכויות עבור "' + (OUTCOME_LABELS[d.outcome] || d.outcome) + '" ' +
-        'טרם אושר, ולכן הלקוח רואה הפניה לפנות למשרד במקום הסבר. ' +
-        'לאישור: מלאו את התוכן ב-RIGHTS_EXPLAINER וסמנו approved: true.';
-    } else {
-      warn.hidden = true;
-    }
-  }
-
-  var decForm = $('decForm');
-  var decErr  = $('decError');
-
-  decForm.addEventListener('submit', function (e) {
-    e.preventDefault();
-    decErr.hidden = true;
-
-    var date    = $('decDate').value;
-    var percent = $('decPercent').value;
-
-    if (!date)    return decFail('צריך תאריך החלטה.', $('decDate'));
-    if (percent === '') return decFail('צריך להזין אחוזי נכות.', $('decPercent'));
-
-    CaseStore.saveDecision(openId, {
-      date:           date,
-      percent:        parseInt(percent, 10),
-      outcome:        $('decOutcome').value,
-      permanent:      $('decPermanent').checked,
-      appealDeadline: $('decDeadline').value || null,
-      officeNote:     $('decNote').value.trim()
-    }, staff.name);
-
-    renderCase();
-    toast('החלטת הוועדה נשמרה והלקוח רואה אותה.');
-  });
-
-  function decFail(text, focusOn) {
-    decErr.textContent = text;
-    decErr.hidden = false;
-    focusOn.focus();
-  }
-
-  /* ---- דרישת מסמך מהלקוח ---- */
-
-  /** ממלא את הקטלוג של סוג התביעה, בלי מסמכים שכבר קיימים בתיק */
-  function renderCatalog(file) {
-    var catalog = REQUIRED_DOC_CATALOG[file.claimType] || [];
-    var taken   = {};
-    file.documents.forEach(function (d) { taken[d.name] = true; });
-
-    var sel = $('reqPick');
-    sel.textContent = '';
-
-    var blank = document.createElement('option');
-    blank.value = '';
-    blank.textContent = catalog.length ? '— בחירה מהקטלוג או מילוי ידני —' : '— אין קטלוג לסוג תביעה זה —';
-    sel.appendChild(blank);
-
-    catalog.forEach(function (entry, i) {
-      if (taken[entry.name]) return;          // כבר בתיק - אין טעם לדרוש שוב
-      var opt = document.createElement('option');
-      opt.value = String(i);
-      opt.textContent = entry.name;
-      sel.appendChild(opt);
-    });
-  }
-
-  // בחירה מהקטלוג ממלאת את השדות, ואפשר עדיין לערוך אותם
-  $('reqPick').addEventListener('change', function () {
-    var file = CaseStore.load(openId);
-    var entry = (REQUIRED_DOC_CATALOG[file.claimType] || [])[parseInt(this.value, 10)];
-    if (!entry) return;
-    $('reqName').value     = entry.name;
-    $('reqNote').value     = entry.note;
-    $('reqRequired').checked = entry.required;
-  });
-
-  /** ממלא את הטופס משם מסמך שהגיע מניתוח הפער */
-  function prefillRequest(name) {
-    var file  = CaseStore.load(openId);
-    var entry = (REQUIRED_DOC_CATALOG[file.claimType] || [])
-                  .find(function (e) { return e.name === name; });
-
-    $('reqName').value       = name;
-    $('reqNote').value       = entry ? entry.note : '';
-    $('reqRequired').checked = entry ? entry.required : true;
-    $('reqName').focus();
-    $('reqName').scrollIntoView({ block: 'center' });
-  }
 
   var reqForm = $('reqForm');
   var reqErr  = $('reqError');
@@ -441,21 +244,17 @@
       return reqFail('ההנחיה קצרה מדי. בלי הנחיה ברורה הלקוח יעלה את המסמך הלא נכון.', $('reqNote'));
     }
 
-    var file = CaseStore.load(openId);
-    if (file.documents.some(function (d) { return d.name === name; })) {
+    if (currentCase && currentCase.documents.some(function (d) { return d.name === name; })) {
       return reqFail('המסמך "' + name + '" כבר קיים בתיק.', $('reqName'));
     }
 
-    CaseStore.addDocument(openId, {
-      name:     name,
-      note:     note,
-      required: $('reqRequired').checked
-    }, staff.name);
+    Api.addDocument(openId, name, note, required)
+       .then(function () { return renderCase(); })
+       .then(function () { toast('הדרישה נוספה והלקוח יראה אותה.'); })
+       .catch(function (err) { toast(err.message || 'הוספת הדרישה נכשלה.'); });
 
     reqForm.reset();
     $('reqRequired').checked = true;
-    renderCase();
-    toast('הדרישה נשלחה. המסמך מופיע כעת אצל הלקוח.');
   });
 
   function reqFail(text, focusOn) {
@@ -466,21 +265,29 @@
 
   /* ---- בדיקת מסמכים ---- */
 
+  /* המפתחות הם ערכי המסד (pending_review עם קו תחתון), כפי
+     שממשק הניהול מקבל אותם מ-/api/office. עד 13.09 הם היו
+     הערכים של data.js עם מקף. */
   var REVIEW_STATUS = {
     'approved':       { tag: 'tag-ok',   mark: '✓', text: 'אושר' },
-    'pending-review': { tag: 'tag-warn', mark: '●', text: 'ממתין לבדיקה' },
+    'pending_review': { tag: 'tag-warn', mark: '●', text: 'ממתין לבדיקה' },
     'missing':        { tag: 'tag-wait', mark: '!', text: 'הלקוח עוד לא העלה' },
     'rejected':       { tag: 'tag-stop', mark: '✗', text: 'נדחה - הלקוח התבקש להעלות מחדש' }
   };
 
+  function reviewStatus(value) {
+    return REVIEW_STATUS[value] ||
+           { tag: 'tag-wait', mark: '?', text: value || 'לא ידוע' };
+  }
+
   function renderReview(file) {
     // מה שממתין לבדיקה קודם - זו העבודה הפתוחה של הצוות
-    var order = { 'pending-review': 0, 'rejected': 1, 'missing': 2, 'approved': 3 };
+    var order = { 'pending_review': 0, 'rejected': 1, 'missing': 2, 'approved': 3 };
     var docs  = file.documents.slice().sort(function (a, b) {
       return order[a.status] - order[b.status];
     });
 
-    var waiting = docs.filter(function (d) { return d.status === 'pending-review'; }).length;
+    var waiting = docs.filter(function (d) { return d.status === 'pending_review'; }).length;
     $('reviewIntro').textContent = waiting === 0
       ? 'אין מסמכים שממתינים לבדיקה בתיק הזה.'
       : (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') + ' לבדיקה שלך.';
@@ -489,7 +296,7 @@
     list.textContent = '';
 
     docs.forEach(function (doc) {
-      var s  = REVIEW_STATUS[doc.status];
+      var s  = reviewStatus(doc.status);
       var li = el('li');
 
       var tag = el('span', 'tag ' + s.tag);
@@ -507,22 +314,13 @@
       if (doc.status === 'rejected' && doc.rejectReason) {
         li.appendChild(el('p', 'reject-note', 'סיבת הדחייה שנמסרה ללקוח: ' + doc.rejectReason));
       }
-      if (doc.status === 'pending-review') {
+      if (doc.status === 'pending_review') {
         li.appendChild(reviewControls(doc));
       }
 
-      // דרישה שהמשרד הוסיף וטרם נענתה - אפשר לבטל אותה
-      if (doc.id.indexOf('req-') === 0 && doc.status === 'missing') {
-        var cancel = el('button', 'btn btn-outline btn-sm doc-actions', 'ביטול הדרישה');
-        cancel.type = 'button';
-        cancel.setAttribute('aria-label', 'ביטול הדרישה למסמך ' + doc.name);
-        cancel.addEventListener('click', function () {
-          CaseStore.removeDocument(openId, doc.id, staff.name);
-          renderCase();
-          toast('הדרישה למסמך "' + doc.name + '" בוטלה.');
-        });
-        li.appendChild(cancel);
-      }
+      /* ביטול דרישה הוסר: docs/06 מגדיר DELETE /api/office/documents/:id
+         אך הוא טרם מומש. כפתור שכותב ל-localStorage היה נראה כאילו
+         הדרישה בוטלה בזמן שהלקוח עדיין רואה אותה. */
 
       list.appendChild(li);
     });
@@ -537,7 +335,11 @@
     ok.type = 'button';
     ok.setAttribute('aria-label', 'אישור המסמך ' + doc.name);
     ok.addEventListener('click', function () {
-      CaseStore.reviewDocument(openId, doc.id, 'approved', null, staff.name);
+      Api.reviewDocument(doc.id, 'approve', null)
+         .then(function () { return renderCase(); })
+         .then(function () { toast('המסמך "' + doc.name + '" אושר.'); })
+         .catch(function (err) { toast(err.message || 'האישור נכשל.'); });
+      return;
       renderCase();
       toast('המסמך "' + doc.name + '" אושר.');
     });
@@ -579,7 +381,11 @@
         input.focus();
         return toast('צריך לכתוב סיבת דחייה ברורה - הלקוח רואה אותה.');
       }
-      CaseStore.reviewDocument(openId, doc.id, 'rejected', reason, staff.name);
+      Api.reviewDocument(doc.id, 'reject', reason)
+         .then(function () { return renderCase(); })
+         .then(function () { toast('המסמך "' + doc.name + '" נדחה והלקוח יעודכן.'); })
+         .catch(function (err) { toast(err.message || 'הדחייה נכשלה.'); });
+      return;
       renderCase();
       toast('המסמך "' + doc.name + '" נדחה והסיבה נשלחה ללקוח.');
     });
@@ -598,59 +404,6 @@
 
   /* ---- פניות מהלקוח ---- */
 
-  var REPLY_KINDS = {
-    'no-document':  'אין לי את המסמך',
-    'need-help':    'צריך עזרה בהשגתו',
-    'sent-by-mail': 'שלחתי בדואר',
-    'already-gave': 'כבר מסרתי למשרד',
-    'other':        'הודעה מהלקוח'
-  };
-
-  function renderReplies() {
-    var replies = CaseStore.clientReplies(openId);
-    var list    = $('replyList');
-    list.textContent = '';
-
-    if (!replies.length) {
-      list.appendChild(el('li', 'empty', 'הלקוח עוד לא פנה בתיק הזה.'));
-      return;
-    }
-
-    replies.forEach(function (reply) {
-      var li = el('li', reply.readAt ? 'reply read' : 'reply unread');
-
-      if (!reply.readAt) {
-        var tag = el('span', 'tag tag-warn');
-        tag.appendChild(el('span', null, '!', true));
-        tag.appendChild(document.createTextNode('חדש'));
-        li.appendChild(tag);
-      }
-
-      li.appendChild(el('h3', null, REPLY_KINDS[reply.kind] || reply.kind));
-      if (reply.docName) {
-        li.appendChild(el('p', 'item-note', 'בנוגע ל: ' + reply.docName));
-      }
-      if (reply.text) {
-        li.appendChild(el('p', 'reply-text', reply.text));
-      }
-      li.appendChild(el('p', 'item-when', formatDate(reply.date)));
-
-      if (!reply.readAt) {
-        var done = el('button', 'btn btn-outline btn-sm', 'סימון כטופל');
-        done.type = 'button';
-        done.addEventListener('click', function () {
-          CaseStore.markReplyRead(openId, reply.id);
-          renderCase();
-        });
-        li.appendChild(done);
-      }
-
-      list.appendChild(li);
-    });
-  }
-
-  /* ---- שליחת עדכון ללקוח ---- */
-
   var msgForm = $('msgForm');
   var msgErr  = $('msgError');
 
@@ -665,15 +418,12 @@
     if (!title)           return msgFail('צריך כותרת להודעה.', $('msgTitle'));
     if (body.length < 10) return msgFail('תוכן ההודעה קצר מדי.', $('msgBody'));
 
-    CaseStore.addMessage(openId, {
-      title:     title,
-      body:      body,
-      important: $('msgImportant').checked
-    }, staff.name);
+    Api.sendMessage(openId, title, body, important)
+       .then(function () { return renderCase(); })
+       .then(function () { toast('העדכון נשלח ללקוח.'); })
+       .catch(function (err) { toast(err.message || 'שליחת העדכון נכשלה.'); });
 
     msgForm.reset();
-    renderCase();
-    toast('העדכון נשלח ללקוח.');
   });
 
   function msgFail(text, focusOn) {
@@ -682,30 +432,6 @@
     focusOn.focus();
   }
 
-  function renderSent(file) {
-    var list = $('sentList');
-    list.textContent = '';
-
-    if (!file.messages.length) {
-      list.appendChild(el('li', 'empty', 'עוד לא נשלחו עדכונים בתיק הזה.'));
-      return;
-    }
-
-    file.messages.forEach(function (msg) {
-      var li = el('li');
-      if (msg.important) {
-        var tag = el('span', 'tag tag-warn');
-        tag.appendChild(el('span', null, '!', true));
-        tag.appendChild(document.createTextNode('עדכון חשוב'));
-        li.appendChild(tag);
-      }
-      li.appendChild(el('h3', null, msg.title));
-      li.appendChild(el('p', 'item-note', msg.body));
-      li.appendChild(el('p', 'item-when',
-        formatDate(msg.date) + (msg.from ? ' · מאת ' + msg.from : '')));
-      list.appendChild(li);
-    });
-  }
 
   /* ================= ניתוח מקצועי ================= */
 
@@ -719,17 +445,16 @@
    * השכבה הראשונה, לא היחידה.
    */
   function assistContext() {
-    var file = CaseStore.load(openId);
-    var gap  = analyzeGap(file);
+    var file = currentCase || {};
 
     return {
       claimType:      file.claimType,
       branch:         file.branch,
       currentStage:   file.currentStage,
-      totalStages:    CLAIM_STAGES.length,
-      stageTitle:     CLAIM_STAGES[file.currentStage - 1].title,
-      stageEnteredAt: file.stageEnteredAt,
-      openedAt:       file.openedAt,
+      totalStages:    (file.stageOptions || []).length,
+      stageTitle:     file.stageTitle,
+      stageEnteredAt: null,
+      openedAt:       null,
       nextHearing:    file.nextHearing,
       documents:      file.documents.map(function (d) {
         return {
@@ -741,11 +466,6 @@
           file:         d.file            // השרת ממיר ל-hasFile בלבד
         };
       }),
-      gap: {
-        blocking: gap.blocking.map(function (i) { return i.name; }),
-        inReview: gap.inReview.map(function (i) { return i.name; }),
-        upcoming: gap.upcoming.map(function (i) { return i.name + ' (שלב ' + i.stage + ')'; })
-      }
     };
   }
 
@@ -891,6 +611,9 @@
     return node;
   }
 
-  /* ---- מי שכבר מחובר נכנס ישירות ---- */
-  if (StaffAuth.current()) start();
+  /* ---- מי שכבר מחובר נכנס ישירות ----
+     השרת מחליט, לא הדפדפן. 401 פשוט משאיר את מסך הכניסה. */
+  Api.me({ allowUnauthorized: true })
+     .then(function (who) { if (who && who.type === 'user') start(); })
+     .catch(function () { /* לא מחובר */ });
 })();

@@ -15,6 +15,12 @@ from server.db.pool import cursor
 
 LOCAL = ("127.0.0.1", 45123)
 
+def _hash_of(token):
+    """אותו hash שהשרת שומר, כדי לכוון לשורה אחת בדיוק."""
+    import hashlib
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 STAFF_EMAIL = "nahmani@nahmani-bendahan.co.il"
 STAFF_PASSWORD = "office2026"
 
@@ -108,17 +114,21 @@ def test_logout_revokes_the_session(api):
 def test_revoked_session_is_rejected_even_with_cookie(api):
     staff_login(api)
     token = api.cookies.get("portal_session")
+    # רק ה-session של הבדיקה. עדכון גורף היה מנתק כל משתמש אחר
+    # שמחובר באותו רגע, כולל דפדפן פתוח של מפתח.
     with cursor(commit=True) as cur:
-        cur.execute("update sessions set revoked_at = now() where revoked_at is null")
+        cur.execute("update sessions set revoked_at = now() where token_hash = %s",
+                    (_hash_of(token),))
     api.cookies.set("portal_session", token)
     assert api.get("/api/me").status_code == 401
 
 
 def test_expired_session_is_rejected(api):
     staff_login(api)
+    token = api.cookies.get("portal_session")
     with cursor(commit=True) as cur:
         cur.execute("update sessions set expires_at = now() - interval '1 hour' "
-                    "where revoked_at is null")
+                    "where token_hash = %s", (_hash_of(token),))
     assert api.get("/api/me").status_code == 401
 
 
@@ -222,29 +232,32 @@ def test_reject_without_reason_is_refused(api):
     assert r.status_code == 400
 
 
-def test_stage_change_keeps_history(api):
-    """שינוי שלב מוסיף אירוע ואינו מוחק את הקודמים."""
+def test_stage_change_keeps_history(api, temp_case):
+    """שינוי שלב מוסיף אירוע ואינו מוחק את הקודמים.
+
+    רץ על תיק זמני ולא על תיקי ההדגמה - בדיקה שמשנה מצב לא
+    אמורה להזיז את הנתונים שמישהו בודק בדפדפן."""
     csrf = staff_login(api)
     with cursor() as cur:
-        cur.execute("""select c.id as case_id, s.id as stage_id
-                         from cases c
-                         join stage_templates s on s.claim_type_id = c.claim_type_id
-                        where s.position = 2 limit 1""")
-        row = cur.fetchone()
+        cur.execute("""select id from stage_templates
+                        where claim_type_id = %s order by position limit 2""",
+                    (temp_case["claim_type_id"],))
+        stages = cur.fetchall()
         cur.execute("select count(*) as n from case_stage_events where case_id = %s",
-                    (row["case_id"],))
+                    (temp_case["case_id"],))
         before = cur.fetchone()["n"]
 
-    r = api.post("/api/office/cases/%s/stage-events" % row["case_id"],
-                 json={"stage_template_id": str(row["stage_id"]), "note": "בדיקה"},
-                 headers={"X-CSRF-Token": csrf})
-    assert r.status_code == 200, r.text
+    for stage in stages:
+        r = api.post("/api/office/cases/%s/stage-events" % temp_case["case_id"],
+                     json={"stage_template_id": str(stage["id"]), "note": "בדיקה"},
+                     headers={"X-CSRF-Token": csrf})
+        assert r.status_code == 200, r.text
 
     with cursor() as cur:
         cur.execute("select count(*) as n from case_stage_events where case_id = %s",
-                    (row["case_id"],))
+                    (temp_case["case_id"],))
         after = cur.fetchone()["n"]
-    assert after == before + 1, "היסטוריית השלבים לא נשמרה"
+    assert after == before + len(stages), "היסטוריית השלבים לא נשמרה"
 
 
 def test_stage_from_another_claim_type_is_refused(api):

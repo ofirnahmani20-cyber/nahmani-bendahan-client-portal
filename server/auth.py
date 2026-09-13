@@ -52,9 +52,21 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-# ה-CSRF נקשר ל-session. נשמר בזיכרון התהליך ולא במסד: הוא חסר
-# ערך בלי ה-session עצמו, ואינו צריך לשרוד הפעלה מחדש.
-_csrf_by_session = {}
+def _csrf_for(token: str) -> str:
+    """
+    טוקן CSRF נגזר מה-session, ולא נשמר בשום מקום.
+
+    למה לא במפה בזיכרון (כפי שהיה עד 13.09): הפעלה מחדש של השרת
+    מחקה את המפה, ואז כל משתמש מחובר קיבל "בדיקת CSRF נכשלה" על
+    כל פעולה - בלי שום רמז למה. גזירה דטרמיניסטית שורדת הפעלה
+    מחדש ואינה דורשת מצב משותף בין תהליכים.
+
+    הסוד הוא מפתח השרת. מי שאין לו את ה-session cookie (שהוא
+    HttpOnly) אינו יכול לגזור את הטוקן.
+    """
+    key = os.environ.get("PORTAL_ID_HMAC_KEY", "").encode("utf-8")
+    return hmac.new(key, ("csrf:" + token).encode("utf-8"),
+                    hashlib.sha256).hexdigest()
 
 
 # ================================================================
@@ -65,7 +77,7 @@ def create_session(response: Response, *, firm_id, subject_type, subject_id,
                    request: Request, hours: int):
     """פותח session, כותב אותו למסד ומצמיד cookies לתשובה."""
     token = _new_token()
-    csrf = _new_token()
+    csrf = _csrf_for(token)
     expires = datetime.now(timezone.utc) + timedelta(hours=hours)
 
     with cursor(commit=True) as cur:
@@ -90,7 +102,6 @@ def create_session(response: Response, *, firm_id, subject_type, subject_id,
     # ה-CSRF cookie קריא ל-JS במכוון - זו תבנית double-submit,
     # וה-JS חייב להיות מסוגל להחזיר אותו ככותרת.
     response.set_cookie(CSRF_COOKIE, csrf, **{**common, "httponly": False})
-    _csrf_by_session[_hash_token(token)] = csrf
     return csrf
 
 
@@ -152,7 +163,6 @@ def revoke_session(request: Request):
             "update sessions set revoked_at = now() where token_hash = %s",
             (_hash_token(token),),
         )
-    _csrf_by_session.pop(_hash_token(token), None)
 
 
 def clear_cookies(response: Response):
@@ -193,7 +203,7 @@ def require_csrf(request: Request):
 
     token = request.cookies.get(SESSION_COOKIE)
     sent = request.headers.get(CSRF_HEADER)
-    expected = _csrf_by_session.get(_hash_token(token)) if token else None
+    expected = _csrf_for(token) if token else None
 
     if not sent or not expected or not hmac.compare_digest(sent, expected):
         raise HTTPException(status_code=403, detail="בדיקת CSRF נכשלה.")

@@ -111,11 +111,12 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
 
         cur.execute(
             """select s.position, s.title, s.description, s.is_terminal,
-                      e.occurred_at
+                      (select max(e.occurred_at)
+                         from case_stage_events e
+                        where e.stage_template_id = s.id
+                          and e.case_id = c.id) as occurred_at
                  from stage_templates s
                  join cases c on c.claim_type_id = s.claim_type_id
-                 left join case_stage_events e
-                        on e.stage_template_id = s.id and e.case_id = c.id
                 where c.id = %s
                 order by s.position""",
             (case_id,),

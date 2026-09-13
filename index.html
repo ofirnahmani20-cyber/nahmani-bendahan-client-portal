@@ -6,7 +6,7 @@
 <title>כניסה לאזור האישי | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="description" content="כניסה לאזור האישי - מעקב אחר תביעת הביטוח הלאומי שלך.">
-<link rel="stylesheet" href="assets/css/style.css?v=202609121636">
+<link rel="stylesheet" href="assets/css/style.css?v=20260913195613">
 </head>
 <body>
 
@@ -43,22 +43,21 @@
                maxlength="9" aria-describedby="idHint" required>
       </div>
 
-      <div class="field">
-        <label for="password">קוד אישי</label>
-        <p class="hint" id="pwHint">הקוד בן 4 הספרות שקיבלת מהמשרד</p>
-        <input type="password" id="password" name="password"
-               inputmode="numeric" autocomplete="current-password"
-               aria-describedby="pwHint" required>
+      <div class="field" id="codeField" hidden>
+        <label for="password">קוד חד-פעמי</label>
+        <p class="hint" id="pwHint">הקוד בן 6 הספרות שנשלח אליך</p>
+        <input type="text" id="password" name="password"
+               inputmode="numeric" autocomplete="one-time-code"
+               maxlength="6" aria-describedby="pwHint">
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block">כניסה</button>
+      <button type="submit" class="btn btn-primary btn-block" id="submitBtn">שליחת קוד</button>
 
     </form>
 
     <div class="demo-box">
-      <strong>חשבונות להתנסות</strong><br>
-      תעודת זהות <code>123456782</code> · קוד <code>1234</code><br>
-      תעודת זהות <code>987654321</code> · קוד <code>1234</code>
+      <strong>גרסת הדגמה</strong><br>
+      הקוד החד-פעמי נכתב ללוג השרת ואינו נשלח ב-SMS.
     </div>
 
   </div>
@@ -106,51 +105,7 @@
   </div>
 </footer>
 
-<script src="assets/js/data.js?v=202609121636"></script>
-<script>
-  // מי שכבר מחובר מועבר ישירות לאזור האישי
-  if (Auth.current()) location.replace('dashboard.html');
-
-  var form   = document.getElementById('loginForm');
-  var idBox  = document.getElementById('idNumber');
-  var pwBox  = document.getElementById('password');
-  var errBox = document.getElementById('loginError');
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-
-    var id = idBox.value.trim();
-    var pw = pwBox.value;
-
-    clearError();
-
-    if (id.length !== 9 || !/^\d+$/.test(id)) {
-      return showError('מספר תעודת הזהות צריך להיות 9 ספרות.', idBox);
-    }
-    if (!pw) {
-      return showError('צריך להזין את הקוד האישי.', pwBox);
-    }
-    if (!Auth.login(id, pw)) {
-      return showError('מספר תעודת הזהות או הקוד האישי אינם נכונים. אפשר לנסות שוב.', idBox);
-    }
-
-    location.href = 'dashboard.html';
-  });
-
-  function showError(msg, focusOn) {
-    errBox.textContent = msg;
-    errBox.hidden = false;
-    if (focusOn) {
-      focusOn.setAttribute('aria-invalid', 'true');
-      focusOn.focus();
-    }
-  }
-
-  function clearError() {
-    errBox.hidden = true;
-    idBox.removeAttribute('aria-invalid');
-    pwBox.removeAttribute('aria-invalid');
-  }
-</script>
+<script src="assets/js/api.js?v=20260913195613"></script>
+<script src="assets/js/login.js?v=20260913195613"></script>
 </body>
 </html>

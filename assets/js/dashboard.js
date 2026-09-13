@@ -8,11 +8,12 @@
 (function () {
   'use strict';
 
-  var user = Auth.requireLogin();
-  if (!user) return;
-
-  var caseFile = CaseStore.load(user.idNumber);
-  if (!caseFile) { Auth.logout(); return; }
+  /* הזהות והנתונים מגיעים מהשרת בלבד. אין כאן בדיקה מקומית
+     ואין נפילה ל-localStorage: מסך שמראה נתון ישן על תיק משפטי
+     גרוע ממסך שאומר שלא הצלחנו לטעון. */
+  var user = null;
+  var caseFile = null;
+  var CLAIM_STAGES = [];
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -28,6 +29,12 @@
   /** "מסמך אחד" / "3 מסמכים" - עברית תקינה גם ביחיד */
   function countDocs(n) {
     return n === 1 ? 'מסמך אחד' : n + ' מסמכים';
+  }
+
+  /* היה ב-data.js. חוק תצוגה פשוט, לא חוק עסק - השרת הוא
+     שקובע את הסטטוס עצמו. */
+  function DOC_NEEDS_UPLOAD(doc) {
+    return doc.status === 'missing' || doc.status === 'rejected';
   }
 
   var STATUS = {
@@ -108,9 +115,12 @@
 
     send.addEventListener('click', function () {
       if (!chosen) return;
-      CaseStore.addClientReply(user.idNumber, doc.id, chosen, area.value.trim());
+      /* ⚠️ אין עדיין endpoint לתגובת לקוח (docs/06 לא הגדיר אחד).
+         הפעולה מושבתת במקום להיכתב ל-localStorage ולהיראות
+         כאילו נשלחה למשרד. */
+      toast('שליחת תגובה תתאפשר בקרוב. בינתיים אפשר להתקשר למשרד.');
+      return;
       toast('העדכון נשלח למשרד. ניצור קשר בהקדם.');
-      caseFile = CaseStore.load(user.idNumber);
       renderTodo();
       renderDocs();
       renderSummary();
@@ -288,7 +298,11 @@
     body.appendChild(head);
     body.appendChild(el('p', 'decision-when', 'ההחלטה התקבלה ב-' + formatDate(d.date)));
 
-    var info = RIGHTS_EXPLAINER[d.outcome];
+    /* RIGHTS_EXPLAINER היה ב-data.js ועדיין אין לו endpoint.
+       בהיעדרו מציגים את ההפניה למשרד - בדיוק ההתנהגות שתוכננה
+       כשהתוכן לא אושר. */
+    var explainer = (typeof RIGHTS_EXPLAINER !== 'undefined') ? RIGHTS_EXPLAINER : {};
+    var info = explainer[d.outcome];
 
     if (info && info.approved) {
       body.appendChild(el('h3', null, 'מה זה אומר'));
@@ -575,6 +589,17 @@
 
   function renderContact() {
     var l = caseFile.lawyer;
+    if (!l) {
+      /* ה-API טרם מחזיר את פרטי עורך הדין המטפל. מציגים את
+         פרטי המשרד במקום להשאיר שדות ריקים. */
+      $('lawyerName').textContent = 'משרד עורכי הדין Nahmani Ben-Dahan';
+      $('lawyerRole').textContent = 'הצוות המטפל בתיק';
+      var p = $('lawyerPhone');
+      p.textContent = 'התקשרות למשרד: 03-5551234';
+      p.href = 'tel:035551234';
+      $('lawyerEmail').href = 'mailto:office@nahmani-bendahan.co.il';
+      return;
+    }
     $('lawyerName').textContent = l.name;
     $('lawyerRole').textContent = l.role;
 
@@ -717,19 +742,17 @@
   }
 
   function acceptFile(doc, file) {
-    CaseStore.saveDocument(user.idNumber, doc.id, {
-      status: 'pending-review',
-      file: file.name,
-      date: new Date().toISOString().slice(0, 10)
-    });
-
-    toast('המסמך "' + doc.name + '" נשלח למשרד.');
-
-    caseFile = CaseStore.load(user.idNumber);
+    /* הקובץ נשלח לשרת, ורק אחרי שהשרת אישר אנחנו טוענים מחדש
+       את התיק ממנו. אין עדכון אופטימי של המסך: אם ההעלאה נכשלה,
+       הלקוח חייב לדעת שהמסמך לא הגיע. */
     pendingDoc = null;
-    renderTodo();
-    renderDocs();
-    renderSummary();
+    Api.uploadFile(doc.id, file).then(function (res) {
+      return reload().then(function () {
+        toast('המסמך "' + doc.name + '" נשלח למשרד.');
+      });
+    }).catch(function (err) {
+      toast(err.message || 'העלאת המסמך נכשלה. אפשר לנסות שוב.');
+    });
   }
 
   /* ---- משוב על איכות הצילום ---- */
@@ -826,7 +849,10 @@
 
   /* ---- יציאה ---- */
 
-  $('logoutBtn').addEventListener('click', function () { Auth.logout(); });
+  $('logoutBtn').addEventListener('click', function () {
+    Api.clientLogout().then(function () { location.replace('index.html'); },
+                            function () { location.replace('index.html'); });
+  });
 
   /* ---- עזר ליצירת אלמנטים ---- */
 
@@ -964,16 +990,87 @@
     list.classList.add('steps-in');
   };
 
-  /* ---- הפעלה ---- */
+  /* ==========================================================
+     הפעלה
+     ----------------------------------------------------------
+     שני צעדים: מי אני, ואז מה התיק שלי. שניהם מהשרת.
+     התיק נבחר לפי ה-session ולא לפי מזהה שהדפדפן מחזיק, ולכן
+     אין כאן דרך לבקש תיק של מישהו אחר.
+     ========================================================== */
 
-  renderStatus();
-  renderSummary();
-  renderDecision();
-  renderTodo();
-  renderDocs();
-  renderNextSteps();
-  renderStages();
-  renderDuration();
-  renderMessages();
-  renderContact();
+  function paint() {
+    renderStatus();
+    renderSummary();
+    renderDecision();
+    renderTodo();
+    renderDocs();
+    renderNextSteps();
+    renderStages();
+    renderDuration();
+    renderMessages();
+    renderContact();
+  }
+
+  /** טוען מחדש את התיק מהשרת ומצייר. משמש אחרי כל פעולה. */
+  function reload() {
+    return Api.clientCase(caseFile.id).then(function (data) {
+      caseFile = normalise(data);
+      paint();
+    });
+  }
+
+  /** מתרגם את תשובת ה-API למבנה שהרינדור הקיים מצפה לו. */
+  function normalise(data) {
+    CLAIM_STAGES = (data.stages || []).map(function (st) {
+      return { id: st.position, title: st.title, desc: st.desc };
+    });
+    data.stageDates = {};
+    (data.stages || []).forEach(function (st) {
+      if (st.occurredAt) data.stageDates[st.position] = st.occurredAt;
+    });
+    /* שדות שה-API טרם מספק. מוצהרים ריקים במפורש כדי שהרינדור
+       יציג "אין" במקום להיכשל על undefined. */
+    data.nextSteps = data.nextSteps || [];
+    data.decision = data.decision || null;
+    data.lawyer = data.lawyer || null;
+    data.clientReplies = data.clientReplies || [];
+    return data;
+  }
+
+  function fail(message) {
+    var host = $('summaryBody') || document.body;
+    host.textContent = '';
+    var box = el('div', 'alert alert-error');
+    box.textContent = message;
+    host.appendChild(box);
+  }
+
+  Api.me()
+     .then(function (who) {
+       if (who.type !== 'client') {
+         location.replace(who.type === 'user' ? 'admin.html' : 'index.html');
+         return null;
+       }
+       user = { name: who.name };
+       return Api.clientCases();
+     })
+     .then(function (list) {
+       if (!list) return null;
+       if (!list.cases.length) {
+         fail('לא נמצא תיק פעיל. יש לפנות למשרד.');
+         return null;
+       }
+       return Api.clientCase(list.cases[0].id);
+     })
+     .then(function (data) {
+       if (!data) return;
+       caseFile = normalise(data);
+       paint();
+     })
+     .catch(function (err) {
+       /* 401 כבר הפנה למסך הכניסה דרך Api.onUnauthorized. */
+       if (err && err.status !== 401) {
+         fail(err.message || 'לא הצלחנו לטעון את התיק. נסה לרענן.');
+       }
+     });
 })();

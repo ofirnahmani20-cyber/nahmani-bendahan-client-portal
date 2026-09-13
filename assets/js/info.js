@@ -55,16 +55,16 @@
   }
 
   /* ---- שלבי הליווי ----
-     נבנה מ-CLAIM_STAGES, אותו מקור שממנו נבנית מפת הדרכים באזור
+     נבנה מ-PUBLIC_STAGES ב-content.js - עותק תצוגה של
      האישי. שינוי שם שלב שם ישתקף כאן אוטומטית.
      <details> כמו ב-FAQ: פתיחה במקלדת בלי שורת JavaScript. */
 
   function renderStages() {
     var host = $('stageList');
-    if (!host || typeof CLAIM_STAGES === 'undefined') return;
+    if (!host || typeof PUBLIC_STAGES === 'undefined') return;
     host.textContent = '';
 
-    CLAIM_STAGES.forEach(function (stage) {
+    PUBLIC_STAGES.forEach(function (stage) {
       var d = el('details', 'acc-item');
       var s = el('summary', 'acc-q');
       s.appendChild(el('span', 'acc-n', String(stage.id).padStart(2, '0')));
