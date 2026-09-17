@@ -391,4 +391,147 @@ FROM   case_stage_events e
 JOIN   stage_templates  s ON s.id = e.stage_template_id
 ORDER  BY e.case_id, e.occurred_at DESC, e.created_at DESC;
 
+
+-- -------------------------------------------------------------
+--  8. משימות ומועדי גג
+--  המשרד עובד לפי זמן, והטבלה הזו היא המקום היחיד שיודע מתי.
+--  שתי הערות לפני הקוד:
+--
+--  א. מועד גג משפטי אינו נגזר כאן ולא בשום מקום אחר. הוא מוזן
+--     על ידי איש צוות, עם מקור ועם אישור מפורש, ואילוץ
+--     legal_deadline_needs_human למטה אוכף זאת גם על insert
+--     ישיר במסד. המערכת מנהלת התראות על מועד - היא אינה
+--     ממציאה אותו.
+--
+--  ב. מועד היעד אינו מוצג ללקוח. ראה ההערה על
+--     case_next_steps.eta_text: תאריך מדויק שמוצג ללקוח נקרא
+--     כהתחייבות, ולכן המועדים כאן משרתים את המשרד בלבד.
+-- -------------------------------------------------------------
+
+-- הטבלאות למטה תולות מפתח זר מורכב ב-cases(id, firm_id), כדי
+-- שהמסד עצמו ימנע זיווג של משימה לתיק של משרד אחר. האילוץ
+-- המתאים לא היה קיים על cases, וכאן הוא נוסף.
+-- הקובץ כולו הוא CREATE ... IF NOT EXISTS ולכן אידמפוטנטי;
+-- ALTER אינו כזה, ולכן הוא עטוף בבדיקת קטלוג.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'cases_id_firm_key') THEN
+    ALTER TABLE cases ADD CONSTRAINT cases_id_firm_key UNIQUE (id, firm_id);
+  END IF;
+END $$;
+
+-- קטלוג סוגי המשימות, בדפוס required_document_templates: רשימה
+-- סגורה במסד ולא קבוע בקוד, כדי שהמשרד יוכל להרחיב בלי פריסה.
+CREATE TABLE IF NOT EXISTS task_types (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id    uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  name       text NOT NULL,
+  code       text NOT NULL,
+  position   integer NOT NULL,
+  is_active  boolean NOT NULL DEFAULT true,
+  UNIQUE (firm_id, code),
+  -- נדרש כמפתח יעד לאילוץ שמוודא שהסוג שייך לאותו משרד
+  UNIQUE (id, firm_id)
+);
+
+CREATE TABLE IF NOT EXISTS case_tasks (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id              uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id              uuid NOT NULL,
+  task_type_id         uuid NOT NULL,
+  title                text NOT NULL,
+  description          text,
+  assignee_user_id     uuid REFERENCES users(id) ON DELETE SET NULL,
+  -- timestamptz ולא date, בשונה מ-appeal_deadline: למשימה יש
+  -- שעת יעד ("ועדה ב-10:30"), והשעה היא חלק מהמועד.
+  due_at               timestamptz NOT NULL,
+  -- cancelled: המשימה בוטלה. השורה נשארת, כמו ב-case_documents.
+  -- אין DELETE על משימות באף נתיב קוד.
+  status               text NOT NULL DEFAULT 'open'
+                       CHECK (status IN ('open', 'in_progress',
+                                         'waiting_client', 'done',
+                                         'cancelled')),
+  priority             text NOT NULL DEFAULT 'normal'
+                       CHECK (priority IN ('critical', 'high',
+                                           'normal', 'low')),
+  is_legal_deadline    boolean NOT NULL DEFAULT false,
+  deadline_source      text,
+  confirmed_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  confirmed_at         timestamptz,
+  completed_at         timestamptz,
+  completed_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_by_user_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  -- הזוג הגנרי היחיד בסכמה. בכל מקום אחר זמן השינוי נושא שם
+  -- דומיין (reviewed_at, decided_at), אבל משימה נערכת בכמה
+  -- אופנים שונים והדרישה היא לדעת מי עדכן לאחרונה.
+  updated_by_user_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at           timestamptz,
+  -- מועד משפטי מחייב אישור אנושי, מקור מתועד, ושם המאשר.
+  -- זהו הגב של הכלל: גם insert שמדלג על ה-API אינו יכול
+  -- ליצור מועד משפטי שאיש לא אישר.
+  CONSTRAINT legal_deadline_needs_human
+    CHECK (NOT is_legal_deadline
+           OR (deadline_source IS NOT NULL
+               AND length(btrim(deadline_source)) >= 5
+               AND confirmed_by_user_id IS NOT NULL
+               AND confirmed_at IS NOT NULL)),
+  -- "הושלמה" מחייב חתימה. בלעדיה אי אפשר לדעת מי סגר מועד גג.
+  CONSTRAINT done_needs_completion
+    CHECK (status <> 'done'
+           OR (completed_at IS NOT NULL
+               AND completed_by_user_id IS NOT NULL)),
+  FOREIGN KEY (case_id, firm_id)
+    REFERENCES cases(id, firm_id) ON DELETE CASCADE,
+  FOREIGN KEY (task_type_id, firm_id)
+    REFERENCES task_types(id, firm_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_case
+  ON case_tasks (case_id, due_at);
+-- המסך הראשי שואל תמיד "מה פתוח במשרד", ולכן האינדקס חלקי.
+CREATE INDEX IF NOT EXISTS idx_tasks_open
+  ON case_tasks (firm_id, due_at) WHERE completed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee
+  ON case_tasks (assignee_user_id, due_at) WHERE completed_at IS NULL;
+
+
+-- -------------------------------------------------------------
+--  תצוגת עזר: דחיפות המשימה
+--  מדרגות המועד והמיון מוגדרים פה פעם אחת, כדי ששתי נקודות
+--  קצה לא יחשבו "קריטי" בשתי דרכים שונות ויסטו זו מזו.
+--  המדרגות: עבר · 3-1 ימים · 7-4 · 14-8 · מעבר לכך.
+-- -------------------------------------------------------------
+
+CREATE OR REPLACE VIEW case_task_urgency AS
+SELECT t.id                            AS task_id,
+       t.firm_id,
+       t.case_id,
+       t.due_at,
+       t.status,
+       t.priority,
+       t.is_legal_deadline,
+       -- ימים שלמים עד המועד. שלילי = המועד חלף.
+       (t.due_at::date - current_date)  AS days_left,
+       t.status IN ('done', 'cancelled')                      AS is_closed,
+       t.status NOT IN ('done', 'cancelled') AND t.due_at < now()
+                                                              AS is_overdue,
+       CASE
+         WHEN t.status IN ('done', 'cancelled')    THEN 'closed'
+         WHEN t.due_at < now()                     THEN 'overdue'
+         WHEN t.due_at::date - current_date <= 3   THEN 'critical'
+         WHEN t.due_at::date - current_date <= 7   THEN 'warning'
+         WHEN t.due_at::date - current_date <= 14  THEN 'normal'
+         ELSE 'later'
+       END                             AS bucket,
+       -- המיון שאושר: באיחור תחילה, אחריו העדיפות שהצוות קבע,
+       -- ובתוך אותה עדיפות המועד הקרוב ראשון.
+       CASE WHEN t.status NOT IN ('done', 'cancelled')
+                 AND t.due_at < now() THEN 0 ELSE 1 END       AS overdue_rank,
+       CASE t.priority WHEN 'critical' THEN 0
+                       WHEN 'high'     THEN 1
+                       WHEN 'normal'   THEN 2
+                       ELSE 3 END                             AS priority_rank
+FROM   case_tasks t;
+
 COMMIT;

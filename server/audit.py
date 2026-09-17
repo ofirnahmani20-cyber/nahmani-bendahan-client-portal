@@ -25,6 +25,11 @@ SAFE_METADATA_KEYS = frozenset({
     "case_id", "document_id", "stage_template_id", "decision",
     "preset", "outcome", "reason_given", "from_stage", "to_stage",
     "message_id", "scan_status", "mime_type", "size_bytes",
+    # משימות. שים לב למה שאין כאן: כותרת ותיאור המשימה. היומן
+    # עונה מי נגע במה ומתי, ולא מה היה כתוב - וכותרת משימה היא
+    # טקסט חופשי שהצוות מקליד ועלול להכיל פרט מזהה.
+    "task_id", "task_type_id", "priority", "from_status", "to_status",
+    "due_at", "due_changed", "assignee_changed", "is_legal_deadline",
 })
 
 

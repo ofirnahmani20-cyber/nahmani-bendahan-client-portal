@@ -6,8 +6,8 @@
 <title>ניהול תיקים | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="assets/css/style.css?v=20260913195613">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260913195613">
+<link rel="stylesheet" href="assets/css/style.css?v=20260917221519">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260917221519">
 </head>
 <body class="admin">
 
@@ -112,15 +112,53 @@
 
   <main class="page band-in" id="main">
 
+    <!-- הכרזה על שינויי סינון ומונים, לקוראי מסך -->
+    <p class="visually-hidden" id="adminAnnounce" role="status" aria-live="polite"></p>
+
+    <!-- ---- באנר מועדים קריטיים ----
+         נשאר על המסך בשני התצוגות עד שהמשימה הושלמה. -->
+    <section class="deadline-banner" id="deadlineBanner"
+             aria-labelledby="bannerTitle" hidden>
+      <h2 class="visually-hidden" id="bannerTitle">מועדים הדורשים טיפול מיידי</h2>
+      <div id="bannerBody"></div>
+    </section>
+
     <p class="demo-warning" role="note">
-      <strong>גרסת הדגמה.</strong> הנתונים נשמרים בדפדפן הזה בלבד ואינם מוגנים.
-      אין להשתמש במסך זה עם נתוני לקוחות אמיתיים לפני מימוש שרת - ראה <code>docs/03</code>.
+      <strong>גרסת הדגמה.</strong> הנתונים נשמרים במסד הדגמה ואינם מוגנים.
+      אין להשתמש במסך זה עם נתוני לקוחות אמיתיים לפני השלמת הפריסה -
+      ראה <code>docs/03</code>.
     </p>
 
     <!-- ---- רשימת תיקים ---- -->
     <section id="listView">
       <h1>התיקים במשרד</h1>
       <p class="lead" id="listSummary"></p>
+
+      <!-- ---- דורש טיפול ---- -->
+      <div class="block attention-block">
+        <div class="attention-head">
+          <h2 id="attentionTitle">דורש טיפול</h2>
+          <p class="item-note" id="attentionScope"></p>
+        </div>
+
+        <div class="chips" id="attentionChips" role="group"
+             aria-label="סינון לפי דחיפות"></div>
+
+        <div class="attention-filters">
+          <div class="field">
+            <label for="attentionAssignee">אחראי</label>
+            <select id="attentionAssignee">
+              <option value="">כל המשרד</option>
+            </select>
+          </div>
+          <label class="check">
+            <input type="checkbox" id="attentionDone">
+            <span>כולל משימות שהושלמו</span>
+          </label>
+        </div>
+
+        <ul class="plain-list task-list" id="attentionList"></ul>
+      </div>
 
       <div class="block table-block">
         <table class="cases">
@@ -253,6 +291,98 @@
         </div>
 
         <div>
+          <!-- משימות התיק -->
+          <section class="block task-block" aria-labelledby="h-tasks">
+            <h2 id="h-tasks">משימות בתיק</h2>
+            <p class="item-note" id="taskIntro"></p>
+            <ul class="plain-list task-list" id="taskList"></ul>
+
+            <button type="button" class="btn btn-outline btn-small"
+                    id="taskNew" aria-expanded="false">משימה חדשה</button>
+
+            <form id="taskForm" class="task-form" hidden>
+              <div class="alert alert-error" id="taskError" role="alert" hidden></div>
+
+              <div class="field">
+                <label for="taskTitle">כותרת</label>
+                <input type="text" id="taskTitle" maxlength="200" required>
+              </div>
+
+              <div class="field">
+                <label for="taskType">סוג המשימה</label>
+                <select id="taskType" required></select>
+              </div>
+
+              <div class="field">
+                <label for="taskDesc">תיאור</label>
+                <textarea id="taskDesc" rows="3" maxlength="2000"></textarea>
+              </div>
+
+              <div class="field">
+                <label for="taskDue">תאריך ושעת יעד</label>
+                <input type="datetime-local" id="taskDue" required>
+              </div>
+
+              <div class="field">
+                <label for="taskPriority">דחיפות</label>
+                <select id="taskPriority">
+                  <option value="critical">קריטי</option>
+                  <option value="high">גבוה</option>
+                  <option value="normal" selected>רגיל</option>
+                  <option value="low">נמוך</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="taskAssignee">אחראי</label>
+                <select id="taskAssignee">
+                  <option value="">ללא אחראי</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="taskStatus">סטטוס</label>
+                <select id="taskStatus">
+                  <option value="open" selected>פתוחה</option>
+                  <option value="in_progress">בטיפול</option>
+                  <option value="waiting_client">ממתין ללקוח</option>
+                  <option value="cancelled">בוטלה</option>
+                </select>
+              </div>
+
+              <!-- מועד משפטי מחייב מקור ואישור אנושי. המערכת
+                   אינה קובעת מועדים משפטיים בעצמה. -->
+              <label class="check">
+                <input type="checkbox" id="taskLegal" aria-expanded="false"
+                       aria-controls="taskLegalPanel">
+                <span>מועד משפטי מחייב</span>
+              </label>
+
+              <div class="legal-panel" id="taskLegalPanel" hidden>
+                <p class="item-note">
+                  המערכת אינה מסיקה מועדים משפטיים. ציין מהיכן נלקח
+                  התאריך ואשר אותו.
+                </p>
+                <div class="field">
+                  <label for="taskSource">מקור המועד</label>
+                  <input type="text" id="taskSource" maxlength="500"
+                         placeholder="למשל: מכתב דחייה מ-19.08.2026">
+                </div>
+                <label class="check">
+                  <input type="checkbox" id="taskConfirm">
+                  <span>בדקתי את המקור ואני מאשר את התאריך</span>
+                </label>
+              </div>
+
+              <div class="task-form-actions">
+                <button type="submit" class="btn btn-primary btn-small"
+                        id="taskSave">שמירה</button>
+                <button type="button" class="btn btn-outline btn-small"
+                        id="taskCancel">ביטול</button>
+              </div>
+            </form>
+          </section>
+
           <!-- פניות מהלקוח -->
           <section class="block" aria-labelledby="h-replies">
             <h2 id="h-replies">פניות מהלקוח</h2>
@@ -322,7 +452,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260913195613"></script>
-<script src="assets/js/admin.js?v=20260913195613"></script>
+<script src="assets/js/api.js?v=20260917221519"></script>
+<script src="assets/js/admin.js?v=20260917221519"></script>
 </body>
 </html>

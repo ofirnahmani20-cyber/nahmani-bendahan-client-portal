@@ -8,6 +8,8 @@ seed.py - נתוני ההדגמה, מומרים משני התיקים שב-asset
    מ-data.js ואין להשתמש בהן בסביבה אמיתית.
 """
 
+import datetime
+
 import bcrypt
 
 from .connect import id_lookup, id_encrypt
@@ -41,6 +43,17 @@ STAGES = [
 CLAIM_TYPES = [
     ("נכות כללית",  "general-disability", 1),
     ("נכות מעבודה", "work-injury",        2),
+]
+
+TASK_TYPES = [
+    ("הגשת ערר",                "appeal",            1),
+    ("הכנה לוועדה רפואית",      "committee-prep",    2),
+    ("השלמת מסמכים מהלקוח",     "client-docs",       3),
+    ("השגת מסמך רפואי",         "medical-record",    4),
+    ("יצירת קשר עם הלקוח",      "client-contact",    5),
+    ("פנייה לביטוח לאומי",      "nii-inquiry",       6),
+    ("מעקב החלטה",              "decision-followup", 7),
+    ("אחר",                     "other",             8),
 ]
 
 STAFF = [
@@ -139,8 +152,58 @@ CASES = [
 ]
 
 
+# משימות ההדגמה, לפי מספר תיק.
+#
+# המועדים יחסיים ליום ההרצה ולא תאריכים קבועים, כדי שמסך "דורש
+# טיפול" יציג תמיד את אותו תמהיל: משימה שחלפה, משימה בטווח
+# הקריטי, משימה קריטית בעדיפות אך במועד רחוק, ואחת שהושלמה.
+# תאריכים קבועים היו מתיישנים והופכים הכול ל"באיחור".
+#
+# ⚠️ אף משימת הדגמה אינה מסומנת כמועד משפטי מחייב, בכוונה.
+#    מועד משפטי נכנס רק דרך אישור אנושי מפורש בממשק, ולא היה
+#    נכון שנתוני זרע יעקפו את השער הזה.
+#
+# (סוג, כותרת, תיאור, ימים מהיום, שעה, עדיפות, סטטוס, אחראי)
+TASKS = {
+    "BL-2026-0417": [
+        ("client-docs", "להשיג מהלקוח אישור מחלה מעודכן",
+         "האישור שבידינו מסתיים ב-31.08. נדרש אישור ממשיך לקראת הוועדה.",
+         -3, "12:00", "high", "open", "nahmani@nahmani-bendahan.co.il"),
+        ("committee-prep", "הכנת התיק לוועדה הרפואית",
+         "לרכז את סיכומי האשפוז, חוות הדעת והתצהיר לקלסר אחד לקראת הדיון.",
+         2, "10:30", "critical", "open", "nahmani@nahmani-bendahan.co.il"),
+        ("client-contact", "לעדכן את הלקוח לקראת הוועדה",
+         "לעבור איתו על מה שיישאל בוועדה ומה להביא.",
+         5, "16:00", "normal", "waiting_client", "nahmani@nahmani-bendahan.co.il"),
+        ("nii-inquiry", "לברר מול הסניף את מספר האסמכתא",
+         "האסמכתא טרם התקבלה בכתב. נדרשת לצורך הערר, ולכן בעדיפות קריטית.",
+         9, "09:00", "critical", "open", "bendahan@nahmani-bendahan.co.il"),
+        ("medical-record", "לבקש חוות דעת אורתופדית",
+         "התקבלה והוגשה.",
+         -10, "09:00", "normal", "done", "nahmani@nahmani-bendahan.co.il"),
+    ],
+    "BL-2026-0388": [
+        ("client-docs", "להשלים טופס ב.ל 250 מהמעסיק",
+         "הטופס נדרש להשלמת התביעה ולא התקבל מהמעסיק.",
+         1, "09:00", "high", "open", "bendahan@nahmani-bendahan.co.il"),
+        ("decision-followup", "מעקב החלטת ועדת העררים",
+         "לבדוק מול הסניף אם ההחלטה בכתב יצאה.",
+         12, "11:00", "normal", "open", "bendahan@nahmani-bendahan.co.il"),
+        ("appeal", "לבחון מועד ערר לאחר קבלת ההחלטה",
+         "המועד עצמו ייוזן ויאושר על ידי הצוות מתוך ההחלטה בכתב.",
+         20, "09:00", "normal", "open", "bendahan@nahmani-bendahan.co.il"),
+    ],
+}
+
+
 def _hash(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _due(days: int, clock: str) -> datetime.datetime:
+    """מועד יעד יחסי ליום ההרצה."""
+    day = datetime.date.today() + datetime.timedelta(days=days)
+    return datetime.datetime.combine(day, datetime.time.fromisoformat(clock))
 
 
 def run(conn) -> dict:
@@ -154,9 +217,9 @@ def run(conn) -> dict:
             TRUNCATE audit_log, sessions, otp_challenges, notifications,
                      notification_preferences, messages, document_replies,
                      document_files, case_documents, case_decisions,
-                     case_next_steps, case_stage_events, cases,
+                     case_next_steps, case_stage_events, case_tasks, cases,
                      required_document_templates, stage_templates,
-                     claim_types, clients, users, firms
+                     task_types, claim_types, clients, users, firms
             RESTART IDENTITY CASCADE
         """)
 
@@ -199,9 +262,20 @@ def run(conn) -> dict:
         counts["claim_types"] = len(claim_types)
         counts["stage_templates"] = sum(len(v) for v in stages.values())
 
+        task_types = {}
+        for name, code, position in TASK_TYPES:
+            cur.execute(
+                """INSERT INTO task_types (firm_id, name, code, position)
+                   VALUES (%s,%s,%s,%s) RETURNING id""",
+                (firm_id, name, code, position),
+            )
+            task_types[code] = cur.fetchone()[0]
+        counts["task_types"] = len(task_types)
+
         counts["cases"] = 0
         counts["documents"] = 0
         counts["stage_events"] = 0
+        counts["tasks"] = 0
         for c in CASES:
             cur.execute(
                 """INSERT INTO clients (firm_id, full_name, national_id_lookup,
@@ -281,6 +355,25 @@ def run(conn) -> dict:
                     (firm_id, case_id, title, body, important,
                      users[c["lawyer_email"]], sent_at),
                 )
+
+            for (kind, title, desc, days, clock, priority, status,
+                 who) in TASKS.get(c["case_number"], []):
+                owner = users[who]
+                done = status == "done"
+                cur.execute(
+                    """INSERT INTO case_tasks
+                         (firm_id, case_id, task_type_id, title, description,
+                          assignee_user_id, due_at, status, priority,
+                          completed_at, completed_by_user_id,
+                          created_by_user_id)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (firm_id, case_id, task_types[kind], title, desc,
+                     owner, _due(days, clock), status, priority,
+                     _due(days, clock) if done else None,
+                     owner if done else None,
+                     users[c["lawyer_email"]]),
+                )
+                counts["tasks"] += 1
 
             d = c["decision"]
             if d:

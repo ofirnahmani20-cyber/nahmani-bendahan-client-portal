@@ -76,6 +76,7 @@ def temp_case():
            "firm_id": base["firm_id"], "claim_type_id": base["claim_type_id"]}
 
     with _cursor(commit=True) as cur:
+        cur.execute("delete from case_tasks where case_id = %s", (case_id,))
         cur.execute("delete from case_stage_events where case_id = %s", (case_id,))
         cur.execute("delete from messages where case_id = %s", (case_id,))
         cur.execute("delete from document_files where document_id = %s", (document_id,))

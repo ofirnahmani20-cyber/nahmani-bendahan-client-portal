@@ -166,6 +166,43 @@
       return Api.get('/api/office/audit-log' +
                      (caseId ? '?case_id=' + encodeURIComponent(caseId) : ''));
     },
+
+    // ---- משימות ----
+    /* המיון והמדרגות מגיעים מהשרת. הדפדפן אינו מחשב דחיפות
+       ואינו ממיין מחדש - אחרת שני מסכים היו יכולים לסטות. */
+    officeTasks: function (query) {
+      var parts = [];
+      query = query || {};
+      if (query.assignee) parts.push('assignee=' + encodeURIComponent(query.assignee));
+      if (query.status)   parts.push('status=' + encodeURIComponent(query.status));
+      if (query.bucket)   parts.push('bucket=' + encodeURIComponent(query.bucket));
+      if (query.includeDone) parts.push('include_done=true');
+      return Api.get('/api/office/tasks' + (parts.length ? '?' + parts.join('&') : ''));
+    },
+    caseTasks: function (caseId) {
+      return Api.get('/api/office/cases/' + encodeURIComponent(caseId) + '/tasks');
+    },
+    taskTypes: function () { return Api.get('/api/office/task-types'); },
+    officeStaff: function () { return Api.get('/api/office/staff'); },
+
+    createTask: function (caseId, task) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/tasks',
+                      task);
+    },
+    updateTask: function (taskId, task) {
+      return Api.post('/api/office/tasks/' + encodeURIComponent(taskId) + '/update',
+                      task);
+    },
+    reassignTask: function (taskId, userId) {
+      return Api.post('/api/office/tasks/' + encodeURIComponent(taskId) + '/assignee',
+                      { assignee_user_id: userId || null });
+    },
+    completeTask: function (taskId) {
+      return Api.post('/api/office/tasks/' + encodeURIComponent(taskId) + '/complete');
+    },
+    reopenTask: function (taskId) {
+      return Api.post('/api/office/tasks/' + encodeURIComponent(taskId) + '/reopen');
+    },
   };
 
   global.Api = Api;

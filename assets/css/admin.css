@@ -185,7 +185,152 @@ body.admin select { cursor: pointer; }
 .assist-a.pending { color: var(--text-soft); font-style: italic; }
 .assist-copy { margin: 10px 0 0; }
 
+/* ==========================================================
+   משימות, מועדי גג ודחיפויות
+   ----------------------------------------------------------
+   כלל הבית חל כאן במלואו: הצבע לעולם אינו הערוץ היחיד. כל
+   מדרגת מועד נושאת סמל וטקסט ("✗ באיחור", "! קריטי"), הסמל
+   aria-hidden, והמילים הן המידע. הצבע רק מזרז את הסריקה.
+
+   צבעי המדרגות הם טוקנים קיימים, למעט אדום כהה אחד:
+   #7d1414 - 10.60:1 על לבן, 9.40:1 על --stop-soft. הוא כבר
+   היה בקובץ (.assist-a.error) ונבחר כדי ש"עבר המועד" ייראה
+   כהה יותר מ"קריטי" (--stop, 7.5:1) ולא רק שונה בגוון.
+   ========================================================== */
+
+/* ---- באנר המועדים הקריטיים ---- */
+.deadline-banner {
+  background: var(--stop-soft);
+  border: 2px solid #7d1414;
+  border-inline-start-width: 7px;
+  border-radius: 0;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+.banner-lead {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+  margin: 0; font-size: 17px; font-weight: 700; color: #7d1414;
+}
+.banner-lead .banner-mark { font-size: 20px; line-height: 1; }
+.banner-text { color: var(--text); font-weight: 700; }
+.banner-when { color: #7d1414; white-space: nowrap; }
+.banner-more { margin: 10px 0 0; font-size: 15px; }
+.banner-more ul { margin: 6px 0 0; padding-inline-start: 20px; }
+.banner-more li { margin: 0 0 3px; }
+.banner-go { margin: 12px 0 0; }
+
+/* ---- אזור "דורש טיפול" ---- */
+.attention-block { border-inline-start: 5px solid var(--bronze); }
+.attention-head {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: 4px 14px; margin: 0 0 14px;
+}
+.attention-head h2 { margin: 0; }
+.attention-head .item-note { margin: 0; }
+
+/* שבבי הסיכום. המצב הנבחר מסומן במילוי, בעובי הגבול ובסימן -
+   ולא בצבע בלבד. aria-pressed נושא את אותו מידע לקורא מסך. */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 42px; padding: 7px 14px;
+  font: inherit; font-size: 15px; font-weight: 700;
+  color: var(--text); background: var(--surface);
+  border: 2px solid var(--border-ui); border-radius: 0;
+  cursor: pointer;
+}
+.chip:hover { background: var(--accent-soft); }
+.chip .chip-n {
+  min-width: 24px; padding: 0 6px; text-align: center;
+  background: var(--accent-soft); border-radius: 0;
+  font-size: 14px;
+}
+.chip[aria-pressed="true"] {
+  background: var(--accent); color: var(--on-bg); border-color: var(--accent);
+}
+.chip[aria-pressed="true"]::before { content: "✓"; font-size: 14px; }
+.chip[aria-pressed="true"] .chip-n {
+  background: #4a443a; color: var(--on-bg);   /* 7.67:1 - הטקסט הבהיר עליו */
+}
+/* אפס נראה שקט: השבב נשאר לחיץ אך אינו קורא לתשומת לב */
+.chip.chip-zero { color: var(--text-soft); border-color: var(--border); }
+.chip.chip-zero .chip-n { background: transparent; }
+
+.attention-filters {
+  display: flex; flex-wrap: wrap; align-items: end; gap: 0 18px;
+  margin: 0 0 8px;
+}
+.attention-filters .field { flex: 0 1 260px; }
+.attention-filters .check { margin-bottom: 16px; }
+
+/* ---- שורת משימה ---- */
+.task-list > li { padding: 14px 0; }
+.task-row {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+  justify-content: space-between; align-items: start;
+}
+.task-main { flex: 1 1 320px; min-width: 0; }
+.task-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+.task-title { font-weight: 700; margin: 0 0 3px; }
+.task-title.task-closed { font-weight: 600; color: var(--text-soft); }
+.task-where { font-size: 14px; color: var(--text-soft); margin: 0; }
+/* מספר תיק ותאריך נשארים קריאים בתוך עברית, ואינם נשברים
+   באמצע ברוחב צר - מזהה שנחתך לשתי שורות קשה לקרוא ולהשוות. */
+.task-where .num,
+.task-when .num { direction: ltr; unicode-bidi: plaintext; white-space: nowrap; }
+.task-desc {
+  margin: 8px 0 0; font-size: 14.5px;
+  border-inline-start: 3px solid var(--border);
+  padding-inline-start: 10px; white-space: pre-wrap;
+}
+.task-when { margin: 6px 0 0; font-size: 14.5px; }
+.task-side { flex: 0 0 auto; text-align: start; }
+.task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+
+/* מדרגת המועד. הרקע והקו הם הערוץ השני; הראשון הוא התג. */
+.task-bar {
+  border-inline-start: 5px solid var(--border);
+  padding-block: 10px;
+  padding-inline: 12px 10px;
+}
+.task-bar.b-overdue  { border-inline-start-color: #7d1414; background: var(--stop-soft); }
+.task-bar.b-critical { border-inline-start-color: var(--stop); background: var(--stop-soft); }
+.task-bar.b-warning  { border-inline-start-color: var(--warn); background: var(--warn-soft); }
+.task-bar.b-normal   { border-inline-start-color: var(--wait); }
+.task-bar.b-later    { border-inline-start-color: var(--border); }
+.task-bar.b-closed   { border-inline-start-color: var(--ok); }
+
+.tag-overdue {
+  background: var(--stop-soft); border-color: #7d1414; color: #7d1414;
+}
+.tag-legal {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--text);
+}
+.task-legal-note {
+  margin: 6px 0 0; font-size: 13.5px; color: var(--text-soft);
+}
+
+/* ---- טופס משימה ---- */
+.task-form { margin: 16px 0 0; border-top: 2px solid var(--border); padding-top: 16px; }
+.task-form[hidden] { display: none; }
+.task-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* המועד המשפטי מסומן בגבול משלו, כדי שיהיה ברור שזה שדה
+   שדורש החלטה ולא עוד שורה בטופס. */
+.legal-panel {
+  border: 2px solid var(--accent);
+  border-radius: 0;
+  background: var(--accent-soft);
+  padding: 14px 14px 2px;
+  margin: 0 0 16px;
+}
+.legal-panel[hidden] { display: none; }
+.legal-panel .item-note { margin: 0 0 12px; }
+
 @media (max-width: 520px) {
   body.admin .btn { width: auto; }
   .review-actions .btn { flex: 1 1 auto; }
+  .task-actions .btn { flex: 1 1 auto; }
+  .attention-filters .field { flex: 1 1 100%; }
 }

@@ -188,6 +188,13 @@
     'client.file_uploaded':      'הלקוח העלה מסמך',
     'client.document_replied':   'הלקוח הגיב',
     'client.case_viewed':        'הלקוח צפה בתיק',
+    'client.file_downloaded':    'הלקוח הוריד מסמך',
+    'office.task_created':          'נוצרה משימה',
+    'office.task_updated':          'עודכנה משימה',
+    'office.task_reassigned':       'הוחלף אחראי',
+    'office.task_completed':        'הושלמה משימה',
+    'office.task_reopened':         'נפתחה משימה מחדש',
+    'office.task_deadline_changed': 'הוזז מועד יעד',
   };
 
   function renderLog(caseId) {
@@ -222,6 +229,8 @@
     $('listView').hidden = false;
     $('caseView').hidden = true;
     $('backBtn').hidden  = true;
+
+    loadAttention();
 
     return Api.officeCases().then(function (data) {
       var cases   = data.cases;
@@ -322,7 +331,11 @@
       renderDecisionForm(file);
       renderCatalog(file);
       renderReview(file);
+      renderCaseTasks();
       renderLog(openId);
+      /* הבאנר חייב להישאר גם כאן: מועד קריטי בתיק אחר לא
+         אמור להיעלם רק כי נפתח תיק. */
+      loadBanner();
     }).catch(function (err) {
       $('caseMeta').textContent = err.message || 'לא הצלחנו לטעון את התיק.';
     });
@@ -389,7 +402,7 @@
       return reqFail('המסמך "' + name + '" כבר קיים בתיק.', $('reqName'));
     }
 
-    Api.addDocument(openId, name, note, required)
+    Api.addDocument(openId, name, note, $('reqRequired').checked)
        .then(function () { return renderCase(); })
        .then(function () { toast('הדרישה נוספה והלקוח יראה אותה.'); })
        .catch(function (err) { toast(err.message || 'הוספת הדרישה נכשלה.'); });
@@ -577,7 +590,7 @@
     if (!title)           return msgFail('צריך כותרת להודעה.', $('msgTitle'));
     if (body.length < 10) return msgFail('תוכן ההודעה קצר מדי.', $('msgBody'));
 
-    Api.sendMessage(openId, title, body, important)
+    Api.sendMessage(openId, title, body, $('msgImportant').checked)
        .then(function () { return renderCase(); })
        .then(function () { toast('העדכון נשלח ללקוח.'); })
        .catch(function (err) { toast(err.message || 'שליחת העדכון נכשלה.'); });
@@ -735,6 +748,547 @@
     askAssist('', q);
   });
 
+  /* ================= משימות ומועדי גג =================
+     המיון, המדרגות והמונים מגיעים מהשרת. הדפדפן אינו מחשב
+     דחיפות ואינו ממיין מחדש - אחרת מסך "דורש טיפול" ומסך
+     התיק היו יכולים לסטות זה מזה.
+
+     כל מדרגה וכל דחיפות נושאות סמל *וטקסט*. הסמל aria-hidden,
+     והמילים הן המידע. ==================================== */
+
+  var BUCKETS = {
+    'overdue':  { tag: 'tag-overdue', mark: '✗', text: 'באיחור' },
+    'critical': { tag: 'tag-stop',    mark: '!', text: 'קריטי' },
+    'warning':  { tag: 'tag-warn',    mark: '●', text: 'אזהרה' },
+    'normal':   { tag: 'tag-wait',    mark: '●', text: 'רגיל' },
+    'later':    { tag: 'tag-wait',    mark: '○', text: 'בהמשך' },
+    'closed':   { tag: 'tag-ok',      mark: '✓', text: 'נסגרה' }
+  };
+
+  var PRIORITIES = {
+    'critical': { tag: 'tag-stop', mark: '!', text: 'דחיפות קריטית' },
+    'high':     { tag: 'tag-warn', mark: '▲', text: 'דחיפות גבוהה' },
+    'normal':   { tag: 'tag-wait', mark: '●', text: 'דחיפות רגילה' },
+    'low':      { tag: 'tag-wait', mark: '▽', text: 'דחיפות נמוכה' }
+  };
+
+  var TASK_STATUS = {
+    'open':           'פתוחה',
+    'in_progress':    'בטיפול',
+    'waiting_client': 'ממתין ללקוח',
+    'done':           'הושלמה',
+    'cancelled':      'בוטלה'
+  };
+
+  /* חמשת השבבים. count הוא המפתח במונים שהשרת מחזיר, ו-match
+     מסנן את המערך שכבר נטען - בלי קריאה חדשה לשרת. */
+  var CHIPS = [
+    { key: 'critical', label: 'קריטי', count: 'critical',
+      match: function (t) {
+        return t.bucket !== 'closed' &&
+               (t.priority === 'critical' || t.daysLeft <= 3);
+      } },
+    { key: 'today', label: 'להיום', count: 'today',
+      match: function (t) { return t.bucket !== 'closed' && t.daysLeft === 0; } },
+    { key: 'week', label: 'השבוע', count: 'week',
+      match: function (t) {
+        return t.bucket !== 'closed' && t.daysLeft >= 0 && t.daysLeft <= 7;
+      } },
+    { key: 'waiting', label: 'ממתין ללקוח', count: 'waitingClient',
+      match: function (t) { return t.status === 'waiting_client'; } },
+    { key: 'overdue', label: 'באיחור', count: 'overdue',
+      match: function (t) { return t.isOverdue; } }
+  ];
+
+  var attention   = null;   /* התשובה האחרונה מהשרת */
+  var chipFilter  = null;   /* השבב הנבחר, או null */
+  var taskCatalog = null;   /* סוגי המשימות, נטענים פעם אחת */
+  var staffList   = null;   /* אנשי הצוות, לבחירת אחראי */
+  var editingTask = null;   /* המשימה שבעריכה, או null ליצירה */
+
+  function bucketOf(value) {
+    return BUCKETS[value] || { tag: 'tag-wait', mark: '?', text: value || 'לא ידוע' };
+  }
+
+  function priorityOf(value) {
+    return PRIORITIES[value] ||
+           { tag: 'tag-wait', mark: '?', text: value || 'לא ידוע' };
+  }
+
+  /** תג סטטוס: סמל aria-hidden ולצידו טקסט גלוי. */
+  function statusTag(spec) {
+    var tag = el('span', 'tag ' + spec.tag);
+    tag.appendChild(el('span', null, spec.mark, true));
+    tag.appendChild(document.createTextNode(spec.text));
+    return tag;
+  }
+
+  /** כמה זמן נותר, במילים. שלילי = המועד חלף. */
+  function timeLeft(t) {
+    var d = t.daysLeft;
+    if (t.isOverdue) {
+      if (d === 0)  return 'המועד חלף היום';
+      if (d === -1) return 'באיחור של יום אחד';
+      return 'באיחור של ' + (-d) + ' ימים';
+    }
+    if (d === 0) return 'המועד היום';
+    if (d === 1) return 'נותר יום אחד';
+    return 'נותרו ' + d + ' ימים';
+  }
+
+  function loadLookups() {
+    if (taskCatalog && staffList) return Promise.resolve();
+    return Promise.all([Api.taskTypes(), Api.officeStaff()])
+      .then(function (res) {
+        taskCatalog = res[0].taskTypes;
+        staffList   = res[1].staff;
+
+        var type = $('taskType');
+        type.textContent = '';
+        taskCatalog.forEach(function (tt) {
+          var o = el('option', null, tt.name);
+          o.value = tt.id;
+          type.appendChild(o);
+        });
+
+        [$('taskAssignee'), $('attentionAssignee')].forEach(function (sel) {
+          /* האפשרות הראשונה נשמרת מה-HTML: "ללא אחראי" בטופס,
+             "כל המשרד" בסינון. */
+          while (sel.options.length > 1) sel.remove(1);
+          staffList.forEach(function (s) {
+            var o = el('option', null, s.name);
+            o.value = s.id;
+            sel.appendChild(o);
+          });
+        });
+      });
+  }
+
+  /* ---- "דורש טיפול" ---- */
+
+  function loadAttention() {
+    return loadLookups().then(function () {
+      return Api.officeTasks({
+        assignee: $('attentionAssignee').value || null,
+        includeDone: $('attentionDone').checked
+      });
+    }).then(function (data) {
+      attention = data;
+      renderChips(data.counts);
+      renderAttention();
+      renderBanner(data.banner);
+    }).catch(function (err) {
+      attention = null;
+      var list = $('attentionList');
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את המשימות.'));
+      $('attentionScope').textContent = '';
+    });
+  }
+
+  function renderChips(counts) {
+    var box = $('attentionChips');
+    box.textContent = '';
+    CHIPS.forEach(function (chip) {
+      var n = counts[chip.count] || 0;
+      var btn = el('button', 'chip' + (n ? '' : ' chip-zero'));
+      btn.type = 'button';
+      btn.setAttribute('data-chip', chip.key);
+      btn.appendChild(document.createTextNode(chip.label));
+      btn.appendChild(el('span', 'chip-n', String(n)));
+      btn.addEventListener('click', function () {
+        chipFilter = (chipFilter === chip.key) ? null : chip.key;
+        syncChips();
+        renderAttention();
+      });
+      box.appendChild(btn);
+    });
+    syncChips();
+  }
+
+  /** מסמן את השבב הנבחר בלי לבנות את הכפתורים מחדש.
+      בנייה מחדש הייתה מוחקת את הכפתור שנלחץ, וכל הפעלה
+      מהמקלדת הייתה מאבדת את המיקוד לתוך ה-body. */
+  function syncChips() {
+    var chips = $('attentionChips').querySelectorAll('.chip');
+    Array.prototype.forEach.call(chips, function (btn) {
+      btn.setAttribute('aria-pressed',
+        String(btn.getAttribute('data-chip') === chipFilter));
+    });
+  }
+
+  function renderAttention() {
+    var list = $('attentionList');
+    list.textContent = '';
+    if (!attention) return;
+
+    var chip  = null;
+    var i;
+    for (i = 0; i < CHIPS.length; i++) {
+      if (CHIPS[i].key === chipFilter) chip = CHIPS[i];
+    }
+    var shown = chip ? attention.tasks.filter(chip.match) : attention.tasks;
+
+    var who = $('attentionAssignee');
+    var scope = who.value
+      ? 'האחראי: ' + who.options[who.selectedIndex].text
+      : 'כל המשרד';
+    $('attentionScope').textContent = shown.length === 0
+      ? scope + ' · אין משימות בתצוגה'
+      : scope + ' · ' + (shown.length === 1 ? 'משימה אחת' :
+                         shown.length + ' משימות') +
+        (chip ? ' בסינון "' + chip.label + '"' : '');
+
+    if (!shown.length) {
+      list.appendChild(el('li', 'item-note', chip
+        ? 'אין משימות בקטגוריה "' + chip.label + '".'
+        : 'אין משימות פתוחות. כל המועדים מטופלים.'));
+      announce('אין משימות בתצוגה.');
+      return;
+    }
+
+    shown.forEach(function (t) { list.appendChild(taskRow(t, false)); });
+    announce((chip ? 'סינון ' + chip.label + ': ' : '') +
+             shown.length + ' משימות בתצוגה.');
+  }
+
+  /* ---- הבאנר ---- */
+
+  function loadBanner() {
+    return Api.officeTasks().then(function (data) {
+      renderBanner(data.banner);
+    }).catch(function () { /* הבאנר אינו חוסם את תצוגת התיק */ });
+  }
+
+  function renderBanner(items) {
+    var box  = $('deadlineBanner');
+    var body = $('bannerBody');
+    body.textContent = '';
+
+    if (!items || !items.length) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+
+    /* הראשון הוא הדחוף ביותר - המיון כבר נעשה בשרת.
+       החלקים מופרדים ב-"·" ולא נתפרים למשפט אחד, כי כותרת
+       משימה היא טקסט חופשי שהצוות מקליד ולא בהכרח נסמכת. */
+    var top = items[0];
+    var lead = el('p', 'banner-lead');
+    lead.appendChild(el('span', 'banner-mark',
+                        top.isOverdue ? '✗' : '!', true));
+    lead.appendChild(document.createTextNode(
+      top.isOverdue ? 'באיחור' : 'דחוף'));
+    lead.appendChild(el('span', 'banner-when', '— ' + timeLeft(top)));
+    lead.appendChild(el('span', 'banner-text', '· ' + top.title));
+    lead.appendChild(el('span', 'banner-text', '· בתיק ' + top.clientName));
+    body.appendChild(lead);
+
+    if (top.isLegalDeadline) {
+      body.appendChild(el('p', 'task-legal-note',
+        'מועד משפטי מחייב · מקור: ' + (top.deadlineSource || '-')));
+    }
+
+    if (items.length > 1) {
+      var more = el('div', 'banner-more');
+      more.appendChild(el('p', null, items.length === 2
+        ? 'מועד קריטי נוסף:'
+        : 'עוד ' + (items.length - 1) + ' מועדים קריטיים:'));
+      var ul = document.createElement('ul');
+      items.slice(1).forEach(function (t) {
+        ul.appendChild(el('li', null,
+          timeLeft(t) + ' · ' + t.title + ' · ' + t.clientName));
+      });
+      more.appendChild(ul);
+      body.appendChild(more);
+    }
+
+    var go = el('div', 'banner-go');
+    var btn = el('button', 'btn btn-primary btn-sm', 'פתיחת התיק הדחוף');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'פתיחת התיק של ' + top.clientName);
+    btn.addEventListener('click', function () { openCase(top.caseId); });
+    go.appendChild(btn);
+    body.appendChild(go);
+  }
+
+  /* ---- שורת משימה ---- */
+
+  function taskRow(t, allowEdit) {
+    var li = el('li');
+    var bar = el('div', 'task-bar b-' + t.bucket);
+    var row = el('div', 'task-row');
+
+    var main = el('div', 'task-main');
+    var tags = el('div', 'task-tags');
+    tags.appendChild(statusTag(bucketOf(t.bucket)));
+    tags.appendChild(statusTag(priorityOf(t.priority)));
+    if (t.isLegalDeadline) {
+      tags.appendChild(statusTag({ tag: 'tag-legal', mark: '§',
+                                   text: 'מועד משפטי' }));
+    }
+    main.appendChild(tags);
+
+    main.appendChild(el('p', 'task-title' +
+      (t.bucket === 'closed' ? ' task-closed' : ''), t.title));
+
+    var where = el('p', 'task-where');
+    where.appendChild(document.createTextNode(t.taskType + ' · ' +
+                                              t.clientName + ' · '));
+    where.appendChild(el('span', 'num', t.caseNumber));
+    where.appendChild(document.createTextNode(' · ' +
+      (TASK_STATUS[t.status] || t.status) +
+      ' · ' + (t.assignee || 'ללא אחראי')));
+    main.appendChild(where);
+
+    if (t.description) {
+      main.appendChild(el('p', 'task-desc', t.description));
+    }
+
+    var when = el('p', 'task-when');
+    when.appendChild(el('span', 'num', stamp(t.dueAt)));
+    when.appendChild(document.createTextNode(' · ' + timeLeft(t)));
+    main.appendChild(when);
+
+    if (t.isLegalDeadline && t.deadlineSource) {
+      main.appendChild(el('p', 'task-legal-note',
+        'מקור המועד: ' + t.deadlineSource +
+        (t.confirmedBy ? ' · אושר בידי ' + t.confirmedBy : '')));
+    }
+    if (t.completedAt) {
+      main.appendChild(el('p', 'task-legal-note',
+        'הושלמה ' + stamp(t.completedAt) +
+        (t.completedBy ? ' בידי ' + t.completedBy : '')));
+    }
+
+    row.appendChild(main);
+
+    var side = el('div', 'task-side');
+    var actions = el('div', 'task-actions');
+
+    if (t.status === 'done' || t.status === 'cancelled') {
+      actions.appendChild(taskButton('פתיחה מחדש', 'btn-outline', t,
+        'פתיחה מחדש של המשימה ' + t.title,
+        function () { return Api.reopenTask(t.id); },
+        'המשימה נפתחה מחדש.'));
+    } else {
+      actions.appendChild(taskButton('סימון הושלמה', 'btn-ok', t,
+        'סימון המשימה ' + t.title + ' כהושלמה',
+        function () { return Api.completeTask(t.id); },
+        'המשימה סומנה כהושלמה ונשמרה בהיסטוריה.'));
+    }
+
+    if (allowEdit) {
+      var edit = el('button', 'btn btn-outline btn-sm', 'עריכה');
+      edit.type = 'button';
+      edit.setAttribute('aria-label', 'עריכת המשימה ' + t.title);
+      edit.addEventListener('click', function () { openTaskForm(t); });
+      actions.appendChild(edit);
+    } else {
+      var open = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק');
+      open.type = 'button';
+      open.setAttribute('aria-label', 'פתיחת התיק של ' + t.clientName);
+      open.addEventListener('click', function () { openCase(t.caseId); });
+      actions.appendChild(open);
+    }
+
+    side.appendChild(actions);
+    row.appendChild(side);
+    bar.appendChild(row);
+    li.appendChild(bar);
+    return li;
+  }
+
+  /** כפתור פעולה שמרענן את המסך שממנו נלחץ. */
+  function taskButton(label, kind, t, aria, action, okMessage) {
+    var btn = el('button', 'btn ' + kind + ' btn-sm', label);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', aria);
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      action()
+        .then(function () { return refreshTasks(); })
+        .then(function () { toast(okMessage); })
+        .catch(function (err) {
+          btn.disabled = false;
+          toast(err.message || 'הפעולה נכשלה.');
+        });
+    });
+    return btn;
+  }
+
+  /** מרענן את מה שמוצג כרגע: רשימת התיק, או "דורש טיפול".
+      גם היומן מתרענן - פעולת משימה נרשמת בו, ואם הוא לא ייטען
+      מחדש הוא יציג מצב שכבר אינו נכון. */
+  function refreshTasks() {
+    if (openId) {
+      return renderCaseTasks()
+        .then(loadBanner)
+        .then(function () { return renderLog(openId); });
+    }
+    return loadAttention();
+  }
+
+  /* ---- משימות התיק ---- */
+
+  function renderCaseTasks() {
+    var list = $('taskList');
+    if (!openId) return Promise.resolve();
+    return loadLookups().then(function () {
+      return Api.caseTasks(openId);
+    }).then(function (data) {
+      list.textContent = '';
+      var open = data.tasks.filter(function (t) {
+        return t.status !== 'done' && t.status !== 'cancelled';
+      }).length;
+
+      $('taskIntro').textContent = data.tasks.length === 0
+        ? 'אין משימות בתיק הזה.'
+        : (open === 0 ? 'כל המשימות בתיק טופלו. '
+                      : (open === 1 ? 'משימה אחת פתוחה. '
+                                    : open + ' משימות פתוחות. ')) +
+          'ההיסטוריה נשמרת במלואה.';
+
+      data.tasks.forEach(function (t) {
+        list.appendChild(taskRow(t, true));
+      });
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את משימות התיק.'));
+    });
+  }
+
+  /* ---- הטופס ---- */
+
+  var taskForm = $('taskForm');
+
+  function taskFail(text, focusOn) {
+    var box = $('taskError');
+    box.textContent = text;
+    box.hidden = false;
+    if (focusOn) focusOn.focus();
+  }
+
+  function setLegalPanel(on) {
+    $('taskLegalPanel').hidden = !on;
+    $('taskLegal').setAttribute('aria-expanded', String(on));
+  }
+
+  function openTaskForm(t) {
+    editingTask = t || null;
+    $('taskError').hidden = true;
+    taskForm.hidden = false;
+    $('taskNew').setAttribute('aria-expanded', 'true');
+    $('taskSave').textContent = t ? 'שמירת השינויים' : 'יצירת המשימה';
+
+    $('taskTitle').value    = t ? t.title : '';
+    $('taskDesc').value     = t && t.description ? t.description : '';
+    /* dueAt חוזר עם אזור זמן; datetime-local רוצה זמן מקומי בלי
+       אזור, וזה בדיוק 16 התווים הראשונים. */
+    $('taskDue').value      = t ? t.dueAt.slice(0, 16) : '';
+    $('taskPriority').value = t ? t.priority : 'normal';
+    $('taskStatus').value   = t && t.status !== 'done' ? t.status : 'open';
+    $('taskType').value     = t ? t.taskTypeId :
+                              (taskCatalog.length ? taskCatalog[0].id : '');
+    $('taskAssignee').value = t && t.assigneeId ? t.assigneeId : '';
+
+    $('taskLegal').checked  = !!(t && t.isLegalDeadline);
+    $('taskSource').value   = t && t.deadlineSource ? t.deadlineSource : '';
+    /* אישור לעולם אינו מסומן מראש. מועד משפטי נשמר רק כשאדם
+       מסמן את התיבה באותו מסך, גם בעריכה של מועד שאושר קודם. */
+    $('taskConfirm').checked = false;
+    setLegalPanel($('taskLegal').checked);
+
+    $('taskTitle').focus();
+  }
+
+  function closeTaskForm() {
+    editingTask = null;
+    taskForm.reset();
+    taskForm.hidden = true;
+    setLegalPanel(false);
+    $('taskError').hidden = true;
+    $('taskNew').setAttribute('aria-expanded', 'false');
+    $('taskNew').focus();
+  }
+
+  $('taskNew').addEventListener('click', function () {
+    if (taskForm.hidden) openTaskForm(null);
+    else closeTaskForm();
+  });
+
+  $('taskCancel').addEventListener('click', closeTaskForm);
+
+  $('taskLegal').addEventListener('change', function () {
+    setLegalPanel($('taskLegal').checked);
+    if ($('taskLegal').checked) $('taskSource').focus();
+  });
+
+  taskForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    $('taskError').hidden = true;
+
+    var title = $('taskTitle').value.trim();
+    var due   = $('taskDue').value;
+    var legal = $('taskLegal').checked;
+
+    if (title.length < 2) return taskFail('צריך כותרת למשימה.', $('taskTitle'));
+    if (!due)             return taskFail('צריך תאריך ושעת יעד.', $('taskDue'));
+    if (!$('taskType').value) {
+      return taskFail('צריך לבחור סוג משימה.', $('taskType'));
+    }
+    /* אותן שתי בדיקות נאכפות גם בשרת וגם באילוץ במסד. כאן הן
+       רק כדי שההודעה תגיע מיד ובלי סבב לשרת. */
+    if (legal && $('taskSource').value.trim().length < 5) {
+      return taskFail('מועד משפטי מחייב ציון מקור - מאיזה מכתב או ' +
+                      'החלטה נגזר התאריך.', $('taskSource'));
+    }
+    if (legal && !$('taskConfirm').checked) {
+      return taskFail('מועד משפטי מחייב אישור מפורש. המערכת אינה ' +
+                      'קובעת מועדים משפטיים בעצמה.', $('taskConfirm'));
+    }
+
+    var body = {
+      task_type_id: $('taskType').value,
+      title: title,
+      description: $('taskDesc').value.trim() || null,
+      due_at: due,
+      priority: $('taskPriority').value,
+      status: $('taskStatus').value,
+      assignee_user_id: $('taskAssignee').value || null,
+      is_legal_deadline: legal,
+      deadline_source: legal ? $('taskSource').value.trim() : null,
+      confirm_legal_deadline: legal && $('taskConfirm').checked
+    };
+
+    var saving = editingTask
+      ? Api.updateTask(editingTask.id, body)
+      : Api.createTask(openId, body);
+    var isEdit = !!editingTask;
+
+    saving
+      .then(function (res) {
+        closeTaskForm();
+        return refreshTasks().then(function () {
+          toast(isEdit
+            ? (res && res.dueChanged
+                ? 'המשימה עודכנה. הזזת המועד נרשמה ביומן.'
+                : 'המשימה עודכנה.')
+            : 'המשימה נוצרה.');
+        });
+      })
+      .catch(function (err) {
+        taskFail(err.message || 'שמירת המשימה נכשלה.', $('taskTitle'));
+      });
+  });
+
+  $('attentionAssignee').addEventListener('change', loadAttention);
+  $('attentionDone').addEventListener('change', loadAttention);
+
+
   /* ================= עזרים ================= */
 
   /** ממיר 2026-09-22 ל-22.09.2026 */
@@ -751,6 +1305,13 @@
     var pad = function (n) { return n < 10 ? '0' + n : String(n); };
     return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() +
            ' בשעה ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  /** הכרזה לקורא מסך, בדפוס #viewAnnounce שבאזור הלקוח.
+      שינוי סינון אינו מזיז מיקוד, ולכן בלעדיה הוא היה שקט. */
+  function announce(msg) {
+    var box = $('adminAnnounce');
+    if (box) box.textContent = msg;
   }
 
   var toastTimer = null;
