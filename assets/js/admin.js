@@ -68,9 +68,116 @@
         staff = who;
         $('loginView').hidden = true;
         $('appView').hidden   = false;
+        /* הפוטר שייך למסך הכניסה. עד 18.09 הוא נשאר גלוי גם
+           אחרי התחברות והופיע מעל הבאנר. */
+        var foot = document.querySelector('.sitefoot');
+        if (foot) foot.hidden = true;
         $('staffName').textContent = who.name + (who.role ? ' · ' + who.role : '');
-        return showList();
+        return route(location.hash.slice(1));
       });
+  }
+
+
+  /* ================= ניווט =================
+     שני מפלסים על אותו מנוע: שמונת האזורים, ושש הלשוניות
+     שבתוך תיק. הוספת אזור או לשונית בעתיד היא שורה במפה. */
+
+  var TOP_VIEWS = {
+    dashboard: { el: 'view-dashboard', title: 'דשבורד' },
+    tasks:     { el: 'view-tasks',     title: 'ניהול משימות' },
+    cases:     { el: 'view-cases',     title: 'התיקים בטיפולי' },
+    closed:    { el: 'view-closed',    title: 'תיקים שהושלמו ושכר טרחה' },
+    documents: { el: 'view-documents', title: 'מסמכים' },
+    clients:   { el: 'view-clients',   title: 'לקוחות' },
+    reports:   { el: 'view-reports',   title: 'דוחות' },
+    settings:  { el: 'view-settings',  title: 'הגדרות' }
+  };
+
+  var CASE_VIEWS = {
+    state:      { el: 'case-view-state',      title: 'מצב התיק' },
+    comms:      { el: 'case-view-comms',      title: 'דרישות ותקשורת עם הלקוח' },
+    docs:       { el: 'case-view-docs',       title: 'מסמכי התיק' },
+    committees: { el: 'case-view-committees', title: 'ועדות, החלטות ומועדים' },
+    tasks:      { el: 'case-view-tasks',      title: 'משימות' },
+    history:    { el: 'case-view-history',    title: 'היסטוריה' }
+  };
+
+  var drawer = ViewNav.drawer({
+    button: 'menuBtn', panel: 'drawer',
+    overlay: 'drawerOverlay', close: 'drawerClose',
+    inert: ['#main', '.topbar']
+  });
+
+  var topNav = ViewNav.create({
+    views: TOP_VIEWS,
+    links: '.sitenav a[data-view], .drawer-link[data-view], #view-dashboard a[data-view]',
+    announce: 'adminAnnounce',
+    titleSel: '.view-title',
+    fallback: 'cases',
+    onLink: function () { drawer.close(false); },
+    onShow: function (name) {
+      /* תיק פתוח ובחרו אזור עליון - יוצאים מסביבת התיק. */
+      if (openId) {
+        openId = null;
+        currentCase = null;
+        $('caseWorkspace').hidden = true;
+        $('topLevel').hidden      = false;
+        $('backBtn').hidden       = true;
+      }
+      setHash(name);
+      loadTopView(name);
+    }
+  });
+
+  var caseNav = ViewNav.create({
+    views: CASE_VIEWS,
+    links: '.case-tabs a[data-view]',
+    announce: 'adminAnnounce',
+    titleSel: '.view-title',
+    fallback: 'state',
+    onShow: function (name) {
+      if (openId) setHash('cases/' + openId + '/' + name);
+    }
+  });
+
+  /** כל אזור טוען את מה ששייך לו, ורק כשנכנסים אליו. */
+  function loadTopView(name) {
+    if (name === 'cases')   return showList();
+    if (name === 'tasks')   return loadAttention();
+    if (name === 'reports') return renderLog(null, 'firmLogList');
+    return Promise.resolve();
+  }
+
+  var settingHash = false;
+  function setHash(value) {
+    if (location.hash.slice(1) === value) return;
+    settingHash = true;
+    history.replaceState(null, '', '#' + value);
+    settingHash = false;
+  }
+
+  /** #cases/<id>/<tab> פותח תיק ולשונית; אחרת אזור עליון. */
+  function route(hash) {
+    var parts = (hash || '').split('/');
+
+    if (parts[0] === 'cases' && parts[1]) {
+      topNav.show('cases', false);
+      return openCase(parts[1], caseNav.has(parts[2]) ? parts[2] : 'state');
+    }
+
+    var name = topNav.has(parts[0]) ? parts[0] : 'cases';
+    topNav.show(name, false);
+    return loadTopView(name);
+  }
+
+  window.addEventListener('hashchange', function () {
+    if (settingHash) return;
+    route(location.hash.slice(1));
+  });
+
+  var drawerOut = $('drawerLogout');
+  if (drawerOut) {
+    drawerOut.addEventListener('click', function () { $('staffLogout').click(); });
   }
 
 
@@ -197,8 +304,9 @@
     'office.task_deadline_changed': 'הוזז מועד יעד',
   };
 
-  function renderLog(caseId) {
-    var list = $('logList');
+  /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
+  function renderLog(caseId, listId) {
+    var list = $(listId || 'logList');
     if (!list) return Promise.resolve();
     return Api.auditLog(caseId).then(function (data) {
       list.textContent = '';
@@ -224,14 +332,6 @@
   /* ================= רשימת התיקים ================= */
 
   function showList() {
-    openId = null;
-    currentCase = null;
-    $('listView').hidden = false;
-    $('caseView').hidden = true;
-    $('backBtn').hidden  = true;
-
-    loadAttention();
-
     return Api.officeCases().then(function (data) {
       var cases   = data.cases;
       var waiting = cases.reduce(function (n, c) { return n + c.awaitingReview; }, 0);
@@ -261,11 +361,11 @@
         stage.appendChild(el('div', 'sub', c.stageTitle || ''));
         tr.appendChild(stage);
 
-        tr.appendChild(countCell(c.awaitingReview, 'wait'));
-        tr.appendChild(countCell(c.openForClient, 'warn'));
+        tr.appendChild(countCell(c.awaitingReview, 'hot'));
+        tr.appendChild(countCell(c.openForClient, 'calm'));
 
         var act = document.createElement('td');
-        var open = el('button', 'btn btn-outline btn-small', 'פתיחת התיק');
+        var open = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק');
         open.type = 'button';
         open.addEventListener('click', function () { openCase(c.id); });
         act.appendChild(open);
@@ -288,28 +388,64 @@
 
   function countCell(n, tone) {
     var td = document.createElement('td');
-    var box = el('span', 'count' + (n ? ' count-' + tone : ''), String(n || 0));
+    var box = el('span', 'count' + (n ? ' ' + tone : ''), String(n || 0));
     td.appendChild(box);
     return td;
   }
 
   /* ================= תיק בודד ================= */
 
-  function openCase(caseId) {
+  function openCase(caseId, tab) {
     openId = caseId;
-    $('listView').hidden = true;
-    $('caseView').hidden = false;
-    $('backBtn').hidden  = false;
 
     /* הניתוח שייך לתיק - אסור שיישאר על המסך כשעוברים לתיק אחר */
     assistHistory = [];
     $('assistLog').textContent = '';
     $('assistInput').value = '';
 
-    renderCase().then(function () { $('caseClient').focus(); });
+    $('topLevel').hidden     = true;
+    $('caseWorkspace').hidden = false;
+    $('backBtn').hidden      = false;
+
+    caseNav.show(tab || 'state', false);
+    setHash('cases/' + caseId + '/' + caseNav.current());
+
+    return renderCase().then(function () { $('caseClient').focus(); });
   }
 
-  $('backBtn').addEventListener('click', showList);
+  /** יוצא מהתיק וחוזר לרשימה. */
+  function closeCase() {
+    openId = null;
+    currentCase = null;
+    $('caseWorkspace').hidden = true;
+    $('topLevel').hidden      = false;
+    $('backBtn').hidden       = true;
+    topNav.show('cases', true);
+    setHash('cases');
+    return showList();
+  }
+
+  $('backBtn').addEventListener('click', closeCase);
+
+  /** הכותרת הקבועה של התיק - נשארת זהה בכל שש הלשוניות. */
+  function renderCaseHead(file) {
+    var facts = [
+      ['מספר תיק',  file.caseNumber, true],
+      ['סוג התביעה', file.claimType],
+      ['שלב נוכחי',  (file.currentStage || '-') +
+                     (file.stageTitle ? ' · ' + file.stageTitle : '')],
+      ['סטטוס',      file.status || 'פעיל'],
+      ['אחראי',      file.assignee || 'לא שויך']
+    ];
+    var dl = $('caseFacts');
+    dl.textContent = '';
+    facts.forEach(function (f) {
+      var wrap = el('div', 'case-fact');
+      wrap.appendChild(el('dt', null, f[0]));
+      wrap.appendChild(el('dd', f[2] ? 'num' : null, f[1] || '-'));
+      dl.appendChild(wrap);
+    });
+  }
 
   /** טוען את התיק מהשרת ומצייר. מוחזר Promise כדי שפעולות
       יוכלו להמתין לרענון לפני שהן מודיעות שהצליחו. */
@@ -317,15 +453,12 @@
     return Api.officeCase(openId).then(function (file) {
       currentCase = file;
 
-      var head = $('caseClient');
-      head.textContent = file.clientName;
-      head.tabIndex = -1;
+      $('caseClient').textContent = file.clientName;
+      renderCaseHead(file);
 
       $('caseMeta').textContent =
         'תיק ' + file.caseNumber + ' · ' + file.claimType +
-        (file.branch ? ' · ' + file.branch : '') +
-        ' · שלב ' + (file.currentStage || '-') +
-        (file.stageTitle ? ' - ' + file.stageTitle : '');
+        (file.branch ? ' · ' + file.branch : '');
 
       renderStage(file);
       renderDecisionForm(file);
@@ -511,9 +644,6 @@
          .then(function () { return renderCase(); })
          .then(function () { toast('המסמך "' + doc.name + '" אושר.'); })
          .catch(function (err) { toast(err.message || 'האישור נכשל.'); });
-      return;
-      renderCase();
-      toast('המסמך "' + doc.name + '" אושר.');
     });
 
     var no = el('button', 'btn btn-stop btn-sm', 'דחייה');
@@ -557,9 +687,6 @@
          .then(function () { return renderCase(); })
          .then(function () { toast('המסמך "' + doc.name + '" נדחה והלקוח יעודכן.'); })
          .catch(function (err) { toast(err.message || 'הדחייה נכשלה.'); });
-      return;
-      renderCase();
-      toast('המסמך "' + doc.name + '" נדחה והסיבה נשלחה ללקוח.');
     });
     form.appendChild(send);
     wrap.appendChild(form);
@@ -671,9 +798,16 @@
     var abort = new AbortController();
     var timer = setTimeout(function () { abort.abort(); }, 120000);
 
+    /* הבקשה הזו אינה עוברת דרך Api.request כי היא קוראת את
+       התשובה כזרם, ולכן טוקן ה-CSRF חייב להיצרף כאן ידנית.
+       בלעדיו השרת מחזיר 403 וכל הפאנל לא עבד. */
     fetch('/api/office/assist', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': Api.csrfToken() || ''
+      },
       signal: abort.signal,
       body: JSON.stringify({
         case:     assistContext(),

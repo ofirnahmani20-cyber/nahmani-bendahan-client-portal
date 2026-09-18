@@ -51,11 +51,14 @@
 
   /* ---- תגובה למשרד על מסמך ---- */
 
+  /* המזהים חייבים להיות זהים ל-REPLY_KINDS שב-server/api_client.py.
+     עד 18.09 שלושה מהם היו שונים, והשרת דחה אותם ב-400 - כלומר
+     שלושה מארבעת כפתורי התגובה פשוט לא עבדו. */
   var REPLY_OPTIONS = [
-    { kind: 'no-document',  label: 'אין לי את המסמך' },
-    { kind: 'need-help',    label: 'צריך עזרה בהשגתו' },
-    { kind: 'sent-by-mail', label: 'שלחתי בדואר' },
-    { kind: 'already-gave', label: 'כבר מסרתי למשרד' }
+    { kind: 'dont-have',   label: 'אין לי את המסמך' },
+    { kind: 'need-help',   label: 'צריך עזרה בהשגתו' },
+    { kind: 'sent-mail',   label: 'שלחתי בדואר' },
+    { kind: 'gave-office', label: 'כבר מסרתי למשרד' }
   ];
 
   /**

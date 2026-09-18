@@ -309,3 +309,48 @@ def test_client_cannot_read_the_audit_log(api, temp_case):
         client_id = cur.fetchone()["client_id"]
     client_login(api, client_id)
     assert api.get("/api/office/audit-log").status_code == 403
+
+
+# ================================================================
+#  6. חוזה הממשק מול השרת
+# ================================================================
+
+def test_client_reply_kinds_match_the_browser():
+    """
+    מזהי התגובה בדפדפן חייבים להיות זהים ל-REPLY_KINDS שבשרת.
+
+    עד 18.09 שלושה מהם היו שונים, והשרת דחה אותם ב-400 - כלומר
+    שלושה מארבעת כפתורי התגובה של הלקוח פשוט לא עבדו. הבדיקות
+    לא תפסו זאת כי הן שלחו את המחרוזות של השרת ישירות.
+    """
+    import pathlib
+    import re
+
+    from server.api_client import REPLY_KINDS
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    source = (root / "assets" / "js" / "dashboard.js").read_text(encoding="utf-8")
+    block = source.split("REPLY_OPTIONS = [")[1].split("]")[0]
+    in_browser = set(re.findall(r"kind:\s*'([a-z-]+)'", block))
+
+    assert in_browser == set(REPLY_KINDS), (
+        "מזהי התגובה בדפדפן אינם תואמים לשרת: בדפדפן בלבד %s, בשרת בלבד %s"
+        % (sorted(in_browser - set(REPLY_KINDS)), sorted(set(REPLY_KINDS) - in_browser))
+    )
+
+
+def test_every_reply_kind_is_accepted_by_the_server(api, temp_case):
+    """כל אחד מארבעת המזהים מתקבל בפועל, ולא רק קיים ברשימה."""
+    from server.api_client import REPLY_KINDS
+
+    with cursor() as cur:
+        cur.execute("select client_id from cases where id = %s",
+                    (temp_case["case_id"],))
+        client_id = cur.fetchone()["client_id"]
+
+    csrf = client_login(api, client_id)
+    for kind in REPLY_KINDS:
+        r = api.post("/api/client/documents/%s/replies" % temp_case["document_id"],
+                     json={"kind": kind},
+                     headers={"X-CSRF-Token": csrf})
+        assert r.status_code == 200, "השרת דחה את סוג התגובה %s: %s" % (kind, r.text)

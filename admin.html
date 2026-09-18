@@ -6,8 +6,8 @@
 <title>ניהול תיקים | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="assets/css/style.css?v=20260917221519">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260917221519">
+<link rel="stylesheet" href="assets/css/style.css?v=20260918031922">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260918031922">
 </head>
 <body class="admin">
 
@@ -87,28 +87,81 @@
 
   <header class="topbar">
     <div class="topbar-in">
-      <div class="logo">
-      <span class="logo-mark" aria-hidden="true"></span>
-      <div class="logo-wm">
-        <b><span>Nahmani</span><span>Ben-Dahan</span></b>
-        <i>Law Office</i>
-        <span class="who" id="staffName"></span>
-      </div>
-    </div>
-  
-    <nav class="sitenav" aria-label="ניווט ראשי">
-      <ul>
-        <li><a href="admin.html">רשימת התיקים</a></li>
-        <li><a href="info.html">האתר הציבורי</a></li>
-      </ul>
-    </nav>
 
-    <div class="topbar-actions topbar-end">
-        <button type="button" class="btn btn-quiet" id="backBtn" hidden>חזרה לרשימת התיקים</button>
+      <!-- כפתור התפריט ראשון בסדר הקריאה, ולכן בצד ימין ב-RTL.
+           עד 18.09 לא היה כאן תפריט כלל, ומתחת ל-860px הממשק
+           נשאר בלי שום אמצעי ניווט. -->
+      <button type="button" class="hamburger" id="menuBtn"
+              aria-expanded="false" aria-controls="drawer">
+        <svg width="26" height="18" viewBox="0 0 26 18" fill="none" aria-hidden="true">
+          <path d="M1 1.5H25M1 9H25M1 16.5H25" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <span>תפריט</span>
+      </button>
+
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <div class="logo-wm">
+          <b><span>Nahmani</span><span>Ben-Dahan</span></b>
+          <i>Law Office</i>
+          <span class="who" id="staffName"></span>
+        </div>
+      </div>
+
+      <nav class="sitenav" aria-label="ניווט ראשי">
+        <ul>
+          <li><a href="#dashboard" data-view="dashboard">דשבורד</a></li>
+          <li><a href="#tasks" data-view="tasks">ניהול משימות</a></li>
+          <li><a href="#cases" data-view="cases">התיקים בטיפולי</a></li>
+          <li><a href="#closed" data-view="closed">הושלמו ושכר טרחה</a></li>
+          <li><a href="#documents" data-view="documents">מסמכים</a></li>
+          <li><a href="#clients" data-view="clients">לקוחות</a></li>
+          <li><a href="#reports" data-view="reports">דוחות</a></li>
+          <li><a href="#settings" data-view="settings">הגדרות</a></li>
+        </ul>
+      </nav>
+
+      <div class="topbar-actions topbar-end">
+        <button type="button" class="btn btn-quiet" id="backBtn" hidden>חזרה לתיקים</button>
         <button type="button" class="btn btn-quiet" id="staffLogout">יציאה</button>
       </div>
     </div>
   </header>
+
+  <!-- ===== התפריט הנשלף ===== -->
+  <div class="drawer-overlay" id="drawerOverlay" hidden></div>
+
+  <nav class="drawer" id="drawer" aria-label="תפריט ראשי" hidden>
+    <div class="drawer-head">
+      <span class="drawer-eyebrow">תפריט</span>
+      <button type="button" class="drawer-close" id="drawerClose" aria-label="סגירת התפריט">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <ul class="drawer-list">
+      <li><button type="button" class="drawer-link" data-view="dashboard"><span>דשבורד</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="tasks"><span>ניהול משימות</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="cases"><span>התיקים בטיפולי</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="closed"><span>תיקים שהושלמו ושכר טרחה</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="documents"><span>מסמכים</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="clients"><span>לקוחות</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="reports"><span>דוחות</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="settings"><span>הגדרות</span></button></li>
+    </ul>
+
+    <hr class="drawer-rule">
+
+    <ul class="drawer-list">
+      <li><a class="drawer-link" href="info.html">האתר הציבורי</a></li>
+    </ul>
+
+    <hr class="drawer-rule">
+
+    <button type="button" class="drawer-link drawer-out" id="drawerLogout">יציאה מהמערכת</button>
+  </nav>
 
   <main class="page band-in" id="main">
 
@@ -129,95 +182,220 @@
       ראה <code>docs/03</code>.
     </p>
 
-    <!-- ---- רשימת תיקים ---- -->
-    <section id="listView">
-      <h1>התיקים במשרד</h1>
-      <p class="lead" id="listSummary"></p>
+    <!-- ============ שמונת האזורים ============
+         כל אזור הוא .view שמתחלף ב-hidden. ארבעה מהם הם מצב
+         ריק מנוסח בשלב א' - הם ייבנו בשלבים ב'-ו'. -->
+    <div id="topLevel">
 
-      <!-- ---- דורש טיפול ---- -->
-      <div class="block attention-block">
-        <div class="attention-head">
-          <h2 id="attentionTitle">דורש טיפול</h2>
-          <p class="item-note" id="attentionScope"></p>
+      <!-- ---- דשבורד ---- -->
+      <div class="view" id="view-dashboard" hidden>
+        <h1 class="view-title" tabindex="-1">דשבורד</h1>
+        <p class="lead">תמונת מצב של העבודה, התיקים והגבייה.</p>
+        <div class="block">
+          <p class="item-note">
+            הדשבורד יציג תקציר של שלושת האזורים המרכזיים, וייבנה
+            אחרי שהם יושלמו. בינתיים אפשר לעבור ישירות ל<a href="#tasks" data-view="tasks">ניהול משימות</a>
+            או ל<a href="#cases" data-view="cases">תיקים בטיפולי</a>.
+          </p>
         </div>
+      </div>
 
-        <div class="chips" id="attentionChips" role="group"
-             aria-label="סינון לפי דחיפות"></div>
+      <!-- ---- ניהול משימות ---- -->
+      <div class="view" id="view-tasks" hidden>
+        <h1 class="view-title" tabindex="-1">ניהול משימות</h1>
+        <p class="lead">מסך העבודה היומי: כל משימות המשרד, לפי דחיפות.</p>
 
-        <div class="attention-filters">
-          <div class="field">
-            <label for="attentionAssignee">אחראי</label>
-            <select id="attentionAssignee">
-              <option value="">כל המשרד</option>
-            </select>
+        <div class="block attention-block">
+          <div class="attention-head">
+            <h2 id="attentionTitle">דורש טיפול</h2>
+            <p class="item-note" id="attentionScope"></p>
           </div>
-          <label class="check">
-            <input type="checkbox" id="attentionDone">
-            <span>כולל משימות שהושלמו</span>
-          </label>
+
+          <div class="chips" id="attentionChips" role="group"
+               aria-label="סינון לפי דחיפות"></div>
+
+          <div class="attention-filters">
+            <div class="field">
+              <label for="attentionAssignee">אחראי</label>
+              <select id="attentionAssignee">
+                <option value="">כל המשרד</option>
+              </select>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="attentionDone">
+              <span>כולל משימות שהושלמו</span>
+            </label>
+          </div>
+
+          <ul class="plain-list task-list" id="attentionList"></ul>
         </div>
-
-        <ul class="plain-list task-list" id="attentionList"></ul>
       </div>
 
-      <div class="block table-block">
-        <table class="cases">
-          <caption class="visually-hidden">רשימת תיקי הלקוחות במשרד</caption>
-          <thead>
-            <tr>
-              <th scope="col">לקוח</th>
-              <th scope="col">תיק</th>
-              <th scope="col">סוג התביעה</th>
-              <th scope="col">שלב נוכחי</th>
-              <th scope="col">ממתין לבדיקה</th>
-              <th scope="col">חסר ללקוח</th>
-              <th scope="col">פניות חדשות</th>
-              <th scope="col">חוסם שלב</th>
-              <th scope="col"><span class="visually-hidden">פעולה</span></th>
-            </tr>
-          </thead>
-          <tbody id="caseRows"></tbody>
-        </table>
+      <!-- ---- התיקים בטיפולי ---- -->
+      <div class="view" id="view-cases" hidden>
+        <h1 class="view-title" tabindex="-1">התיקים בטיפולי</h1>
+        <p class="lead" id="listSummary"></p>
+
+        <div class="block table-block">
+          <table class="cases">
+            <caption class="visually-hidden">רשימת תיקי הלקוחות במשרד</caption>
+            <thead>
+              <tr>
+                <th scope="col">לקוח</th>
+                <th scope="col">תיק</th>
+                <th scope="col">סוג התביעה</th>
+                <th scope="col">שלב נוכחי</th>
+                <th scope="col">ממתין לבדיקה</th>
+                <th scope="col">חסר ללקוח</th>
+                <th scope="col"><span class="visually-hidden">פעולה</span></th>
+              </tr>
+            </thead>
+            <tbody id="caseRows"></tbody>
+          </table>
+        </div>
       </div>
 
-      <section class="block" aria-labelledby="h-log">
-        <h2 id="h-log">יומן פעולות הצוות</h2>
-        <p class="item-note" id="logIntro"></p>
-        <ul class="plain-list" id="logList"></ul>
-      </section>
-    </section>
+      <!-- ---- תיקים שהושלמו ושכר טרחה ---- -->
+      <div class="view" id="view-closed" hidden>
+        <h1 class="view-title" tabindex="-1">תיקים שהושלמו ושכר טרחה</h1>
+        <p class="lead">תוצאת ההליך והמצב הכספי של כל תיק שהסתיים.</p>
+        <div class="block">
+          <p class="item-note">
+            האזור הזה דורש מנגנון סגירת תיק ומודל תוצאה ושכר טרחה,
+            והוא ייבנה בשלב ו'. כרגע אין במערכת נתיב לסגירת תיק.
+          </p>
+        </div>
+      </div>
 
-    <!-- ---- תיק בודד ---- -->
-    <section id="caseView" hidden>
+      <!-- ---- מסמכים ---- -->
+      <div class="view" id="view-documents" hidden>
+        <h1 class="view-title" tabindex="-1">מסמכים</h1>
+        <p class="lead">מבט רוחבי על מסמכי המשרד.</p>
+        <div class="block">
+          <p class="item-note">
+            הקלסר נבנה בשלב ד'. מסמכי תיק בודד זמינים כבר עכשיו
+            בתוך התיק, בלשונית "מסמכי התיק".
+          </p>
+        </div>
+      </div>
 
-      <h1 id="caseClient"></h1>
+      <!-- ---- לקוחות ---- -->
+      <div class="view" id="view-clients" hidden>
+        <h1 class="view-title" tabindex="-1">לקוחות</h1>
+        <p class="lead">רשימת הלקוחות של המשרד.</p>
+        <div class="block">
+          <p class="item-note">
+            ניהול לקוחות דורש נקודות קצה שטרם נבנו (יצירה, עריכה
+            ושינוי טלפון). נכנס בשלב ו'.
+          </p>
+        </div>
+      </div>
+
+      <!-- ---- דוחות ---- -->
+      <div class="view" id="view-reports" hidden>
+        <h1 class="view-title" tabindex="-1">דוחות</h1>
+        <p class="lead">יומן הפעולות של כל המשרד.</p>
+
+        <section class="block" aria-labelledby="h-firmlog">
+          <h2 id="h-firmlog">יומן פעולות הצוות</h2>
+          <p class="item-note" id="firmLogIntro"></p>
+          <ul class="plain-list" id="firmLogList"></ul>
+        </section>
+      </div>
+
+      <!-- ---- הגדרות ---- -->
+      <div class="view" id="view-settings" hidden>
+        <h1 class="view-title" tabindex="-1">הגדרות</h1>
+        <p class="lead">קטלוגים והגדרות המשרד.</p>
+        <div class="block">
+          <p class="item-note">
+            עריכת סוגי תביעה, מסלולי שלבים, קטלוג המסמכים וסוגי
+            המשימות - כולם יושבים כבר במסד וייחשפו כאן בשלב ו'.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============ סביבת העבודה של התיק ============
+         הכותרת וסרגל הלשוניות קבועים; רק אזור התוכן מתחלף.
+         מעבר בין לשוניות אינו מוציא את המשתמש מהתיק. -->
+    <div id="caseWorkspace" hidden>
+
+      <div class="case-head">
+        <h1 id="caseClient" tabindex="-1"></h1>
+        <dl class="case-facts" id="caseFacts"></dl>
+      </div>
+
+      <nav class="case-tabs" id="caseTabs" aria-label="ניווט בתוך התיק">
+        <ul>
+          <li><a href="#state" data-view="state">מצב התיק</a></li>
+          <li><a href="#comms" data-view="comms">דרישות ותקשורת</a></li>
+          <li><a href="#docs" data-view="docs">מסמכי התיק</a></li>
+          <li><a href="#committees" data-view="committees">ועדות, החלטות ומועדים</a></li>
+          <li><a href="#tasks" data-view="tasks">משימות</a></li>
+          <li><a href="#history" data-view="history">היסטוריה</a></li>
+        </ul>
+      </nav>
+
       <p class="lead" id="caseMeta"></p>
 
-      <div class="cols">
+      <!-- ============ 1. מצב התיק ============ -->
+      <div class="case-view" id="case-view-state" hidden>
+        <h2 class="view-title" tabindex="-1">מצב התיק</h2>
 
-        <div>
-          <!-- מצב טכני - חישוב דטרמיניסטי, לא AI -->
-          <section class="block gap-block" aria-labelledby="h-gap">
-            <h2 id="h-gap">מצב טכני</h2>
-            <div id="gapBody"></div>
-          </section>
+        <!-- מצב טכני - חישוב דטרמיניסטי, לא AI -->
+        <section class="block gap-block" aria-labelledby="h-gap">
+          <h3 id="h-gap">מצב טכני</h3>
+          <div id="gapBody"></div>
+        </section>
 
-          <!-- שלב -->
-          <section class="block" aria-labelledby="h-stage">
-            <h2 id="h-stage">שלב התביעה</h2>
-            <p class="item-note" id="stageNow"></p>
+        <!-- ניתוח מקצועי - עונה על "מה השלב הבא", ולכן כאן -->
+        <section class="block assist-block" aria-labelledby="h-assist">
+          <h3 id="h-assist">ניתוח מקצועי</h3>
+          <p class="assist-note">
+            חומר לשיקול דעתך בלבד - אינו ייעוץ משפטי או רפואי, ואינו נשלח ללקוח.
+            נשלחים לניתוח נתוני התיק בלבד, <strong>בלי שם, תעודת זהות או תוכן רפואי</strong>.
+          </p>
+
+          <div class="assist-actions">
+            <button type="button" class="btn btn-outline btn-sm" data-ask="next">מה השלב הבא בתיק</button>
+            <button type="button" class="btn btn-outline btn-sm" data-ask="say">מה כדאי לומר ללקוח</button>
+            <button type="button" class="btn btn-outline btn-sm" data-ask="medical">אילו השלמות רפואיות חסרות</button>
+          </div>
+
+          <div class="assist-log" id="assistLog" aria-live="polite"></div>
+
+          <form id="assistForm">
             <div class="field">
-              <label for="stageSelect">עדכון השלב הנוכחי</label>
-              <select id="stageSelect"></select>
+              <label for="assistInput">שאלה חופשית</label>
+              <textarea id="assistInput" rows="2" maxlength="1000"></textarea>
             </div>
-            <button type="button" class="btn btn-primary btn-sm" id="stageSave">שמירת השלב</button>
-          </section>
+            <button type="submit" class="btn btn-primary btn-sm" id="assistSend">שליחה לניתוח</button>
+          </form>
+        </section>
+      </div>
 
-          <!-- החלטת הוועדה -->
-          <section class="block" aria-labelledby="h-decision">
-            <h2 id="h-decision">החלטת הוועדה</h2>
-            <p class="item-note" id="decisionNow"></p>
-            <div class="alert alert-error" id="decError" role="alert" hidden></div>
+      <!-- ============ 4. ועדות, החלטות ומועדים ============ -->
+      <div class="case-view" id="case-view-committees" hidden>
+        <h2 class="view-title" tabindex="-1">ועדות, החלטות ומועדים</h2>
+
+        <!-- שלב -->
+        <section class="block" aria-labelledby="h-stage">
+          <h3 id="h-stage">שלב התביעה</h3>
+          <p class="item-note" id="stageNow"></p>
+          <div class="field">
+            <label for="stageSelect">עדכון השלב הנוכחי</label>
+            <select id="stageSelect"></select>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="stageSave">שמירת השלב</button>
+        </section>
+
+        <!-- החלטת הוועדה -->
+        <section class="block" aria-labelledby="h-decision">
+          <h3 id="h-decision">החלטת הוועדה</h3>
+          <p class="item-note" id="decisionNow"></p>
+          <div class="alert alert-error" id="decError" role="alert" hidden></div>
 
             <form id="decForm" novalidate>
               <div class="field">
@@ -248,12 +426,16 @@
               <button type="submit" class="btn btn-primary btn-sm">שמירת ההחלטה</button>
             </form>
 
-            <p class="demo-warning" id="rightsWarning"></p>
-          </section>
+        </section>
+      </div>
+
+      <!-- ============ 2. דרישות ותקשורת עם הלקוח ============ -->
+      <div class="case-view" id="case-view-comms" hidden>
+        <h2 class="view-title" tabindex="-1">דרישות ותקשורת עם הלקוח</h2>
 
           <!-- דרישת מסמך מהלקוח -->
           <section class="block" aria-labelledby="h-request">
-            <h2 id="h-request">דרישת מסמך מהלקוח</h2>
+            <h3 id="h-request">דרישת מסמך מהלקוח</h3>
             <div class="alert alert-error" id="reqError" role="alert" hidden></div>
 
             <form id="reqForm" novalidate>
@@ -282,22 +464,62 @@
             </form>
           </section>
 
-          <!-- מסמכים -->
-          <section class="block" aria-labelledby="h-review">
-            <h2 id="h-review">מסמכים</h2>
-            <p class="item-note" id="reviewIntro"></p>
-            <ul class="plain-list" id="reviewList"></ul>
+          <!-- פניות מהלקוח -->
+          <section class="block" aria-labelledby="h-replies">
+            <h3 id="h-replies">פניות מהלקוח</h3>
+            <ul class="plain-list" id="replyList"></ul>
           </section>
-        </div>
 
-        <div>
+          <!-- שליחת עדכון -->
+          <section class="block" aria-labelledby="h-send">
+            <h3 id="h-send">שליחת עדכון ללקוח</h3>
+            <div class="alert alert-error" id="msgError" role="alert" hidden></div>
+            <form id="msgForm" novalidate>
+              <div class="field">
+                <label for="msgTitle">כותרת</label>
+                <input type="text" id="msgTitle" maxlength="80" required>
+              </div>
+              <div class="field">
+                <label for="msgBody">תוכן ההודעה</label>
+                <textarea id="msgBody" rows="5" maxlength="600" required></textarea>
+              </div>
+              <label class="check">
+                <input type="checkbox" id="msgImportant">
+                <span>סימון כעדכון חשוב</span>
+              </label>
+              <button type="submit" class="btn btn-primary btn-sm">שליחה ללקוח</button>
+            </form>
+          </section>
+
+          <!-- עדכונים קיימים -->
+          <section class="block" aria-labelledby="h-sent">
+            <h3 id="h-sent">עדכונים שנשלחו</h3>
+            <ul class="plain-list" id="sentList"></ul>
+          </section>
+      </div>
+
+      <!-- ============ 3. מסמכי התיק ============ -->
+      <div class="case-view" id="case-view-docs" hidden>
+        <h2 class="view-title" tabindex="-1">מסמכי התיק</h2>
+
+        <section class="block" aria-labelledby="h-review">
+          <h3 id="h-review">מסמכים</h3>
+          <p class="item-note" id="reviewIntro"></p>
+          <ul class="plain-list" id="reviewList"></ul>
+        </section>
+      </div>
+
+      <!-- ============ 5. משימות ============ -->
+      <div class="case-view" id="case-view-tasks" hidden>
+        <h2 class="view-title" tabindex="-1">משימות</h2>
+
           <!-- משימות התיק -->
           <section class="block task-block" aria-labelledby="h-tasks">
-            <h2 id="h-tasks">משימות בתיק</h2>
+            <h3 id="h-tasks">משימות בתיק</h3>
             <p class="item-note" id="taskIntro"></p>
             <ul class="plain-list task-list" id="taskList"></ul>
 
-            <button type="button" class="btn btn-outline btn-small"
+            <button type="button" class="btn btn-outline btn-sm"
                     id="taskNew" aria-expanded="false">משימה חדשה</button>
 
             <form id="taskForm" class="task-form" hidden>
@@ -375,84 +597,35 @@
               </div>
 
               <div class="task-form-actions">
-                <button type="submit" class="btn btn-primary btn-small"
+                <button type="submit" class="btn btn-primary btn-sm"
                         id="taskSave">שמירה</button>
-                <button type="button" class="btn btn-outline btn-small"
+                <button type="button" class="btn btn-outline btn-sm"
                         id="taskCancel">ביטול</button>
               </div>
             </form>
           </section>
-
-          <!-- פניות מהלקוח -->
-          <section class="block" aria-labelledby="h-replies">
-            <h2 id="h-replies">פניות מהלקוח</h2>
-            <ul class="plain-list" id="replyList"></ul>
-          </section>
-
-          <!-- ניתוח מקצועי -->
-          <section class="block assist-block" aria-labelledby="h-assist">
-            <h2 id="h-assist">ניתוח מקצועי</h2>
-
-            <p class="assist-note">
-              חומר לשיקול דעתך בלבד - אינו ייעוץ משפטי או רפואי, ואינו נשלח ללקוח.
-              נשלחים לניתוח נתוני התיק בלבד, <strong>בלי שם, תעודת זהות או תוכן רפואי</strong>.
-            </p>
-
-            <div class="assist-actions">
-              <button type="button" class="btn btn-outline btn-sm" data-ask="next">מה השלב הבא בתיק</button>
-              <button type="button" class="btn btn-outline btn-sm" data-ask="say">מה כדאי לומר ללקוח</button>
-              <button type="button" class="btn btn-outline btn-sm" data-ask="medical">אילו השלמות רפואיות חסרות</button>
-            </div>
-
-            <div class="assist-log" id="assistLog" aria-live="polite"></div>
-
-            <form id="assistForm" novalidate>
-              <div class="field">
-                <label for="assistInput" class="visually-hidden">שאלה מקצועית</label>
-                <textarea id="assistInput" rows="2" maxlength="1000"
-                          placeholder="או שאל שאלה משלך על התיק..."></textarea>
-              </div>
-              <button type="submit" class="btn btn-primary btn-sm" id="assistSend">שליחה</button>
-            </form>
-          </section>
-
-          <!-- שליחת עדכון -->
-          <section class="block" aria-labelledby="h-send">
-            <h2 id="h-send">שליחת עדכון ללקוח</h2>
-            <div class="alert alert-error" id="msgError" role="alert" hidden></div>
-            <form id="msgForm" novalidate>
-              <div class="field">
-                <label for="msgTitle">כותרת</label>
-                <input type="text" id="msgTitle" maxlength="80" required>
-              </div>
-              <div class="field">
-                <label for="msgBody">תוכן ההודעה</label>
-                <textarea id="msgBody" rows="5" maxlength="600" required></textarea>
-              </div>
-              <label class="check">
-                <input type="checkbox" id="msgImportant">
-                <span>סימון כעדכון חשוב</span>
-              </label>
-              <button type="submit" class="btn btn-primary btn-sm">שליחה ללקוח</button>
-            </form>
-          </section>
-
-          <!-- עדכונים קיימים -->
-          <section class="block" aria-labelledby="h-sent">
-            <h2 id="h-sent">עדכונים שנשלחו</h2>
-            <ul class="plain-list" id="sentList"></ul>
-          </section>
-        </div>
-
       </div>
-    </section>
+
+      <!-- ============ 6. היסטוריה ============ -->
+      <div class="case-view" id="case-view-history" hidden>
+        <h2 class="view-title" tabindex="-1">היסטוריה</h2>
+
+        <section class="block" aria-labelledby="h-log">
+          <h3 id="h-log">יומן הפעולות בתיק</h3>
+          <p class="item-note" id="logIntro"></p>
+          <ul class="plain-list" id="logList"></ul>
+        </section>
+      </div>
+
+    </div>
 
   </main>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260917221519"></script>
-<script src="assets/js/admin.js?v=20260917221519"></script>
+<script src="assets/js/api.js?v=20260918031922"></script>
+<script src="assets/js/viewnav.js?v=20260918031922"></script>
+<script src="assets/js/admin.js?v=20260918031922"></script>
 </body>
 </html>

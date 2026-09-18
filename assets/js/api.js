@@ -94,6 +94,10 @@
     get:  function (path, options) { return request('GET', path, undefined, options); },
     post: function (path, body, options) { return request('POST', path, body, options); },
 
+    /* חשוף עבור בקשה שאינה יכולה לעבור דרך request() - כרגע רק
+       הניתוח המקצועי, שקורא את התשובה כזרם. */
+    csrfToken: function () { return readCookie(CSRF_COOKIE); },
+
     // ---- זהות ----
     me: function (options) { return Api.get('/api/me', options); },
 
