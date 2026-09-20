@@ -25,6 +25,10 @@
    */
   function create(options) {
     var views    = options.views;
+    /* focusTitle: false - אל תעביר מיקוד לכותרת התצוגה. משמש
+       כשהכותרת מוסתרת חזותית ומי שלחץ כבר מחזיק את המיקוד על
+       הפריט שנלחץ; העברה לכותרת מוסתרת מעלימה את סימון המיקוד. */
+    var focusTitle = options.focusTitle !== false;
     var titleSel = options.titleSel || '.view-title';
     var fallback = options.fallback || Object.keys(views)[0];
     var announce = options.announce ? document.getElementById(options.announce) : null;
@@ -60,7 +64,7 @@
         announce.textContent = 'נפתח: ' + views[name].title;
       }
 
-      if (moveFocus) {
+      if (moveFocus && focusTitle) {
         var host = document.getElementById(views[name].el);
         var head = host && host.querySelector(titleSel);
         if (head) head.focus();

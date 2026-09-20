@@ -192,9 +192,48 @@ body.admin select { cursor: pointer; }
    ב-hidden, ומתחת ל-860px גם ה-.sitenav נעלם ולא נשאר כלום.
    ========================================================== */
 
-/* התפריט האופקי צר מדי לשמונה פריטים בגודל המלא */
-body.admin .sitenav ul { gap: 0 14px; }
-body.admin .sitenav a { font-size: 14.5px; }
+/* ---- הסרגל העליון: קומפקטי ----
+   הסרגל נדבק לראש המסך, ולכן כל פיקסל שלו נגרע מאזור העבודה
+   בכל גלילה. באזור הלקוח הוא נשאר גדול; כאן הקהל מיומן. */
+body.admin .topbar { padding: 0 20px; }
+body.admin .topbar-in { min-height: 52px; gap: 8px 12px; }
+body.admin .logo { gap: 9px; }
+body.admin .logo-mark { width: 32px; height: 20px; }
+body.admin .logo-wm b { font-size: 12.5px; letter-spacing: .1em; line-height: 1.1; }
+/* שתי המילים זו לצד זו במקום זו מעל זו - חוסך שורה שלמה */
+body.admin .logo-wm b span { display: inline; }
+body.admin .logo-wm b span + span::before { content: " "; }
+/* "Law Office" דקורטיבי בלבד ואינו נושא מידע לצוות */
+body.admin .logo-wm i { display: none; }
+body.admin .logo-wm .who {
+  display: inline-block; margin-top: 1px;
+  font-size: 12.5px; max-width: 30ch;
+}
+/* הסרגל הנמוך יותר מוריד גם את מרווח העוגן */
+body.admin :target, body.admin [id] { scroll-margin-top: 66px; }
+
+/* שמונה פריטים, לוגו ושני כפתורים הסתכמו ב-1263px מול 1180
+   זמינים, והסרגל נשבר לשלוש שורות - 93px במקום 52. הצמצום כאן
+   הוא מה שמחזיר אותו לשורה אחת. */
+body.admin .sitenav ul { gap: 0 9px; padding: 0; }
+body.admin .sitenav a { font-size: 13.5px; padding-block: 7px; }
+body.admin .sitenav li + li::before { margin: 0 4px; }
+/* 42px הוא סף מטרת המגע של ממשק הניהול. החיסכון בגובה הסרגל
+   בא מהריפוד ומהטיפוגרפיה, לא מהקטנת שטח הלחיצה. */
+body.admin .topbar-actions { gap: 6px; }
+body.admin .topbar-actions .btn { min-height: 42px; padding: 5px 11px; font-size: 13.5px; }
+
+/* ---- אזהרת ההדגמה: שורה דקה ----
+   היא לא אמורה לדחוף את תוכן התיק מטה בכל מסך. */
+body.admin .demo-warning {
+  border-width: 1px;
+  border-inline-start-width: 4px;
+  padding: 6px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+body.admin .demo-warning code { padding: 0 5px; font-size: 12px; }
 
 /* כותרות שיושבות על הקנבס הכהה.
    הכלל ב-style.css הוא `.page > section > h1` - צאצא ישיר בלבד,
@@ -208,47 +247,62 @@ body.admin .sitenav a { font-size: 14.5px; }
 
 /* הכותרת הקבועה של התיק. נשארת זהה בכל שש הלשוניות, כדי
    שהמעבר ביניהן לא ירגיש כמו יציאה מהתיק. */
-.case-head { margin: 0 0 14px; }
-.case-head h1 { margin: 0 0 10px; }
-.case-head h1:focus-visible { outline: var(--focus); outline-offset: 6px; }
+.case-head {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 4px 18px; margin: 0 0 10px;
+}
+body.admin .case-head h1 { margin: 0; font-size: 22px; }
+.case-head h1:focus-visible { outline: var(--focus); outline-offset: 4px; }
 
+/* הפרטים בשורה אחת לצד השם, לא בכרטיס נפרד מתחתיו.
+   כל זוג הוא "תווית: ערך" באותה שורה - שתי שורות לכל פרט
+   הכפילו את גובה האזור בלי להוסיף מידע. */
 .case-facts {
-  display: flex; flex-wrap: wrap; gap: 8px 26px;
-  margin: 0; padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-inline-start: 4px solid var(--bronze);
+  display: flex; flex-wrap: wrap; gap: 2px 16px;
+  margin: 0; padding: 0; font-size: 13.5px;
 }
-.case-fact dt {
-  font-size: 13px; font-weight: 700; color: var(--text-soft);
-  letter-spacing: .04em; margin: 0 0 2px;
-}
-.case-fact dd { margin: 0; font-weight: 700; }
+.case-fact { display: flex; align-items: baseline; gap: 5px; }
+.case-fact dt { color: var(--on-bg-dim); }        /* 7.89:1 על הקנבס */
+.case-fact dd { margin: 0; font-weight: 700; color: var(--on-bg); }
 .case-fact dd.num { direction: ltr; unicode-bidi: plaintext; white-space: nowrap; }
+/* מפריד עדין בין הפרטים, דקורטיבי בלבד */
+.case-fact + .case-fact::before {
+  content: "·"; color: var(--on-bg-dim); margin-inline-end: 11px;
+}
 
 /* סרגל הלשוניות. הלשונית הפעילה מסומנת גם במילוי וגם בקו
    תחתון עבה - לא בצבע בלבד, ו-aria-current נושא את אותו מידע. */
-.case-tabs { margin: 0 0 20px; border-bottom: 2px solid var(--border); }
+.case-tabs { margin: 0 0 18px; border-bottom: 2px solid #4a443a; }
 .case-tabs ul {
-  display: flex; flex-wrap: wrap; gap: 2px;
+  display: flex; flex-wrap: wrap; gap: 3px;
   list-style: none; margin: 0; padding: 0;
 }
 .case-tabs a {
   display: block; min-height: 42px;
   padding: 10px 16px;
-  font-size: 15px; font-weight: 700;
+  font-size: 15px; font-weight: 600;
   /* הסרגל יושב על הקנבס הכהה ולא על משטח לבן, ולכן --on-bg-dim
      (7.89:1) ולא --text-soft, שנמדד כאן 2.11:1 - כהה על כהה. */
   color: var(--on-bg-dim); text-decoration: none;
+  /* מילוי עדין נותן לכל לשונית גוף משלה, כך שהשש נקראות כקבוצה
+     של פריטים נפרדים ולא כרצף מילים. #35302a - 1.32:1 מול הקנבס,
+     הפרש עדין במכוון; הוא מפריד צורה ואינו נושא מידע. */
+  background: #35302a;
   border: 2px solid transparent; border-bottom: 0;
   margin-bottom: -2px;
 }
-.case-tabs a:hover { color: var(--text); background: var(--accent-soft); }
+.case-tabs a:hover {
+  color: var(--on-bg); background: #45403a;
+}
+/* הלשונית הפעילה מסומנת בארבעה ערוצים ולא בצבע בלבד: משטח לבן
+   במקום כהה, טקסט כהה, קו ברונזה עבה מתחתיה, ומשקל גופן כבד.
+   aria-current נושא את אותו מידע לקורא מסך. */
 .case-tabs a[aria-current="page"] {
-  color: var(--text);
+  color: var(--text); font-weight: 700;
   background: var(--surface);
   border-color: var(--border);
   border-bottom: 4px solid var(--bronze);
+  margin-bottom: -4px;
 }
 
 /* כותרת הלשונית מוסתרת חזותית: סרגל הלשוניות כבר אומר איפה
@@ -258,18 +312,31 @@ body.admin .sitenav a { font-size: 14.5px; }
   margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.case-view > .view-title:focus-visible {
-  position: static; width: auto; height: auto;
-  margin: 0 0 12px; clip: auto; overflow: visible;
-  outline: var(--focus); outline-offset: 4px;
-}
+/* אין כאן כלל :focus-visible שחושף אותה: המיקוד אינו עובר
+   לכותרת הזו (focusTitle:false ב-admin.js), והחשיפה הקודמת
+   הציגה אותה כהה על כהה מתחת לסרגל הלשוניות. */
+
+/* #caseMeta נושא רק הודעת שגיאת טעינה. ריק - אינו תופס מקום. */
+#caseMeta:empty { display: none; }
+body.admin #caseMeta { margin: 0 0 12px; }
 
 /* מצב ריק מנוסח, לאזורים שייבנו בשלבים הבאים */
 .view > .block > .item-note { margin: 0; }
 
+/* שמונה פריטים, לוגו ושני כפתורים דורשים ~1025px. מתחת ל-1100
+   הסרגל היה נשבר לשתי שורות והופך ל-99px גובה במקום 52. במקום
+   לדחוס עוד, עוברים למגירה - היא כבר קיימת ועובדת.
+   הכלל הבסיסי מסתיר את ההמבורגר מעל 861px, ולכן נדרשת הכרזה
+   מפורשת יותר כאן. */
+@media (max-width: 1140px) {
+  body.admin .sitenav  { display: none; }
+  body.admin .hamburger { display: inline-flex; }
+}
+
 @media (max-width: 700px) {
   .case-tabs a { padding: 10px 12px; font-size: 14px; }
-  .case-facts { gap: 8px 18px; }
+  .case-facts { gap: 2px 12px; }
+  .case-fact + .case-fact::before { margin-inline-end: 7px; }
 }
 
 
@@ -287,25 +354,55 @@ body.admin .sitenav a { font-size: 14.5px; }
    ========================================================== */
 
 /* ---- באנר המועדים הקריטיים ---- */
+/* ---- באנר המועדים: שורה אחת שנפתחת ----
+   הוא מופיע בכל מסך, ולכן במצב סגור הוא חייב להיות שורה ולא
+   בלוק. הפרטים נפתחים בלחיצה ונשארים פתוחים עד שסוגרים. */
 .deadline-banner {
   background: var(--stop-soft);
-  border: 2px solid #7d1414;
-  border-inline-start-width: 7px;
+  border: 1px solid #7d1414;
+  border-inline-start-width: 5px;
   border-radius: 0;
-  padding: 14px 16px;
-  margin: 0 0 18px;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.banner-bar {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 4px 10px; padding: 7px 12px;
 }
 .banner-lead {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
-  margin: 0; font-size: 17px; font-weight: 700; color: #7d1414;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  margin: 0; flex: 1 1 auto; min-width: 0;
+  font-size: 14.5px; font-weight: 700; color: #7d1414;
 }
-.banner-lead .banner-mark { font-size: 20px; line-height: 1; }
-.banner-text { color: var(--text); font-weight: 700; }
+.banner-lead .banner-mark { font-size: 16px; line-height: 1; }
+.banner-text { color: var(--text); font-weight: 600; }
 .banner-when { color: #7d1414; white-space: nowrap; }
-.banner-more { margin: 10px 0 0; font-size: 15px; }
-.banner-more ul { margin: 6px 0 0; padding-inline-start: 20px; }
+
+/* כפתור ההרחבה. הסמל דקורטיבי; המילים הן המידע. */
+.banner-toggle {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 42px; padding: 4px 12px;
+  font: inherit; font-size: 13.5px; font-weight: 700;
+  color: #7d1414; background: transparent;
+  border: 2px solid #7d1414; border-radius: 0;
+  cursor: pointer;
+}
+.banner-toggle:hover { background: #f7dcdc; }   /* #7d1414 עליו 8.8:1 */
+.banner-toggle .caret { font-size: 11px; line-height: 1; }
+.banner-toggle[aria-expanded="true"] .caret { transform: rotate(180deg); }
+
+.banner-details {
+  padding: 0 12px 10px;
+  border-top: 1px solid rgba(125, 20, 20, .28);
+  margin-top: 2px; padding-top: 10px;
+}
+.banner-details[hidden] { display: none; }
+.banner-more { margin: 0; font-size: 14px; }
+.banner-more ul { margin: 5px 0 0; padding-inline-start: 20px; }
 .banner-more li { margin: 0 0 3px; }
-.banner-go { margin: 12px 0 0; }
+.banner-go { margin: 10px 0 0; }
 
 /* ---- אזור "דורש טיפול" ---- */
 .attention-block { border-inline-start: 5px solid var(--bronze); }

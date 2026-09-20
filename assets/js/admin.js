@@ -133,15 +133,20 @@
     views: CASE_VIEWS,
     links: '.case-tabs a[data-view]',
     announce: 'adminAnnounce',
-    titleSel: '.view-title',
+    /* הכותרת בתוך לשונית מוסתרת חזותית, ולכן המיקוד נשאר על
+       הלשונית שנלחצה. ההכרזה היא מה שמוסר את המידע לקורא מסך. */
+    focusTitle: false,
     fallback: 'state',
     onShow: function (name) {
       if (openId) setHash('cases/' + openId + '/' + name);
     }
   });
 
-  /** כל אזור טוען את מה ששייך לו, ורק כשנכנסים אליו. */
+  /** כל אזור טוען את מה ששייך לו, ורק כשנכנסים אליו.
+      הבאנר הוא היוצא מן הכלל: הוא נטען בכל אזור, כי מועד
+      קריטי לא אמור להיעלם רק כי עברת למסך אחר. */
   function loadTopView(name) {
+    if (name !== 'tasks') loadBanner();
     if (name === 'cases')   return showList();
     if (name === 'tasks')   return loadAttention();
     if (name === 'reports') return renderLog(null, 'firmLogList');
@@ -437,6 +442,9 @@
       ['סטטוס',      file.status || 'פעיל'],
       ['אחראי',      file.assignee || 'לא שויך']
     ];
+    /* הסניף נשאר מחוץ לכותרת הקבועה במכוון: הוא הוסיף שורה
+       שלישית לפרטים ואינו נדרש בכל לשונית. הוא מופיע בפרטי
+       התיק עצמם. */
     var dl = $('caseFacts');
     dl.textContent = '';
     facts.forEach(function (f) {
@@ -456,9 +464,9 @@
       $('caseClient').textContent = file.clientName;
       renderCaseHead(file);
 
-      $('caseMeta').textContent =
-        'תיק ' + file.caseNumber + ' · ' + file.claimType +
-        (file.branch ? ' · ' + file.branch : '');
+      /* הפרטים יושבים בכותרת הקבועה. #caseMeta נשאר ריק בהצלחה
+         ומשמש רק להודעת שגיאה, ולכן הוא מוסתר כשהוא ריק. */
+      $('caseMeta').textContent = '';
 
       renderStage(file);
       renderDecisionForm(file);
@@ -934,6 +942,7 @@
       match: function (t) { return t.isOverdue; } }
   ];
 
+  var bannerOpen  = false;  /* הבאנר נפתח בלחיצה ונשאר פתוח */
   var attention   = null;   /* התשובה האחרונה מהשרת */
   var chipFilter  = null;   /* השבב הנבחר, או null */
   var taskCatalog = null;   /* סוגי המשימות, נטענים פעם אחת */
@@ -1110,6 +1119,10 @@
        החלקים מופרדים ב-"·" ולא נתפרים למשפט אחד, כי כותרת
        משימה היא טקסט חופשי שהצוות מקליד ולא בהכרח נסמכת. */
     var top = items[0];
+
+    /* השורה הסגורה: מה הכי דחוף וכמה יש. הבאנר מופיע בכל מסך,
+       ולכן במצב סגור הוא שורה ולא בלוק. */
+    var bar  = el('div', 'banner-bar');
     var lead = el('p', 'banner-lead');
     lead.appendChild(el('span', 'banner-mark',
                         top.isOverdue ? '✗' : '!', true));
@@ -1117,11 +1130,37 @@
       top.isOverdue ? 'באיחור' : 'דחוף'));
     lead.appendChild(el('span', 'banner-when', '— ' + timeLeft(top)));
     lead.appendChild(el('span', 'banner-text', '· ' + top.title));
-    lead.appendChild(el('span', 'banner-text', '· בתיק ' + top.clientName));
-    body.appendChild(lead);
+    lead.appendChild(el('span', 'banner-text', '· ' + top.clientName));
+    bar.appendChild(lead);
+
+    var details = el('div', 'banner-details');
+    details.id = 'bannerDetails';
+    details.hidden = !bannerOpen;
+
+    var toggle = el('button', 'banner-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', String(bannerOpen));
+    toggle.setAttribute('aria-controls', 'bannerDetails');
+    var label = items.length === 1
+      ? 'פרטים'
+      : 'עוד ' + (items.length - 1);
+    toggle.appendChild(document.createTextNode(
+      (bannerOpen ? 'סגירה' : label)));
+    toggle.appendChild(el('span', 'caret', '▾', true));
+    toggle.addEventListener('click', function () {
+      bannerOpen = !bannerOpen;
+      renderBanner(items);
+      /* הכפתור נבנה מחדש, ולכן המיקוד מוחזר אליו במפורש -
+         אחרת הפעלה מהמקלדת הייתה נזרקת ל-body. */
+      var again = document.querySelector('.banner-toggle');
+      if (again) again.focus();
+      announce(bannerOpen ? 'פרטי המועדים נפתחו.' : 'פרטי המועדים נסגרו.');
+    });
+    bar.appendChild(toggle);
+    body.appendChild(bar);
 
     if (top.isLegalDeadline) {
-      body.appendChild(el('p', 'task-legal-note',
+      details.appendChild(el('p', 'task-legal-note',
         'מועד משפטי מחייב · מקור: ' + (top.deadlineSource || '-')));
     }
 
@@ -1136,7 +1175,7 @@
           timeLeft(t) + ' · ' + t.title + ' · ' + t.clientName));
       });
       more.appendChild(ul);
-      body.appendChild(more);
+      details.appendChild(more);
     }
 
     var go = el('div', 'banner-go');
@@ -1145,7 +1184,9 @@
     btn.setAttribute('aria-label', 'פתיחת התיק של ' + top.clientName);
     btn.addEventListener('click', function () { openCase(top.caseId); });
     go.appendChild(btn);
-    body.appendChild(go);
+    details.appendChild(go);
+
+    body.appendChild(details);
   }
 
   /* ---- שורת משימה ---- */
