@@ -6,8 +6,8 @@
 <title>ניהול תיקים | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="assets/css/style.css?v=20260920044010">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260920044010">
+<link rel="stylesheet" href="assets/css/style.css?v=20260920052759">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260920052759">
 </head>
 <body class="admin">
 
@@ -344,10 +344,23 @@
       <div class="case-view" id="case-view-state" hidden>
         <h2 class="view-title" tabindex="-1">מצב התיק</h2>
 
-        <!-- מצב טכני - חישוב דטרמיניסטי, לא AI -->
-        <section class="block gap-block" aria-labelledby="h-gap">
-          <h3 id="h-gap">מצב טכני</h3>
+        <!-- שלוש שורות: איפה התיק, מה הבא, ומה דורש תשומת לב.
+             חישוב דטרמיניסטי מהנתונים הקיימים, לא AI. -->
+        <section class="block state-block" aria-labelledby="h-state">
+          <h3 id="h-state" class="visually-hidden">תמונת מצב</h3>
           <div id="gapBody"></div>
+        </section>
+
+        <!-- שלושה דברים נפרדים, ובמכוון לא שדה אחד:
+             שלב בתביעה · משימה משרדית · מועד משפטי מחייב. -->
+        <section class="block" aria-labelledby="h-next">
+          <h3 id="h-next">מה הלאה</h3>
+          <div class="next-grid" id="nextBody"></div>
+        </section>
+
+        <section class="block" aria-labelledby="h-attn">
+          <h3 id="h-attn">דורש תשומת לב<span id="attnCount"></span></h3>
+          <ul class="plain-list attn-list" id="attnBody"></ul>
         </section>
 
         <!-- ניתוח מקצועי - עונה על "מה השלב הבא", ולכן כאן -->
@@ -517,6 +530,19 @@
           <section class="block task-block" aria-labelledby="h-tasks">
             <h3 id="h-tasks">משימות בתיק</h3>
             <p class="item-note" id="taskIntro"></p>
+
+            <div class="chips" id="taskChips" role="group"
+                 aria-label="סינון משימות התיק"></div>
+
+            <div class="attention-filters">
+              <div class="field">
+                <label for="taskFilterAssignee">אחראי</label>
+                <select id="taskFilterAssignee">
+                  <option value="">כל הצוות</option>
+                </select>
+              </div>
+            </div>
+
             <ul class="plain-list task-list" id="taskList"></ul>
 
             <button type="button" class="btn btn-outline btn-sm"
@@ -624,8 +650,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260920044010"></script>
-<script src="assets/js/viewnav.js?v=20260920044010"></script>
-<script src="assets/js/admin.js?v=20260920044010"></script>
+<script src="assets/js/api.js?v=20260920052759"></script>
+<script src="assets/js/viewnav.js?v=20260920052759"></script>
+<script src="assets/js/admin.js?v=20260920052759"></script>
 </body>
 </html>

@@ -307,9 +307,81 @@
     'office.task_completed':        'הושלמה משימה',
     'office.task_reopened':         'נפתחה משימה מחדש',
     'office.task_deadline_changed': 'הוזז מועד יעד',
+    /* אלה מופיעות רק ביומן כלל-המשרד; לתיק אין להן case_id. */
+    'staff.login_success':       'כניסת צוות למערכת',
+    'staff.login_failed':        'ניסיון כניסה שנכשל',
+    'client.login_success':      'הלקוח נכנס לאזור האישי',
+    'client.login_failed':       'ניסיון כניסה של לקוח שנכשל',
+    'client.otp_requested':      'נשלח קוד כניסה ללקוח',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
+  /** ניסוח אנושי לפעולה, מועשר מה-metadata שכבר חוזר מהשרת. */
+  var DESCRIBE = {
+    'office.stage_changed': function (m) {
+      return 'עודכן שלב התיק' + (m.to_stage ? ' לשלב ' + m.to_stage : '');
+    },
+    'office.document_reviewed': function (m) {
+      if (m.decision === 'approve') return 'מסמך אושר';
+      if (m.decision === 'reject')  return 'מסמך נדחה' +
+        (m.reason_given ? ' עם סיבה שנשלחה ללקוח' : '');
+      return 'מסמך נבדק';
+    },
+    'office.decision_recorded': function (m) {
+      var by = { 'grant': 'מענק חד-פעמי', 'pension': 'קצבה חודשית',
+                 'rejected': 'דחייה', 'below-threshold': 'מתחת לסף' };
+      return 'נרשמה החלטת ועדה' + (by[m.outcome] ? ' · ' + by[m.outcome] : '');
+    },
+    'office.task_updated': function (m) {
+      if (m.due_changed) return 'משימה עודכנה, כולל שינוי מועד היעד';
+      if (m.assignee_changed) return 'משימה עודכנה, כולל החלפת אחראי';
+      return 'משימה עודכנה';
+    },
+    'office.task_deadline_changed': function (m) {
+      return (m.is_legal_deadline ? 'מועד משפטי מחייב הוזז' : 'מועד יעד של משימה הוזז');
+    },
+    'office.task_created': function (m) {
+      return m.is_legal_deadline ? 'נוצר מועד משפטי מחייב' : 'נוצרה משימה חדשה';
+    }
+  };
+
+  /* ניסוח כללי ובטוח לכל מה שאין לו תיאור. מפתח טכני לעולם
+     אינו מוצג למשתמש. */
+  var FALLBACK_BY_SURFACE = {
+    'office': 'פעולה של המשרד בתיק',
+    'client': 'פעולה של הלקוח',
+    'staff':  'פעולה של הצוות במערכת'
+  };
+
+  function describe(entry) {
+    var meta = entry.metadata || {};
+    if (DESCRIBE[entry.action]) return DESCRIBE[entry.action](meta);
+    if (ACTION_LABELS[entry.action]) return ACTION_LABELS[entry.action];
+    var surface = String(entry.action || '').split('.')[0];
+    return FALLBACK_BY_SURFACE[surface] || 'פעולה במערכת';
+  }
+
+  /** 18.09.2026 -> "היום" / "אתמול" / התאריך */
+  function dayLabel(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+
+    var that = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var diff = Math.round((that - today) / 86400000);
+
+    if (diff === 0)  return 'היום';
+    if (diff === -1) return 'אתמול';
+    return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
+  }
+
+  function clockOf(iso) {
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? ''
+      : pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
   function renderLog(caseId, listId) {
     var list = $(listId || 'logList');
     if (!list) return Promise.resolve();
@@ -319,12 +391,19 @@
         list.appendChild(el('li', 'item-note', 'אין עדיין פעולות רשומות.'));
         return;
       }
+      var lastDay = null;
       data.entries.forEach(function (entry) {
-        var li = el('li');
-        li.appendChild(el('h3', null,
-          ACTION_LABELS[entry.action] || entry.action));
-        li.appendChild(el('p', 'item-note',
-          (entry.actor || 'המערכת') + ' · ' + stamp(entry.at)));
+        var day = dayLabel(entry.at);
+        if (day !== lastDay) {
+          list.appendChild(el('li', 'log-day', day));
+          lastDay = day;
+        }
+        var li = el('li', 'log-row');
+        li.appendChild(el('span', 'log-clock num', clockOf(entry.at)));
+        var body = el('div', 'log-body');
+        body.appendChild(el('p', 'log-what', describe(entry)));
+        body.appendChild(el('p', 'item-note', entry.actor || 'המערכת'));
+        li.appendChild(body);
         list.appendChild(li);
       });
     }).catch(function () {
@@ -405,8 +484,8 @@
 
     /* הניתוח שייך לתיק - אסור שיישאר על המסך כשעוברים לתיק אחר */
     assistHistory = [];
-    $('assistLog').textContent = '';
     $('assistInput').value = '';
+    assistEmptyState();
 
     $('topLevel').hidden     = true;
     $('caseWorkspace').hidden = false;
@@ -432,6 +511,15 @@
 
   $('backBtn').addEventListener('click', closeCase);
 
+  /* ארבעת מצבי התיק שבאילוץ CHECK על cases.status. הערך הגולמי
+     לעולם אינו מוצג למשתמש. */
+  var CASE_STATUS = {
+    'active':          'פעיל',
+    'closed_accepted': 'הסתיים בקבלה',
+    'closed_rejected': 'הסתיים בדחייה',
+    'frozen':          'מוקפא'
+  };
+
   /** הכותרת הקבועה של התיק - נשארת זהה בכל שש הלשוניות. */
   function renderCaseHead(file) {
     var facts = [
@@ -439,7 +527,7 @@
       ['סוג התביעה', file.claimType],
       ['שלב נוכחי',  (file.currentStage || '-') +
                      (file.stageTitle ? ' · ' + file.stageTitle : '')],
-      ['סטטוס',      file.status || 'פעיל'],
+      ['סטטוס',      CASE_STATUS[file.status] || 'לא ידוע'],
       ['אחראי',      file.assignee || 'לא שויך']
     ];
     /* הסניף נשאר מחוץ לכותרת הקבועה במכוון: הוא הוסיף שורה
@@ -454,6 +542,184 @@
       dl.appendChild(wrap);
     });
   }
+
+  /* ================= מצב התיק =================
+     מסך שאפשר להבין ממנו את התיק בשניות. הוא אינו מחזיק נתון
+     משלו: הכול נגזר מ-currentCase וממשימות התיק שכבר נטענו.
+     מה שכבר בכותרת הקבועה אינו חוזר כאן. */
+
+  var TASK_STATUS_LABEL = {
+    'open': 'פתוחה', 'in_progress': 'בטיפול',
+    'waiting_client': 'ממתין ללקוח'
+  };
+
+  /** המשימות הפתוחות של התיק, ממוינות כפי שהשרת החזיר. */
+  function openTasksOf(tasks) {
+    return (tasks || []).filter(function (t) {
+      return t.status !== 'done' && t.status !== 'cancelled';
+    });
+  }
+
+  function renderCaseState(file, tasks) {
+    var open = openTasksOf(tasks);
+
+    /* ---- שורה אחת: איפה התיק עומד ---- */
+    var host = $('gapBody');
+    host.textContent = '';
+
+    var stage = el('p', 'state-line');
+    if (file.currentStage) {
+      stage.appendChild(el('span', 'state-num',
+        pad2(file.currentStage) + '/' + pad2(file.totalStages || 8), true));
+      stage.appendChild(el('span', 'state-stage', file.stageTitle || ''));
+      if (file.stageEnteredAt) {
+        stage.appendChild(el('span', 'state-since',
+          'בשלב הזה מאז ' + stamp(file.stageEnteredAt).split(' בשעה')[0]));
+      }
+      if (file.isTerminal) {
+        stage.appendChild(statusTag({ tag: 'tag-ok', mark: '✓',
+                                      text: 'שלב מסיים' }));
+      }
+    } else {
+      stage.appendChild(el('span', 'state-stage', 'טרם נרשם שלב בתיק.'));
+    }
+    host.appendChild(stage);
+
+    /* ---- מה הלאה: שלושה דברים נפרדים ---- */
+    var next = $('nextBody');
+    next.textContent = '';
+
+    /* 1. השלב הבא במסלול התביעה. */
+    var options = file.stageOptions || [];
+    var upcoming = null;
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].position === (file.currentStage || 0) + 1) upcoming = options[i];
+    }
+    next.appendChild(nextCard('שלב בתביעה',
+      file.isTerminal ? 'התיק הגיע לשלב המסיים.'
+                      : (upcoming ? upcoming.title : 'אין שלב נוסף במסלול.'),
+      null));
+
+    /* 2. המשימה המשרדית הקרובה - מה שהמשרד צריך לעשות. */
+    var task = null;
+    open.forEach(function (t) {
+      if (!t.isLegalDeadline && (!task || t.dueAt < task.dueAt)) task = t;
+    });
+    next.appendChild(nextCard('משימה משרדית',
+      task ? task.title : 'אין משימה פתוחה.',
+      task ? timeLeft(task) + ' · ' + (task.assignee || 'ללא אחראי') : null,
+      task ? task.bucket : null));
+
+    /* 3. המועד המשפטי המחייב הקרוב. במכוון שדה נפרד: מועד
+          משפטי אינו משימה, והמערכת אינה קובעת אותו בעצמה. */
+    var legal = null;
+    open.forEach(function (t) {
+      if (t.isLegalDeadline && (!legal || t.dueAt < legal.dueAt)) legal = t;
+    });
+    next.appendChild(nextCard('מועד משפטי מחייב',
+      legal ? legal.title : 'אין מועד משפטי פתוח.',
+      legal ? timeLeft(legal) + ' · אושר בידי ' + (legal.confirmedBy || '-') : null,
+      legal ? legal.bucket : null));
+
+    renderAttention2(file, open);
+  }
+
+  /** כרטיס אחד ב"מה הלאה". label הוא סוג הדבר, ולא כותרת כללית. */
+  function nextCard(label, title, note, bucket) {
+    var box = el('div', 'next-card' + (bucket ? ' b-' + bucket : ''));
+    box.appendChild(el('p', 'next-label', label));
+    box.appendChild(el('p', 'next-title', title));
+    if (note) box.appendChild(el('p', 'next-note', note));
+    return box;
+  }
+
+  /** "דורש תשומת לב" - צבירה מהמקורות, לא טבלה משלה. */
+  function renderAttention2(file, open) {
+    var list = $('attnBody');
+    list.textContent = '';
+    var items = [];
+
+    open.forEach(function (t) {
+      if (t.isOverdue) {
+        items.push({ mark: '✗', tag: 'tag-overdue',
+          text: (t.isLegalDeadline ? 'מועד משפטי באיחור' : 'משימה באיחור') +
+                ': ' + t.title, note: timeLeft(t), go: 'tasks' });
+      } else if (t.daysLeft <= 3) {
+        /* קרוב = באמת קרוב. פריט שסומן קריטי אך מועדו רחוק הוא
+           "בעדיפות קריטית", ולקרוא לו "קרוב" היה מטעה. */
+        items.push({ mark: '!', tag: 'tag-stop',
+          text: (t.isLegalDeadline ? 'מועד משפטי קרוב' : 'משימה דחופה') +
+                ': ' + t.title, note: timeLeft(t), go: 'tasks' });
+      } else if (t.priority === 'critical') {
+        items.push({ mark: '!', tag: 'tag-warn',
+          text: (t.isLegalDeadline ? 'מועד משפטי בעדיפות קריטית'
+                                   : 'משימה בעדיפות קריטית') +
+                ': ' + t.title, note: timeLeft(t), go: 'tasks' });
+      }
+    });
+
+    var docs = file.documents || [];
+    var waiting = docs.filter(function (d) { return d.status === 'pending_review'; });
+    var missing = docs.filter(function (d) {
+      return d.status === 'missing' || d.status === 'rejected';
+    });
+
+    if (waiting.length) {
+      items.push({ mark: '●', tag: 'tag-warn',
+        text: waiting.length === 1 ? 'מסמך אחד ממתין לבדיקה שלך'
+                                   : waiting.length + ' מסמכים ממתינים לבדיקה שלך',
+        note: waiting.map(function (d) { return d.name; }).join(' · '),
+        go: 'docs' });
+    }
+    if (missing.length) {
+      items.push({ mark: '!', tag: 'tag-wait',
+        text: missing.length === 1 ? 'מסמך אחד חסר מהלקוח'
+                                   : missing.length + ' מסמכים חסרים מהלקוח',
+        note: missing.map(function (d) { return d.name; }).join(' · '),
+        go: 'comms' });
+    }
+
+    $('attnCount').textContent = items.length ? ' · ' + items.length : '';
+
+    if (!items.length) {
+      list.appendChild(el('li', 'item-note',
+        'אין כרגע דבר שדורש טיפול מיידי בתיק הזה.'));
+      return;
+    }
+
+    /* המסך אמור להיקרא בשניות. חמישה פריטים הם הגבול שבו רשימה
+       עדיין נסרקת במבט; השאר נספרים ומפנים ללשונית המלאה, ולכן
+       שום דבר לא נעלם. */
+    var CAP = 5;
+    var rest = items.length - CAP;
+    items.slice(0, CAP).forEach(function (it) {
+      var li = el('li', 'attn-row');
+      var main = el('div', 'attn-main');
+      main.appendChild(statusTag({ tag: it.tag, mark: it.mark, text: it.note }));
+      main.appendChild(el('p', 'attn-text', it.text));
+      li.appendChild(main);
+
+      var go = el('button', 'btn btn-outline btn-sm', 'מעבר');
+      go.type = 'button';
+      go.setAttribute('aria-label', 'מעבר ל' + CASE_VIEWS[it.go].title);
+      go.addEventListener('click', function () { caseNav.show(it.go, true); });
+      li.appendChild(go);
+      list.appendChild(li);
+    });
+
+    if (rest > 0) {
+      var more = el('li', 'attn-more');
+      var btn = el('button', 'btn btn-outline btn-sm',
+        'ועוד ' + rest + (rest === 1 ? ' פריט' : ' פריטים') + ' — למשימות');
+      btn.type = 'button';
+      btn.addEventListener('click', function () { caseNav.show('tasks', true); });
+      more.appendChild(btn);
+      list.appendChild(more);
+    }
+  }
+
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
 
   /** טוען את התיק מהשרת ומצייר. מוחזר Promise כדי שפעולות
       יוכלו להמתין לרענון לפני שהן מודיעות שהצליחו. */
@@ -472,7 +738,11 @@
       renderDecisionForm(file);
       renderCatalog(file);
       renderReview(file);
-      renderCaseTasks();
+      /* מצב התיק נגזר גם מהמשימות, ולכן הוא מחכה להן.
+         אין כאן קריאה נוספת לשרת - אותה תשובה בדיוק. */
+      renderCaseTasks().then(function (tasks) {
+        renderCaseState(file, tasks);
+      });
       renderLog(openId);
       /* הבאנר חייב להישאר גם כאן: מועד קריטי בתיק אחר לא
          אמור להיעלם רק כי נפתח תיק. */
@@ -776,6 +1046,20 @@
     };
   }
 
+  /** כל עוד לא הופעל ניתוח, הבלוק אומר זאת במפורש - ולא נראה
+      כאילו כבר יש ניתוח שממתין לקריאה. */
+  function assistEmptyState() {
+    var log = $('assistLog');
+    log.textContent = '';
+    assistHistory = [];
+    var box = el('div', 'assist-empty');
+    box.appendChild(el('p', null, 'טרם הופעל ניתוח מקצועי בתיק הזה.'));
+    box.appendChild(el('p', 'item-note',
+      'בחר אחת מהשאלות המוכנות או כתוב שאלה משלך. הניתוח נוצר ' +
+      'לפי בקשה ואינו רץ מעצמו.'));
+    log.appendChild(box);
+  }
+
   /** נועל את הכפתורים בזמן ניתוח, כדי שברור למה לחיצה לא עושה דבר */
   function setAssistBusy(busy) {
     assistBusy = busy;
@@ -789,6 +1073,9 @@
     setAssistBusy(true);
 
     var log  = $('assistLog');
+    /* המצב הריק יורד ברגע שמתחיל ניתוח אמיתי */
+    var empty = log.querySelector('.assist-empty');
+    if (empty) log.removeChild(empty);
     var turn = el('div', 'assist-turn');
 
     var label = preset === 'next'    ? 'מה השלב הבא בתיק'
@@ -1300,6 +1587,9 @@
   function refreshTasks() {
     if (openId) {
       return renderCaseTasks()
+        .then(function (tasks) {
+          if (currentCase) renderCaseState(currentCase, tasks);
+        })
         .then(loadBanner)
         .then(function () { return renderLog(openId); });
     }
@@ -1308,33 +1598,119 @@
 
   /* ---- משימות התיק ---- */
 
+  /* משימות התיק. הסינון פועל על המערך שכבר נטען - אין קריאה
+     חדשה לשרת, בדיוק כמו השבבים במסך "ניהול משימות". */
+  var caseTaskList   = [];
+  var caseTaskFilter = 'open';   /* open | overdue | urgent | legal | done | all */
+
+  var CASE_CHIPS = [
+    { key: 'open',    label: 'פתוחות',
+      match: function (t) { return t.status !== 'done' && t.status !== 'cancelled'; } },
+    { key: 'overdue', label: 'באיחור',
+      match: function (t) { return t.isOverdue; } },
+    { key: 'urgent',  label: 'דחופות',
+      match: function (t) {
+        return t.bucket !== 'closed' && (t.priority === 'critical' || t.daysLeft <= 3);
+      } },
+    { key: 'legal',   label: 'מועד משפטי',
+      match: function (t) { return t.isLegalDeadline; } },
+    { key: 'done',    label: 'הושלמו',
+      match: function (t) { return t.status === 'done' || t.status === 'cancelled'; } },
+    { key: 'all',     label: 'הכול', match: function () { return true; } }
+  ];
+
   function renderCaseTasks() {
     var list = $('taskList');
     if (!openId) return Promise.resolve();
     return loadLookups().then(function () {
       return Api.caseTasks(openId);
     }).then(function (data) {
-      list.textContent = '';
-      var open = data.tasks.filter(function (t) {
-        return t.status !== 'done' && t.status !== 'cancelled';
-      }).length;
-
-      $('taskIntro').textContent = data.tasks.length === 0
-        ? 'אין משימות בתיק הזה.'
-        : (open === 0 ? 'כל המשימות בתיק טופלו. '
-                      : (open === 1 ? 'משימה אחת פתוחה. '
-                                    : open + ' משימות פתוחות. ')) +
-          'ההיסטוריה נשמרת במלואה.';
-
-      data.tasks.forEach(function (t) {
-        list.appendChild(taskRow(t, true));
-      });
+      caseTaskList = data.tasks;
+      fillCaseAssignees();
+      paintCaseTasks();
+      return caseTaskList;
     }).catch(function (err) {
       list.textContent = '';
       list.appendChild(el('li', 'item-note',
         err.message || 'לא הצלחנו לטעון את משימות התיק.'));
+      return [];
     });
   }
+
+  /** בוחר האחראי מוגבל למי שבאמת מופיע במשימות התיק. */
+  function fillCaseAssignees() {
+    var sel = $('taskFilterAssignee');
+    var seen = {};
+    caseTaskList.forEach(function (t) {
+      if (t.assigneeId) seen[t.assigneeId] = t.assignee;
+    });
+    var keep = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    Object.keys(seen).forEach(function (id) {
+      var o = el('option', null, seen[id]);
+      o.value = id;
+      sel.appendChild(o);
+    });
+    sel.value = seen[keep] ? keep : '';
+  }
+
+  function paintCaseTasks() {
+    var list = $('taskList');
+    var who  = $('taskFilterAssignee').value;
+
+    var chip = CASE_CHIPS[0];
+    CASE_CHIPS.forEach(function (c) { if (c.key === caseTaskFilter) chip = c; });
+
+    var shown = caseTaskList.filter(chip.match).filter(function (t) {
+      return !who || t.assigneeId === who;
+    });
+
+    /* השבבים נושאים מונה, כדי שיהיה מיד ברור מה באיחור ומה דחוף
+       בלי להיכנס לכל סינון בנפרד. */
+    var box = $('taskChips');
+    box.textContent = '';
+    CASE_CHIPS.forEach(function (c) {
+      var n = caseTaskList.filter(c.match).length;
+      var btn = el('button', 'chip' + (n ? '' : ' chip-zero'));
+      btn.type = 'button';
+      btn.setAttribute('data-chip', c.key);
+      btn.setAttribute('aria-pressed', String(c.key === caseTaskFilter));
+      btn.appendChild(document.createTextNode(c.label));
+      btn.appendChild(el('span', 'chip-n', String(n)));
+      btn.addEventListener('click', function () {
+        caseTaskFilter = c.key;
+        paintCaseTasks();
+        announce(c.label + ': ' + shownCount(c) + ' משימות.');
+      });
+      box.appendChild(btn);
+    });
+
+    var total = caseTaskList.length;
+    var openN = openTasksOf(caseTaskList).length;
+    $('taskIntro').textContent = total === 0
+      ? 'אין משימות בתיק הזה.'
+      : (openN === 0 ? 'כל המשימות בתיק טופלו. '
+                     : (openN === 1 ? 'משימה אחת פתוחה. '
+                                    : openN + ' משימות פתוחות. ')) +
+        'ההיסטוריה נשמרת במלואה.';
+
+    list.textContent = '';
+    if (!shown.length) {
+      list.appendChild(el('li', 'item-note',
+        'אין משימות בסינון "' + chip.label + '".'));
+      return;
+    }
+    shown.forEach(function (t) { list.appendChild(taskRow(t, true)); });
+  }
+
+  function shownCount(chip) {
+    var who = $('taskFilterAssignee').value;
+    return caseTaskList.filter(chip.match).filter(function (t) {
+      return !who || t.assigneeId === who;
+    }).length;
+  }
+
+  $('taskFilterAssignee').addEventListener('change', paintCaseTasks);
 
   /* ---- הטופס ---- */
 

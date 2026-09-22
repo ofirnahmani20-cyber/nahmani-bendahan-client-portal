@@ -48,3 +48,24 @@ def test_public_pages_still_served(client, page):
 def test_assets_still_served(client):
     response = client.get("/assets/css/style.css")
     assert response.status_code == 200
+
+
+def test_html_pages_are_not_cached_by_the_browser(client):
+    """
+    דפי ה-HTML מחזיקים את חותמי הגרסה של ה-CSS וה-JS. בלי
+    הנחיית קאש הדפדפן הגיש דף ישן, הדף הפנה לחותמים ישנים,
+    וקידום החותם לעולם לא הגיע למשתמש. זה הסתיר שלושה תיקונים
+    שכבר היו בקוד, ולכן יש לזה בדיקה.
+    """
+    for page in ["/", "/admin.html", "/index.html", "/dashboard.html", "/info.html"]:
+        r = client.get(page)
+        assert r.status_code == 200, page
+        assert r.headers.get("cache-control") == "no-cache", (
+            "לדף %s אין הנחיית no-cache" % page)
+
+
+def test_versioned_assets_stay_cacheable(client):
+    """הנכסים נושאים חותם גרסה, ולכן אין סיבה למנוע מהם קאש."""
+    r = client.get("/assets/js/admin.js")
+    assert r.status_code == 200
+    assert r.headers.get("cache-control") != "no-cache"

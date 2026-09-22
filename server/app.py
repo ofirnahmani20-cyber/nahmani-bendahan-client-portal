@@ -81,6 +81,13 @@ async def security_headers(request: Request, call_next):
     # מידע רפואי ומשפטי - לא בקאש של הדפדפן או של proxy.
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    # דפי ה-HTML מחזיקים את חותמי הגרסה של ה-CSS וה-JS. בלי
+    # הנחיית קאש הדפדפן מגיש דף ישן, הדף מפנה לחותמים ישנים,
+    # וקידום החותם לעולם אינו מגיע למשתמש. no-cache מחייב
+    # אימות מול השרת בכל טעינה; הנכסים עצמם ממשיכים להיות
+    # ניתנים לקאש לנצח, כי החותם מבדיל ביניהם.
+    elif response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache"
     if IS_PRODUCTION:
         response.headers["Strict-Transport-Security"] =             "max-age=31536000; includeSubDomains"
     return response

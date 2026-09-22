@@ -84,13 +84,18 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         _owned_case(cur, case_id, identity)
         cur.execute(
             """select c.id, c.case_number, c.branch, c.opened_at, c.next_hearing_at,
+                      c.status, c.assigned_user_id,
                       cl.full_name as client_name, cl.phone, cl.email,
                       ct.name as claim_type, ct.id as claim_type_id,
-                      st.stage_position, st.stage_title
+                      st.stage_position, st.stage_title,
+                      st.in_stage_since, st.is_terminal,
+                      u.full_name as assignee_name
                  from cases c
                  join clients cl on cl.id = c.client_id
                  join claim_types ct on ct.id = c.claim_type_id
                  left join case_current_stage st on st.case_id = c.id
+                 left join users u on u.id = c.assigned_user_id
+                                  and u.firm_id = c.firm_id
                 where c.id = %s and c.firm_id = %s""",
             (case_id, identity.firm_id),
         )
@@ -131,6 +136,21 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         "email": case["email"], "claimType": case["claim_type"],
         "branch": case["branch"],
         "currentStage": case["stage_position"], "stageTitle": case["stage_title"],
+        # ---- מצב התיק ----
+        # שבעה מהשדות האלה כבר נשלפו בשאילתה ולא הוחזרו. רק
+        # assigned_user_id מצטרף כאן, והוא היה עמודה מתה: נכתב
+        # בזריעה ומעולם לא נקרא.
+        "status": case["status"],
+        "assignee": case["assignee_name"],
+        "assigneeId": (str(case["assigned_user_id"])
+                       if case["assigned_user_id"] else None),
+        "openedAt": case["opened_at"].isoformat() if case["opened_at"] else None,
+        "nextHearing": (case["next_hearing_at"].isoformat()
+                        if case["next_hearing_at"] else None),
+        "stageEnteredAt": (case["in_stage_since"].isoformat()
+                           if case["in_stage_since"] else None),
+        "isTerminal": bool(case["is_terminal"]),
+        "totalStages": len(stages),
         "documents": [{
             "id": str(d["id"]), "name": d["name"], "note": d["guidance"],
             "required": d["is_required"], "status": d["status"],

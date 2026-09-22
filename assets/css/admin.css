@@ -320,6 +320,68 @@ body.admin .case-head h1 { margin: 0; font-size: 22px; }
 #caseMeta:empty { display: none; }
 body.admin #caseMeta { margin: 0 0 12px; }
 
+/* ---- מצב התיק ----
+   שלושה בלוקים קצרים: איפה התיק, מה הלאה, ומה דורש תשומת לב.
+   מה שכבר בכותרת הקבועה אינו חוזר כאן. */
+.state-block { padding-block: 14px; }
+.state-line {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px;
+  margin: 0; font-size: 15px;
+}
+.state-num {
+  font-family: var(--serif); font-size: 26px; font-weight: 700;
+  color: var(--bronze); line-height: 1; direction: ltr;
+}
+.state-stage { font-weight: 700; font-size: 17px; }
+.state-since { color: var(--text-soft); font-size: 14px; }
+
+/* שלושה כרטיסים ולא שדה אחד: שלב בתביעה, משימה משרדית ומועד
+   משפטי מחייב הם שלושה דברים שונים, וערבובם מטשטש מי קובע מה. */
+.next-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.next-card {
+  flex: 1 1 210px;
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--border);
+  padding: 10px 12px;
+}
+.next-label {
+  margin: 0 0 4px; font-size: 12.5px; font-weight: 700;
+  letter-spacing: .04em; color: var(--bronze);
+}
+.next-title { margin: 0; font-weight: 700; }
+.next-note  { margin: 4px 0 0; font-size: 13.5px; color: var(--text-soft); }
+/* צבע הקו חוזר על מדרגת המועד שכבר מוגדרת למשימות */
+.next-card.b-overdue  { border-inline-start-color: #7d1414; background: var(--stop-soft); }
+.next-card.b-critical { border-inline-start-color: var(--stop); background: var(--stop-soft); }
+.next-card.b-warning  { border-inline-start-color: var(--warn); background: var(--warn-soft); }
+.next-card.b-normal   { border-inline-start-color: var(--wait); }
+
+#attnCount { color: var(--bronze); }
+.attn-list > li { padding: 12px 0; }
+.attn-row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 8px 14px;
+}
+.attn-main { flex: 1 1 260px; min-width: 0; }
+.attn-text { margin: 4px 0 0; font-weight: 700; }
+
+/* ---- יומן הפעולות ----
+   מקובץ לפי יום, עם שעה בצד. אין כאן שום מפתח טכני: פעולה
+   שאין לה ניסוח מוכר מקבלת נוסח כללי (ראה describe ב-admin.js). */
+.log-day {
+  font-weight: 700; font-size: 13px; letter-spacing: .04em;
+  color: var(--bronze); padding: 14px 0 4px;
+}
+.log-day:first-child { padding-top: 0; }
+.log-row { display: flex; gap: 12px; align-items: baseline; padding: 8px 0; }
+.log-clock {
+  flex: 0 0 auto; font-size: 13.5px; color: var(--text-soft);
+  direction: ltr; unicode-bidi: plaintext;
+}
+.log-body { flex: 1 1 auto; min-width: 0; }
+.log-what { margin: 0; font-weight: 600; }
+.log-body .item-note { margin: 2px 0 0; font-size: 13.5px; }
+
 /* מצב ריק מנוסח, לאזורים שייבנו בשלבים הבאים */
 .view > .block > .item-note { margin: 0; }
 
@@ -519,3 +581,15 @@ body.admin #caseMeta { margin: 0 0 12px; }
   .task-actions .btn { flex: 1 1 auto; }
   .attention-filters .field { flex: 1 1 100%; }
 }
+
+.attn-more { padding-top: 12px; }
+
+/* מצב ריק לניתוח המקצועי. הבלוק לא אמור להיראות כאילו כבר
+   קיים ניתוח כשעוד לא הופעל אחד. */
+.assist-empty {
+  border: 1px dashed var(--border-ui);
+  padding: 12px 14px;
+  color: var(--text-soft);
+}
+.assist-empty p:first-child { margin: 0; font-weight: 700; color: var(--text); }
+.assist-empty .item-note { margin: 4px 0 0; }
