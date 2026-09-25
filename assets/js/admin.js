@@ -494,6 +494,7 @@
 
   function openCase(caseId, tab) {
     openId = caseId;
+    wasNew = {};
 
     /* הניתוח שייך לתיק - אסור שיישאר על המסך כשעוברים לתיק אחר */
     assistHistory = [];
@@ -725,7 +726,20 @@
     return btn;
   }
 
-  /* ---- השיחה ---- */
+  /* ---- השיחה ----
+     wasNew זוכר אילו הודעות היו חדשות כשנכנסנו לתיק, ומתאפס
+     בפתיחת תיק אחר.
+
+     בלעדיו התג נעלם לפני שאפשר לראות אותו: renderCase קורא
+     ל-refreshComms, ו-onShow של לשונית "דרישות ותקשורת" קורא
+     ל-loadConversation בנפרד. שניהם מסמנים נקרא, והרינדור השני
+     כבר מקבל readAt מלא ומוחק את התג אחרי מילישניות ספורות -
+     כלומר עורך הדין לעולם לא רואה איזו הודעה חדשה.
+
+     "חדשה" פירושה עכשיו: חדשה מאז שפתחת את התיק. בכניסה הבאה
+     היא כבר לא חדשה, וזה בדיוק מה שצריך. */
+
+  var wasNew = {};
 
   function loadConversation() {
     if (!openId) return Promise.resolve();
@@ -733,7 +747,16 @@
       var thread = $('chatThread');
       thread.textContent = '';
 
-      $('chatUnread').textContent = data.unread ? ' · ' + data.unread + ' חדשות' : '';
+      /* נרשם לפני הציור, כדי שגם הספירה וגם התגים יראו אותו מצב */
+      data.messages.forEach(function (m) {
+        if (m.direction === 'inbound' && !m.readAt) wasNew[m.id] = true;
+      });
+
+      var fresh = data.messages.filter(function (m) {
+        return m.direction === 'inbound' && wasNew[m.id];
+      }).length;
+
+      $('chatUnread').textContent = fresh ? ' · ' + fresh + ' חדשות' : '';
       $('chatIntro').textContent = data.messages.length
         ? 'ההודעות בתיק, נכנסות ויוצאות.'
         : 'אין עדיין הודעות בתיק הזה.';
@@ -745,7 +768,7 @@
           m.direction === 'inbound' ? 'הלקוח' : (m.sender || 'המשרד')));
         head.appendChild(el('span', 'chat-when num', stamp(m.at)));
         head.appendChild(el('span', 'chat-chan', CHANNEL_LABEL[m.channel] || m.channel));
-        if (m.direction === 'inbound' && !m.readAt) {
+        if (m.direction === 'inbound' && wasNew[m.id]) {
           head.appendChild(statusTag({ tag: 'tag-warn', mark: '●', text: 'חדשה' }));
         }
         li.appendChild(head);
