@@ -27,7 +27,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import api_auth, api_client, api_office, audit
+from . import (api_auth, api_client, api_conversation, api_office,
+               api_requirements, audit)
 from .auth import require_csrf, require_staff
 from .db.pool import healthy as db_healthy
 from .policy import POLICY_MODE, assert_clean, build_context
@@ -96,6 +97,8 @@ async def security_headers(request: Request, call_next):
 app.include_router(api_auth.router)
 app.include_router(api_client.router)
 app.include_router(api_office.router)
+app.include_router(api_requirements.router)
+app.include_router(api_conversation.router)
 
 
 # ============================================================

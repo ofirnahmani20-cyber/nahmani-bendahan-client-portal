@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>האזור האישי שלי | מעקב תביעת ביטוח לאומי</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/style.css?v=20260920052759">
+<link rel="stylesheet" href="assets/css/style.css?v=20260925111500">
 </head>
 <body>
 
@@ -149,6 +149,31 @@
           <p id="docsOpenIntro" class="measure"></p>
           <ul class="doc-tasks" id="docListOpen"></ul>
         </section>
+
+        <!-- בקשות שאינן מסמך: לחתום, למסור פרטים, ליצור קשר.
+             מסמכים מוצגים ברשימה שמעל ואינם חוזרים כאן. -->
+        <section aria-labelledby="h-reqs" id="clientReqBlock" hidden>
+          <h2 id="h-reqs">בקשות נוספות מהמשרד</h2>
+          <p id="clientReqIntro" class="measure"></p>
+          <ul class="doc-tasks" id="clientReqList"></ul>
+        </section>
+
+        <!-- שיחה עם המשרד -->
+        <section aria-labelledby="h-chat">
+          <h2 id="h-chat">הודעות מול המשרד</h2>
+          <p id="clientChatIntro" class="measure"></p>
+          <ol class="chat" id="clientChat"></ol>
+
+          <form id="clientChatForm">
+            <div class="alert alert-error" id="clientChatError" role="alert" hidden></div>
+            <div class="field">
+              <label for="clientChatBody">כתיבת הודעה למשרד</label>
+              <p class="hint">לשאלות דחופות אפשר תמיד להתקשר למשרד.</p>
+              <textarea id="clientChatBody" rows="3" maxlength="2000" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">שליחה למשרד</button>
+          </form>
+        </section>
       </div>
     </div>
   </div>
@@ -272,9 +297,9 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260920052759"></script>
-<script src="assets/js/quality.js?v=20260920052759"></script>
-<script src="assets/js/dashboard.js?v=20260920052759"></script>
-<script src="assets/js/nav.js?v=20260920052759"></script>
+<script src="assets/js/api.js?v=20260925111500"></script>
+<script src="assets/js/quality.js?v=20260925111500"></script>
+<script src="assets/js/dashboard.js?v=20260925111500"></script>
+<script src="assets/js/nav.js?v=20260925111500"></script>
 </body>
 </html>

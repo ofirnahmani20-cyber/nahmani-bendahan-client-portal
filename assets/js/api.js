@@ -207,6 +207,57 @@
     reopenTask: function (taskId) {
       return Api.post('/api/office/tasks/' + encodeURIComponent(taskId) + '/reopen');
     },
+
+    // ---- דרישות מהלקוח ----
+    /* דרישה ומשלוח הם שני דברים. createRequirement יוצרת את מה
+       שהלקוח צריך לעשות; sendRequirement היא ניסיון מסירה. */
+    requirements: function (caseId) {
+      return Api.get('/api/office/cases/' + encodeURIComponent(caseId) + '/requirements');
+    },
+    createRequirement: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/requirements', body);
+    },
+    updateRequirement: function (id, body) {
+      return Api.post('/api/office/requirements/' + encodeURIComponent(id) + '/update', body);
+    },
+    completeRequirement: function (id) {
+      return Api.post('/api/office/requirements/' + encodeURIComponent(id) + '/complete');
+    },
+    cancelRequirement: function (id) {
+      return Api.post('/api/office/requirements/' + encodeURIComponent(id) + '/cancel');
+    },
+    sendRequirement: function (id, channel) {
+      return Api.post('/api/office/requirements/' + encodeURIComponent(id) + '/send',
+                      { channel: channel });
+    },
+    requirementDeliveries: function (id) {
+      return Api.get('/api/office/requirements/' + encodeURIComponent(id) + '/deliveries');
+    },
+    createReminder: function (id, rule) {
+      return Api.post('/api/office/requirements/' + encodeURIComponent(id) + '/reminders',
+                      rule);
+    },
+    setReminderState: function (reminderId, isPaused) {
+      return Api.post('/api/office/reminders/' + encodeURIComponent(reminderId) + '/state',
+                      { is_paused: !!isPaused });
+    },
+
+    // ---- שיחה ----
+    conversation: function (caseId) {
+      return Api.get('/api/office/cases/' + encodeURIComponent(caseId) + '/conversation');
+    },
+    sendConversation: function (caseId, body, requirementId) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/conversation',
+                      { body: body, requirement_id: requirementId || null });
+    },
+    markConversationRead: function (messageId) {
+      return Api.post('/api/office/conversation/' + encodeURIComponent(messageId) + '/read');
+    },
+    clientConversation: function () { return Api.get('/api/client/conversation'); },
+    clientSendMessage: function (body, requirementId) {
+      return Api.post('/api/client/conversation',
+                      { body: body, requirement_id: requirementId || null });
+    },
   };
 
   global.Api = Api;

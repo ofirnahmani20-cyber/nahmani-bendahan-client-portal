@@ -534,4 +534,177 @@ SELECT t.id                            AS task_id,
                        ELSE 3 END                             AS priority_rank
 FROM   case_tasks t;
 
+
+-- -------------------------------------------------------------
+--  9. דרישות מהלקוח, משלוח ותקשורת
+--  ארבע הערות לפני הקוד:
+--
+--  א. דרישה ≠ משלוח. "מה הלקוח צריך לעשות" הוא דבר אחד, ו"ניסיון
+--     לשלוח לו הודעה בערוץ מסוים" הוא דבר אחר. אותה דרישה יכולה
+--     להישלח כמה פעמים ובכמה ערוצים בלי ליצור דרישות כפולות.
+--
+--  ב. דרישת מסמך אינה טבלה מקבילה. כשסוג הדרישה הוא מסמך היא
+--     מצביעה על שורת case_documents הקיימת, וכך הקובץ שהועלה
+--     הוא אותו קובץ שבקלסר. אין עותק שני.
+--
+--  ג. גוף ההודעה אינו נשמר ב-message_deliveries - רק template_key.
+--     זהו אותו כלל שכבר כתוב על notifications בסעיף 5.
+--
+--  ד. אין כאן scheduler. הכללים נשמרים והשליחה ידנית, עד
+--     שייבחר ספק ותיבנה הרצה מתוזמנת.
+-- -------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS case_requirements (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id            uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id            uuid NOT NULL,
+  kind               text NOT NULL
+                     CHECK (kind IN ('document', 'info', 'signature',
+                                     'form', 'contact', 'action', 'other')),
+  title              text NOT NULL,
+  guidance           text,
+  due_at             timestamptz,
+  priority           text NOT NULL DEFAULT 'normal'
+                     CHECK (priority IN ('critical', 'high', 'normal', 'low')),
+  -- cancelled ולא מחיקה, כמו בכל שאר המערכת.
+  status             text NOT NULL DEFAULT 'open'
+                     CHECK (status IN ('open', 'sent', 'completed',
+                                       'cancelled')),
+  -- כשהסוג מסמך, זו הדרישה הקיימת ב-case_documents ולא חדשה.
+  document_id        uuid REFERENCES case_documents(id) ON DELETE SET NULL,
+  completed_at       timestamptz,
+  completed_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at         timestamptz,
+  -- דרישת מסמך בלי מסמך היא דרישה שאי אפשר למלא.
+  CONSTRAINT requirement_needs_document
+    CHECK (kind <> 'document' OR document_id IS NOT NULL),
+  CONSTRAINT requirement_done_needs_signature
+    CHECK (status <> 'completed'
+           OR (completed_at IS NOT NULL AND completed_by_user_id IS NOT NULL)),
+  FOREIGN KEY (case_id, firm_id)
+    REFERENCES cases(id, firm_id) ON DELETE CASCADE,
+  UNIQUE (id, firm_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_requirements_case
+  ON case_requirements (case_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_requirements_open
+  ON case_requirements (firm_id, due_at)
+  WHERE status IN ('open', 'sent');
+
+
+CREATE TABLE IF NOT EXISTS reminder_rules (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id          uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  requirement_id   uuid NOT NULL,
+  every_days       integer NOT NULL CHECK (every_days BETWEEN 1 AND 90),
+  start_at         timestamptz NOT NULL DEFAULT now(),
+  end_at           timestamptz,
+  channel          text NOT NULL
+                   CHECK (channel IN ('sms', 'whatsapp', 'email', 'portal')),
+  -- חלון שעות וימים מותרים לשליחה. ימי אי-שליחה (חגים) ייכנסו
+  -- בעתיד כשורות בטבלת חריגים ולא כשינוי מבני כאן.
+  hours_from       smallint NOT NULL DEFAULT 9
+                   CHECK (hours_from BETWEEN 0 AND 23),
+  hours_to         smallint NOT NULL DEFAULT 20
+                   CHECK (hours_to BETWEEN 0 AND 23),
+  weekdays         text NOT NULL DEFAULT '0,1,2,3,4',
+  is_paused        boolean NOT NULL DEFAULT false,
+  -- הדרישה הושלמה או בוטלה: התזכורות נעצרות. זו אינה בחירה.
+  stop_on_complete boolean NOT NULL DEFAULT true,
+  created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT reminder_window_is_ordered CHECK (hours_from < hours_to),
+  FOREIGN KEY (requirement_id, firm_id)
+    REFERENCES case_requirements(id, firm_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_live
+  ON reminder_rules (requirement_id) WHERE NOT is_paused;
+
+
+CREATE TABLE IF NOT EXISTS message_deliveries (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id             uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  requirement_id      uuid,
+  -- פולימורפי כמו sessions: notifications מוגבלת ל-client_id
+  -- NOT NULL ולכן אינה יכולה לרשום משלוח לאיש צוות.
+  subject_type        text NOT NULL CHECK (subject_type IN ('client', 'user')),
+  subject_id          uuid NOT NULL,
+  channel             text NOT NULL
+                      CHECK (channel IN ('sms', 'whatsapp', 'email', 'portal')),
+  -- לאן זה באמת נשלח. בלי זה אי אפשר לשחזר משלוח אחרי שהטלפון
+  -- של הלקוח השתנה.
+  to_address          text,
+  -- מפתח תבנית בלבד. גוף ההודעה אינו נשמר כאן, לעולם.
+  template_key        text NOT NULL,
+  status              text NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued', 'sent', 'delivered',
+                                        'failed', 'skipped')),
+  provider_message_id text,
+  error               text,
+  attempts            integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  scheduled_for       timestamptz,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  sent_at             timestamptz,
+  delivered_at        timestamptz,
+  created_by_user_id  uuid REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (requirement_id, firm_id)
+    REFERENCES case_requirements(id, firm_id) ON DELETE CASCADE,
+  -- מניעת הודעה כפולה: אותה דרישה, אותו ערוץ, אותו מועד מתוכנן -
+  -- שורה אחת. זה מה שיאפשר ל-worker עתידי לרוץ שוב בבטחה.
+  UNIQUE (requirement_id, channel, scheduled_for)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deliveries_requirement
+  ON message_deliveries (requirement_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_deliveries_pending
+  ON message_deliveries (scheduled_for) WHERE status = 'queued';
+
+
+-- שיחה אגנוסטית לערוץ. תגובה שקשורה לדרישה נושאת requirement_id
+-- או document_id; פנייה כללית נושאת case_id בלבד. זו ההפרדה
+-- שנדרשה, והיא נאכפת במודל ולא במוסכמה.
+CREATE TABLE IF NOT EXISTS case_conversation (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id        uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id        uuid NOT NULL,
+  direction      text NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+  channel        text NOT NULL DEFAULT 'portal'
+                 CHECK (channel IN ('sms', 'whatsapp', 'email', 'portal')),
+  body           text NOT NULL,
+  requirement_id uuid,
+  document_id    uuid REFERENCES case_documents(id) ON DELETE SET NULL,
+  sent_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  read_at        timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  -- הודעה יוצאת נשלחת בידי איש צוות; נכנסת מגיעה מהלקוח.
+  CONSTRAINT outbound_has_a_sender
+    CHECK (direction <> 'outbound' OR sent_by_user_id IS NOT NULL),
+  FOREIGN KEY (case_id, firm_id)
+    REFERENCES cases(id, firm_id) ON DELETE CASCADE,
+  FOREIGN KEY (requirement_id, firm_id)
+    REFERENCES case_requirements(id, firm_id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_case
+  ON case_conversation (case_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_unread
+  ON case_conversation (case_id) WHERE direction = 'inbound' AND read_at IS NULL;
+
+
+-- קשר דו-כיווני בין דרישת מסמך לשורת המסמך, כדי שאפשר יהיה
+-- להגיע משם לכאן בלי לסרוק. האילוץ נוסף ב-ALTER מוגן כי
+-- case_documents כבר קיימת.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'case_documents'
+                    AND column_name = 'requirement_id') THEN
+    ALTER TABLE case_documents ADD COLUMN requirement_id uuid;
+  END IF;
+END $$;
+
 COMMIT;

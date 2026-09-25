@@ -217,7 +217,9 @@ def run(conn) -> dict:
             TRUNCATE audit_log, sessions, otp_challenges, notifications,
                      notification_preferences, messages, document_replies,
                      document_files, case_documents, case_decisions,
-                     case_next_steps, case_stage_events, case_tasks, cases,
+                     case_next_steps, case_stage_events, case_tasks,
+                     case_conversation, message_deliveries,
+                     reminder_rules, case_requirements, cases,
                      required_document_templates, stage_templates,
                      task_types, claim_types, clients, users, firms
             RESTART IDENTITY CASCADE

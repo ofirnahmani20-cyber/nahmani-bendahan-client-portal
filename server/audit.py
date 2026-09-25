@@ -30,6 +30,11 @@ SAFE_METADATA_KEYS = frozenset({
     # טקסט חופשי שהצוות מקליד ועלול להכיל פרט מזהה.
     "task_id", "task_type_id", "priority", "from_status", "to_status",
     "due_at", "due_changed", "assignee_changed", "is_legal_deadline",
+    # דרישות, משלוח ותקשורת. שוב, שים לב למה שאין כאן: כותרת
+    # הדרישה, ההנחיה, וגוף ההודעה. היומן עונה מי שלח מה ולמי,
+    # ולא מה נכתב - וטקסט חופשי עלול להכיל פרט מזהה.
+    "requirement_id", "delivery_id", "reminder_id", "conversation_id",
+    "channel", "kind", "direction", "every_days",
 })
 
 

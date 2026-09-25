@@ -593,3 +593,20 @@ body.admin #caseMeta { margin: 0 0 12px; }
 }
 .assist-empty p:first-child { margin: 0; font-weight: 700; color: var(--text); }
 .assist-empty .item-note { margin: 4px 0 0; }
+
+/* ---- דרישות ותקשורת ----
+   דרישה ומשלוח הם שני דברים, ולכן שורת הדרישה מציגה את מצב
+   הדרישה *ואת* היסטוריית המשלוח שלה - לא מאחדת ביניהם. */
+.req-list > li { padding: 14px 0; }
+.req-row.req-closed .task-title { color: var(--text-soft); font-weight: 600; }
+.req-kind {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; font-size: 13.5px; font-weight: 700;
+  background: var(--accent-soft); color: var(--text);
+  border: 1px solid var(--border-ui);
+}
+.req-channel {
+  width: auto !important; min-width: 108px;
+  min-height: 42px; font-size: 14px;
+}
+#reqCount, #chatUnread { color: var(--bronze); }

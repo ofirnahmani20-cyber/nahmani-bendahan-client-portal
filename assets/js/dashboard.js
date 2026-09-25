@@ -199,7 +199,23 @@
 
     var total = CLAIM_STAGES.length;
     var n     = caseFile.currentStage;
-    var stage = CLAIM_STAGES[n - 1];
+    var stage = n ? CLAIM_STAGES[n - 1] : null;
+
+    /* תיק שטרם נרשם לו שלב. קורה בין פתיחת התיק במשרד לבין רישום
+       השלב הראשון, ולכן זה מצב חוקי ולא תקלה. אומרים זאת במפורש
+       ויוצאים - בלי המחוון, שאין לו מה להצביע עליו. חשוב: בלי
+       היציאה הזאת renderSummary היה זורק על stage.title, paint כולו
+       היה נעצר, וכל מה שמתחתיו היה נשאר ריק בלי שום הודעת שגיאה. */
+    if (!stage) {
+      var head0 = el('div', 'sum-title');
+      head0.appendChild(el('p', 'sum-eyebrow', 'השלב הנוכחי'));
+      head0.appendChild(el('h2', 'sum-stage', 'התיק נפתח וטרם נקבע לו שלב'));
+      host.appendChild(head0);
+      host.appendChild(el('p', 'sum-what',
+        'המשרד פתח את התיק ועדיין לא רשם את השלב הראשון. ' +
+        'ברגע שהשלב ייקבע הוא יופיע כאן.'));
+      return;
+    }
 
     /* המספר הגדול - אותה מחווה של 01-08 באקורדיון שבדף הציבורי */
     var head = el('div', 'sum-head');
@@ -1002,12 +1018,111 @@
      אין כאן דרך לבקש תיק של מישהו אחר.
      ========================================================== */
 
+  /* ---- בקשות שאינן מסמך ----
+     מסמכים כבר מוצגים ב-docListOpen. כאן רק מה שאינו מסמך:
+     לחתום, למסור פרטים, ליצור קשר. אחרת אותו דבר היה מופיע
+     פעמיים באותו מסך. */
+
+  var REQ_KIND_LABEL = {
+    'info': 'מסירת מידע', 'signature': 'חתימה', 'form': 'השלמת טופס',
+    'contact': 'יצירת קשר עם המשרד', 'action': 'ביצוע פעולה', 'other': 'בקשה'
+  };
+
+  function renderRequirements() {
+    var block = $('clientReqBlock');
+    var list  = $('clientReqList');
+    if (!block || !list) return;
+
+    var items = caseFile.requirements || [];
+    block.hidden = !items.length;
+    list.textContent = '';
+    if (!items.length) return;
+
+    $('clientReqIntro').textContent = items.length === 1
+      ? 'יש בקשה אחת שאינה מסמך.'
+      : 'יש ' + items.length + ' בקשות שאינן מסמך.';
+
+    items.forEach(function (q) {
+      var li = el('li', 'doc-task');
+      var head = el('div', 'doc-head');
+      head.appendChild(el('span', 'doc-name', q.title));
+      head.appendChild(el('span', 'card-cat', REQ_KIND_LABEL[q.kind] || 'בקשה'));
+      li.appendChild(head);
+      if (q.guidance) li.appendChild(el('p', 'item-note', q.guidance));
+      if (q.dueAt) {
+        li.appendChild(iconLine('calendar', 'עד ' + formatDate(q.dueAt.slice(0, 10))));
+      }
+      list.appendChild(li);
+    });
+  }
+
+  /* ---- שיחה עם המשרד ----
+     עד 25.09 הלקוח יכול היה רק לקבל. עכשיו הוא יכול גם להשיב. */
+
+  function renderChat() {
+    var thread = $('clientChat');
+    if (!thread) return;
+
+    Api.clientConversation().then(function (data) {
+      thread.textContent = '';
+      var msgs = data.messages || [];
+      $('clientChatIntro').textContent = msgs.length
+        ? 'ההתכתבות שלך עם המשרד.'
+        : 'אין עדיין הודעות. אפשר לכתוב למשרד מכאן.';
+
+      msgs.forEach(function (m) {
+        var li = el('li', 'chat-msg chat-' + m.direction);
+        var head = el('p', 'chat-head');
+        head.appendChild(el('span', 'chat-who',
+          m.direction === 'inbound' ? 'את/ה' : 'המשרד'));
+        head.appendChild(el('span', 'chat-when num', formatDate(m.at.slice(0, 10))));
+        li.appendChild(head);
+        li.appendChild(el('p', 'chat-body', m.body));
+        if (m.requirementTitle) {
+          li.appendChild(el('p', 'chat-link', 'בקשר ל: ' + m.requirementTitle));
+        }
+        thread.appendChild(li);
+      });
+    }).catch(function () {
+      $('clientChatIntro').textContent = 'לא הצלחנו לטעון את ההודעות.';
+    });
+  }
+
+  var chatForm = $('clientChatForm');
+  if (chatForm) {
+    chatForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var err = $('clientChatError');
+      err.hidden = true;
+
+      var body = $('clientChatBody').value.trim();
+      if (!body) {
+        err.textContent = 'אי אפשר לשלוח הודעה ריקה.';
+        err.hidden = false;
+        return $('clientChatBody').focus();
+      }
+
+      Api.clientSendMessage(body)
+        .then(function () {
+          $('clientChatBody').value = '';
+          renderChat();
+          toast('ההודעה נשלחה למשרד.');
+        })
+        .catch(function (e2) {
+          err.textContent = e2.message || 'השליחה נכשלה.';
+          err.hidden = false;
+        });
+    });
+  }
+
   function paint() {
     renderStatus();
     renderSummary();
     renderDecision();
     renderTodo();
     renderDocs();
+    renderRequirements();
+    renderChat();
     renderNextSteps();
     renderStages();
     renderDuration();
@@ -1038,6 +1153,7 @@
     data.decision = data.decision || null;
     data.lawyer = data.lawyer || null;
     data.clientReplies = data.clientReplies || [];
+    data.requirements = data.requirements || [];
     return data;
   }
 

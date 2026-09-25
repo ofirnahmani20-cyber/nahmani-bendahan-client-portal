@@ -1396,3 +1396,44 @@ img.ph::after { content: none; }
   .dz-actions .btn { width: 100%; }
   .todo-strip { padding: 16px 18px; }
 }
+
+
+/* ==========================================================
+   שיחה בין המשרד ללקוח
+   ----------------------------------------------------------
+   משותף לשני האזורים, ולכן כאן ולא ב-admin.css: הפורטל
+   של הלקוח אינו טוען את admin.css כלל.
+   ========================================================== */
+
+/* השיחה. נכנס ויוצא נבדלים במיקום, ברקע ובתווית "הלקוח"/שם
+   איש הצוות - ולא בצבע בלבד. */
+.chat { list-style: none; margin: 0 0 16px; padding: 0; }
+.chat-msg {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  margin: 0 0 8px;
+  max-width: 88%;
+}
+.chat-inbound  {
+  background: var(--surface);
+  border-inline-start: 4px solid var(--wait);
+  margin-inline-end: auto;
+}
+.chat-outbound {
+  background: var(--accent-soft);
+  border-inline-end: 4px solid var(--bronze);
+  margin-inline-start: auto;
+}
+.chat-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  margin: 0 0 5px; font-size: 13px; color: var(--text-soft);
+}
+.chat-who { font-weight: 700; color: var(--text); }
+.chat-when { direction: ltr; unicode-bidi: plaintext; }
+.chat-chan {
+  border: 1px solid var(--border); padding: 0 6px; font-size: 12px;
+}
+/* anywhere ולא break-word: הלקוח מקליד טקסט חופשי, וקישור ארוך
+   בלי רווחים היה מותח את הבועה מעבר לרוחב המסך בטלפון. */
+.chat-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-link { margin: 6px 0 0; font-size: 13px; color: var(--text-soft); }

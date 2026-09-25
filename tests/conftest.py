@@ -76,6 +76,13 @@ def temp_case():
            "firm_id": base["firm_id"], "claim_type_id": base["claim_type_id"]}
 
     with _cursor(commit=True) as cur:
+        cur.execute("delete from case_conversation where case_id = %s", (case_id,))
+        cur.execute("""delete from reminder_rules where requirement_id in
+                       (select id from case_requirements where case_id = %s)""", (case_id,))
+        cur.execute("""delete from message_deliveries where requirement_id in
+                       (select id from case_requirements where case_id = %s)""", (case_id,))
+        cur.execute("update case_documents set requirement_id = null where case_id = %s", (case_id,))
+        cur.execute("delete from case_requirements where case_id = %s", (case_id,))
         cur.execute("delete from case_tasks where case_id = %s", (case_id,))
         cur.execute("delete from case_stage_events where case_id = %s", (case_id,))
         cur.execute("delete from messages where case_id = %s", (case_id,))

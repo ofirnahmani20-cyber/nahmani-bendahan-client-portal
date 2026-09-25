@@ -6,8 +6,8 @@
 <title>ניהול תיקים | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="assets/css/style.css?v=20260920052759">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260920052759">
+<link rel="stylesheet" href="assets/css/style.css?v=20260925111500">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260925111500">
 </head>
 <body class="admin">
 
@@ -446,6 +446,83 @@
       <div class="case-view" id="case-view-comms" hidden>
         <h2 class="view-title" tabindex="-1">דרישות ותקשורת עם הלקוח</h2>
 
+          <!-- ---- דרישות פעילות ---- -->
+          <section class="block" aria-labelledby="h-reqs">
+            <h3 id="h-reqs">דרישות מהלקוח<span id="reqCount"></span></h3>
+            <p class="item-note" id="reqIntro"></p>
+
+            <button type="button" class="btn btn-outline btn-sm"
+                    id="reqNew" aria-expanded="false">+ דרישה חדשה</button>
+
+            <form id="reqNewForm" class="task-form" hidden>
+              <div class="alert alert-error" id="reqNewError" role="alert" hidden></div>
+
+              <div class="field">
+                <label for="reqKind">סוג הדרישה</label>
+                <select id="reqKind">
+                  <option value="document">העלאת מסמך</option>
+                  <option value="info">מסירת מידע</option>
+                  <option value="signature">חתימה</option>
+                  <option value="form">השלמת טופס</option>
+                  <option value="contact">יצירת קשר עם המשרד</option>
+                  <option value="action">ביצוע פעולה</option>
+                  <option value="other">אחר</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="reqTitle">כותרת</label>
+                <input type="text" id="reqTitle" maxlength="200" required>
+              </div>
+
+              <div class="field">
+                <label for="reqGuidance">הנחיה ללקוח</label>
+                <p class="hint">מה בדיוק נדרש - זה מה שמונע ביצוע שגוי.</p>
+                <textarea id="reqGuidance" rows="2" maxlength="2000"></textarea>
+              </div>
+
+              <div class="field">
+                <label for="reqDue">תאריך יעד</label>
+                <input type="datetime-local" id="reqDue">
+              </div>
+
+              <div class="field">
+                <label for="reqPriority">חשיבות</label>
+                <select id="reqPriority">
+                  <option value="critical">קריטי</option>
+                  <option value="high">גבוה</option>
+                  <option value="normal" selected>רגיל</option>
+                  <option value="low">נמוך</option>
+                </select>
+              </div>
+
+              <div class="task-form-actions">
+                <button type="submit" class="btn btn-primary btn-sm">יצירת הדרישה</button>
+                <button type="button" class="btn btn-outline btn-sm"
+                        id="reqNewCancel">ביטול</button>
+              </div>
+            </form>
+
+            <ul class="plain-list req-list" id="reqList"></ul>
+          </section>
+
+          <!-- ---- שיחה עם הלקוח ---- -->
+          <section class="block" aria-labelledby="h-chat">
+            <h3 id="h-chat">שיחה עם הלקוח<span id="chatUnread"></span></h3>
+            <p class="item-note" id="chatIntro"></p>
+
+            <ol class="chat" id="chatThread"></ol>
+
+            <form id="chatForm">
+              <div class="alert alert-error" id="chatError" role="alert" hidden></div>
+              <div class="field">
+                <label for="chatBody">תשובה ללקוח</label>
+                <textarea id="chatBody" rows="3" maxlength="5000" required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">שליחה</button>
+            </form>
+          </section>
+
           <!-- דרישת מסמך מהלקוח -->
           <section class="block" aria-labelledby="h-request">
             <h3 id="h-request">דרישת מסמך מהלקוח</h3>
@@ -650,8 +727,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260920052759"></script>
-<script src="assets/js/viewnav.js?v=20260920052759"></script>
-<script src="assets/js/admin.js?v=20260920052759"></script>
+<script src="assets/js/api.js?v=20260925111500"></script>
+<script src="assets/js/viewnav.js?v=20260925111500"></script>
+<script src="assets/js/admin.js?v=20260925111500"></script>
 </body>
 </html>

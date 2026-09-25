@@ -138,7 +138,10 @@
     focusTitle: false,
     fallback: 'state',
     onShow: function (name) {
-      if (openId) setHash('cases/' + openId + '/' + name);
+      if (!openId) return;
+      setHash('cases/' + openId + '/' + name);
+      /* הודעות מסומנות כנקראו רק כשנכנסים ללשונית שמציגה אותן. */
+      if (name === 'comms') loadConversation();
     }
   });
 
@@ -313,6 +316,16 @@
     'client.login_success':      'הלקוח נכנס לאזור האישי',
     'client.login_failed':       'ניסיון כניסה של לקוח שנכשל',
     'client.otp_requested':      'נשלח קוד כניסה ללקוח',
+    'office.requirement_created':   'נוצרה דרישה מהלקוח',
+    'office.requirement_updated':   'עודכנה דרישה',
+    'office.requirement_completed': 'דרישה הושלמה',
+    'office.requirement_cancelled': 'דרישה בוטלה',
+    'office.requirement_sent':      'נשלחה דרישה ללקוח',
+    'office.reminder_created':      'הוגדרה תזכורת',
+    'office.reminder_paused':       'תזכורת הושהתה',
+    'office.reminder_resumed':      'תזכורת חודשה',
+    'office.conversation_sent':     'נשלחה הודעה ללקוח',
+    'client.conversation_sent':     'הלקוח שלח הודעה',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
@@ -543,6 +556,308 @@
     });
   }
 
+  /* ================= דרישות ותקשורת =================
+     דרישה ומשלוח הם שני דברים. הדרישה יציבה; המשלוח חוזר.
+     אין כאן scheduler - השליחה יזומה, והמסך אומר זאת. */
+
+  var REQ_KINDS = {
+    'document':  'העלאת מסמך',
+    'info':      'מסירת מידע',
+    'signature': 'חתימה',
+    'form':      'השלמת טופס',
+    'contact':   'יצירת קשר',
+    'action':    'ביצוע פעולה',
+    'other':     'אחר'
+  };
+
+  var REQ_STATUS = {
+    'open':      { tag: 'tag-wait', mark: '●', text: 'טרם נשלחה' },
+    'sent':      { tag: 'tag-warn', mark: '→', text: 'נשלחה ללקוח' },
+    'completed': { tag: 'tag-ok',   mark: '✓', text: 'הושלמה' },
+    'cancelled': { tag: 'tag-wait', mark: '–', text: 'בוטלה' }
+  };
+
+  var CHANNEL_LABEL = {
+    'sms': 'SMS', 'whatsapp': 'WhatsApp', 'email': 'אימייל', 'portal': 'פורטל'
+  };
+
+  var caseRequirements = [];
+
+  function loadRequirements() {
+    if (!openId) return Promise.resolve([]);
+    return Api.requirements(openId).then(function (data) {
+      caseRequirements = data.requirements;
+      paintRequirements();
+      return caseRequirements;
+    }).catch(function (err) {
+      $('reqList').textContent = '';
+      $('reqList').appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את הדרישות.'));
+      return [];
+    });
+  }
+
+  function paintRequirements() {
+    var list = $('reqList');
+    list.textContent = '';
+
+    var live = caseRequirements.filter(function (r) {
+      return r.status === 'open' || r.status === 'sent';
+    });
+    $('reqCount').textContent = live.length ? ' · ' + live.length : '';
+    $('reqIntro').textContent = caseRequirements.length === 0
+      ? 'אין דרישות פתוחות מהלקוח.'
+      : (live.length === 1 ? 'דרישה אחת פתוחה. '
+                           : live.length + ' דרישות פתוחות. ') +
+        'דרישות שנסגרו נשמרות בהיסטוריה.';
+
+    if (!caseRequirements.length) return;
+    caseRequirements.forEach(function (r) { list.appendChild(requirementRow(r)); });
+  }
+
+  function requirementRow(r) {
+    var closed = r.status === 'completed' || r.status === 'cancelled';
+    var li = el('li', 'req-row' + (closed ? ' req-closed' : ''));
+
+    var tags = el('div', 'task-tags');
+    tags.appendChild(statusTag(REQ_STATUS[r.status] ||
+      { tag: 'tag-wait', mark: '?', text: r.status }));
+    tags.appendChild(el('span', 'req-kind', REQ_KINDS[r.kind] || r.kind));
+    if (r.kind === 'document' && r.documentStatus) {
+      tags.appendChild(statusTag(reviewStatus(r.documentStatus)));
+    }
+    li.appendChild(tags);
+
+    li.appendChild(el('p', 'task-title', r.title));
+    if (r.guidance) li.appendChild(el('p', 'task-desc', r.guidance));
+
+    var meta = el('p', 'task-where');
+    var bits = [];
+    if (r.dueAt) bits.push('יעד ' + stamp(r.dueAt));
+    bits.push(r.deliveryCount
+      ? r.deliveryCount + ' משלוחים · אחרון ' + stamp(r.lastDeliveryAt)
+      : 'טרם נשלחה הודעה');
+    if (r.activeReminders) bits.push('תזכורת פעילה');
+    if (r.completedAt) bits.push('הושלמה ' + stamp(r.completedAt) +
+                                 ' בידי ' + (r.completedBy || '-'));
+    meta.textContent = bits.join(' · ');
+    li.appendChild(meta);
+
+    if (!closed) li.appendChild(requirementActions(r));
+    return li;
+  }
+
+  function requirementActions(r) {
+    var box = el('div', 'task-actions');
+
+    var chan = document.createElement('select');
+    chan.className = 'req-channel';
+    chan.setAttribute('aria-label', 'ערוץ שליחה עבור ' + r.title);
+    ['sms', 'whatsapp', 'email', 'portal'].forEach(function (c) {
+      var o = el('option', null, CHANNEL_LABEL[c]);
+      o.value = c;
+      chan.appendChild(o);
+    });
+    box.appendChild(chan);
+
+    var send = el('button', 'btn btn-outline btn-sm', 'שליחה ללקוח');
+    send.type = 'button';
+    send.setAttribute('aria-label', 'שליחת הדרישה ' + r.title);
+    send.addEventListener('click', function () {
+      send.disabled = true;
+      Api.sendRequirement(r.id, chan.value)
+        .then(function (res) {
+          return refreshComms().then(function () {
+            /* אין ספק מוגדר. כישלון אינו שגיאה אלא מצב ידוע,
+               ולכן הוא נאמר במפורש ולא מוצג כתקלה. */
+            toast(res.ok ? 'נרשם משלוח בערוץ ' + CHANNEL_LABEL[chan.value] + '.'
+                         : 'המשלוח נרשם אך לא יצא: ' + (res.reason || 'אין ספק מוגדר.'));
+          });
+        })
+        .catch(function (err) {
+          send.disabled = false;
+          toast(err.message || 'השליחה נכשלה.');
+        });
+    });
+    box.appendChild(send);
+
+    var remind = el('button', 'btn btn-outline btn-sm',
+      r.activeReminders ? 'תזכורת פעילה' : 'תזכורת כל 3 ימים');
+    remind.type = 'button';
+    remind.disabled = !!r.activeReminders;
+    remind.setAttribute('aria-label', 'הגדרת תזכורת לדרישה ' + r.title);
+    remind.addEventListener('click', function () {
+      remind.disabled = true;
+      Api.createReminder(r.id, { every_days: 3, channel: chan.value })
+        .then(refreshComms)
+        .then(function () {
+          toast('התזכורת נשמרה. היא תיעצר אוטומטית כשהדרישה תושלם. ' +
+                'אין כרגע מנגנון שליחה אוטומטי - השליחה ידנית.');
+        })
+        .catch(function (err) {
+          remind.disabled = false;
+          toast(err.message || 'הגדרת התזכורת נכשלה.');
+        });
+    });
+    box.appendChild(remind);
+
+    box.appendChild(reqButton('סימון שהושלמה', 'btn-ok', r,
+      function () { return Api.completeRequirement(r.id); },
+      'הדרישה סומנה כהושלמה והתזכורות נעצרו.'));
+    box.appendChild(reqButton('ביטול', 'btn-stop', r,
+      function () { return Api.cancelRequirement(r.id); },
+      'הדרישה בוטלה והתזכורות נעצרו.'));
+    return box;
+  }
+
+  function reqButton(label, kind, r, action, okMessage) {
+    var btn = el('button', 'btn ' + kind + ' btn-sm', label);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', label + ' · ' + r.title);
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      action().then(refreshComms).then(function () { toast(okMessage); })
+        .catch(function (err) {
+          btn.disabled = false;
+          toast(err.message || 'הפעולה נכשלה.');
+        });
+    });
+    return btn;
+  }
+
+  /* ---- השיחה ---- */
+
+  function loadConversation() {
+    if (!openId) return Promise.resolve();
+    return Api.conversation(openId).then(function (data) {
+      var thread = $('chatThread');
+      thread.textContent = '';
+
+      $('chatUnread').textContent = data.unread ? ' · ' + data.unread + ' חדשות' : '';
+      $('chatIntro').textContent = data.messages.length
+        ? 'ההודעות בתיק, נכנסות ויוצאות.'
+        : 'אין עדיין הודעות בתיק הזה.';
+
+      data.messages.forEach(function (m) {
+        var li = el('li', 'chat-msg chat-' + m.direction);
+        var head = el('p', 'chat-head');
+        head.appendChild(el('span', 'chat-who',
+          m.direction === 'inbound' ? 'הלקוח' : (m.sender || 'המשרד')));
+        head.appendChild(el('span', 'chat-when num', stamp(m.at)));
+        head.appendChild(el('span', 'chat-chan', CHANNEL_LABEL[m.channel] || m.channel));
+        if (m.direction === 'inbound' && !m.readAt) {
+          head.appendChild(statusTag({ tag: 'tag-warn', mark: '●', text: 'חדשה' }));
+        }
+        li.appendChild(head);
+        li.appendChild(el('p', 'chat-body', m.body));
+        if (m.requirementTitle) {
+          li.appendChild(el('p', 'chat-link', 'בקשר ל: ' + m.requirementTitle));
+        }
+        thread.appendChild(li);
+      });
+
+      /* סימון נקרא רק כשהלשונית באמת מוצגת - אחרת "נקרא" היה
+         נרשם על הודעות שאיש לא ראה. */
+      if (caseNav.current() === 'comms') {
+        data.messages.forEach(function (m) {
+          if (m.direction === 'inbound' && !m.readAt) {
+            Api.markConversationRead(m.id).catch(function () {});
+          }
+        });
+      }
+    }).catch(function (err) {
+      $('chatIntro').textContent = err.message || 'לא הצלחנו לטעון את השיחה.';
+    });
+  }
+
+  function refreshComms() {
+    return loadRequirements().then(loadConversation);
+  }
+
+  /* ---- טופס דרישה חדשה ---- */
+
+  var reqNewForm = $('reqNewForm');
+
+  $('reqNew').addEventListener('click', function () {
+    var opening = reqNewForm.hidden;
+    reqNewForm.hidden = !opening;
+    $('reqNew').setAttribute('aria-expanded', String(opening));
+    if (opening) $('reqTitle').focus();
+  });
+
+  $('reqNewCancel').addEventListener('click', function () {
+    reqNewForm.reset();
+    reqNewForm.hidden = true;
+    $('reqNew').setAttribute('aria-expanded', 'false');
+    $('reqNew').focus();
+  });
+
+  reqNewForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = $('reqNewError');
+    err.hidden = true;
+
+    var title = $('reqTitle').value.trim();
+    if (title.length < 2) {
+      err.textContent = 'צריך כותרת לדרישה.';
+      err.hidden = false;
+      return $('reqTitle').focus();
+    }
+
+    /* נקרא לפני ה-reset. קריאה אחריו מחזירה את ברירת המחדל
+       של ה-select ולא את מה שנבחר. */
+    var kind = $('reqKind').value;
+
+    Api.createRequirement(openId, {
+      kind: kind,
+      title: title,
+      guidance: $('reqGuidance').value.trim() || null,
+      due_at: $('reqDue').value || null,
+      priority: $('reqPriority').value
+    }).then(function () {
+      reqNewForm.reset();
+      reqNewForm.hidden = true;
+      $('reqNew').setAttribute('aria-expanded', 'false');
+      return refreshComms();
+    }).then(function () {
+      /* דרישת מסמך יוצרת גם שורת מסמך - אותה שורה שתופיע
+         בקלסר. זה נאמר כדי שלא ייווצר רושם של כפילות. */
+      toast(kind === 'document'
+        ? 'הדרישה נוצרה, והמסמך נוסף לרשימת המסמכים של התיק.'
+        : 'הדרישה נוצרה.');
+      return renderCase();
+    }).catch(function (e2) {
+      err.textContent = e2.message || 'יצירת הדרישה נכשלה.';
+      err.hidden = false;
+      $('reqTitle').focus();
+    });
+  });
+
+  $('chatForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = $('chatError');
+    err.hidden = true;
+
+    var body = $('chatBody').value.trim();
+    if (!body) {
+      err.textContent = 'אי אפשר לשלוח הודעה ריקה.';
+      err.hidden = false;
+      return $('chatBody').focus();
+    }
+
+    Api.sendConversation(openId, body)
+      .then(function () {
+        $('chatBody').value = '';
+        return loadConversation();
+      })
+      .then(function () { toast('ההודעה נשלחה ללקוח.'); })
+      .catch(function (e2) {
+        err.textContent = e2.message || 'השליחה נכשלה.';
+        err.hidden = false;
+      });
+  });
+
+
   /* ================= מצב התיק =================
      מסך שאפשר להבין ממנו את התיק בשניות. הוא אינו מחזיק נתון
      משלו: הכול נגזר מ-currentCase וממשימות התיק שכבר נטענו.
@@ -743,6 +1058,7 @@
       renderCaseTasks().then(function (tasks) {
         renderCaseState(file, tasks);
       });
+      refreshComms();
       renderLog(openId);
       /* הבאנר חייב להישאר גם כאן: מועד קריטי בתיק אחר לא
          אמור להיעלם רק כי נפתח תיק. */

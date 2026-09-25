@@ -112,6 +112,17 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
         messages = cur.fetchall()
 
         cur.execute(
+            """select id, kind, title, guidance, due_at, status
+                 from case_requirements
+                where case_id = %s and firm_id = %s
+                  and kind <> 'document'
+                  and status in ('open', 'sent')
+                order by due_at nulls last, created_at""",
+            (case_id, identity.firm_id),
+        )
+        requirements = cur.fetchall()
+
+        cur.execute(
             """select s.position, s.title, s.description, s.is_terminal,
                       (select max(e.occurred_at)
                          from case_stage_events e
@@ -190,6 +201,15 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
             "important": m["is_important"],
             "date": m["sent_at"].date().isoformat(),
         } for m in messages],
+        # דרישות שאינן מסמך. דרישת מסמך כבר מוצגת ברשימת
+        # המסמכים, ולכן היא מסוננת כאן - אחרת אותו דבר היה
+        # מופיע פעמיים באותו מסך.
+        "requirements": [{
+            "id": str(q["id"]), "kind": q["kind"], "title": q["title"],
+            "guidance": q["guidance"],
+            "dueAt": q["due_at"].isoformat() if q["due_at"] else None,
+            "status": q["status"],
+        } for q in requirements],
         "stages": [{
             "position": s["position"], "title": s["title"],
             "desc": s["description"], "isTerminal": s["is_terminal"],

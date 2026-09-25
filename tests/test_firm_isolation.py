@@ -94,6 +94,11 @@ def second_firm():
     with cursor(commit=True) as cur:
         cur.execute("delete from sessions where firm_id = %s", (firm_id,))
         cur.execute("delete from audit_log where firm_id = %s", (firm_id,))
+        cur.execute("delete from case_conversation where firm_id = %s", (firm_id,))
+        cur.execute("delete from message_deliveries where firm_id = %s", (firm_id,))
+        cur.execute("delete from reminder_rules where firm_id = %s", (firm_id,))
+        cur.execute("update case_documents set requirement_id = null where firm_id = %s", (firm_id,))
+        cur.execute("delete from case_requirements where firm_id = %s", (firm_id,))
         cur.execute("delete from case_tasks where firm_id = %s", (firm_id,))
         cur.execute("delete from case_documents where firm_id = %s", (firm_id,))
         cur.execute("delete from case_stage_events where firm_id = %s", (firm_id,))
@@ -307,3 +312,43 @@ def test_client_of_firm_b_cannot_reply_to_firm_a_document(api, second_firm):
                  json={"kind": "dont-have"},
                  headers={"X-CSRF-Token": resp.jar["portal_csrf"]})
     assert r.status_code == 404
+
+
+def test_firm_a_cannot_read_firm_b_requirements(api, second_firm):
+    _login_seed_staff(api)
+    r = api.get("/api/office/cases/%s/requirements" % second_firm["case_id"])
+    assert r.status_code == 404, "משרד קיבל דרישות של תיק של משרד אחר"
+
+
+def test_firm_a_cannot_read_firm_b_conversation(api, second_firm):
+    _login_seed_staff(api)
+    r = api.get("/api/office/cases/%s/conversation" % second_firm["case_id"])
+    assert r.status_code == 404, "משרד קרא שיחה של תיק של משרד אחר"
+
+
+def test_firm_a_cannot_write_into_firm_b_conversation(api, second_firm):
+    csrf = _login_seed_staff(api)
+    r = api.post("/api/office/cases/%s/conversation" % second_firm["case_id"],
+                 json={"body": "חדירה"}, headers={"X-CSRF-Token": csrf})
+    assert r.status_code == 404, "משרד כתב לשיחה של משרד אחר"
+
+
+def test_firm_a_cannot_touch_firm_b_requirement(api, second_firm):
+    """דרישה של משרד אחר - 404 בכל פעולה, ולא 403."""
+    csrf = _login_seed_staff(api)
+    with cursor(commit=True) as cur:
+        cur.execute("""insert into case_requirements
+                         (firm_id, case_id, kind, title)
+                       values (%s, %s, 'info', 'דרישה של משרד ב') returning id""",
+                    (second_firm["firm_id"], second_firm["case_id"]))
+        rid = cur.fetchone()["id"]
+
+    for path, payload in [("complete", None), ("cancel", None),
+                          ("send", {"channel": "sms"}),
+                          ("reminders", {"every_days": 3, "channel": "sms"})]:
+        r = api.post("/api/office/requirements/%s/%s" % (rid, path),
+                     json=payload, headers={"X-CSRF-Token": csrf})
+        assert r.status_code == 404, "משרד ביצע %s על דרישה של משרד אחר" % path
+
+    assert api.get("/api/office/requirements/%s/deliveries" % rid
+                   ).status_code == 404
