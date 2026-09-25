@@ -1,0 +1,387 @@
+/* ==========================================================
+   DESIGN SYSTEM 2.0 - הרחבה לכל ממשק המשרד
+   ----------------------------------------------------------
+   ds.css מחזיק את הפרימיטיבים ואת הדשבורד. הקובץ הזה פורס
+   את אותה שפה על המסכים שכבר היו: שמונת האזורים, סביבת
+   התיק ומסך הכניסה.
+
+   ההפרדה מכוונת. ds.css הוא השפה, וזה גובה ההגירה של הקוד
+   הישן אליה. אם מסך נבנה מחדש בעתיד, השורות שלו כאן נמחקות
+   ולא נדרס דבר.
+
+   פורטל הלקוחות והדפים הציבוריים אינם מושפעים: כל כלל כאן
+   פותח ב-body.admin, והם אינם נושאים את המחלקה ואינם טוענים
+   את הקובץ. הפורטל כפוף לת"י 5568 עם פרופיל משלו - טקסט
+   19px, מטרות מגע 52px וניגודיות מעל 7:1 - ולכן הוא אינו
+   אמור לרשת את הסקאלה הזאת בלי החלטה נפרדת.
+
+   העיקרון זהה לאורך כל הקובץ: מרווח, קו דק וטיפוגרפיה
+   מחליפים מסגרות, מילויים וצ'יפים צבעוניים.
+   ========================================================== */
+
+body.admin { background: var(--ds-ground); color: var(--ds-ink); }
+
+/* הכללים שנכתבו במקור לקנבס הכהה הופכים לבהיר-על-בהיר ברגע
+   שהקנבס מתהפך. זו הרשימה המלאה שלהם. */
+body.admin .page > h1,
+body.admin .page > section > h1,
+body.admin .page .view > h1,
+body.admin .page .case-head > h1,
+body.admin .view-title,
+body.admin .login-head h1 { color: var(--ds-ink); }        /* 13.46:1 */
+
+body.admin .page > .lead,
+body.admin .page > section > .lead,
+body.admin .page .view > .lead,
+body.admin .view .lead,
+body.admin .login-head .lead,
+body.admin .page #caseMeta,
+body.admin .small-print { color: var(--ds-ink-soft); }     /* 6.23:1 */
+
+body.admin .page {
+  max-width: var(--ds-page-max);
+  padding-inline: var(--ds-gutter);
+  padding-block: var(--ds-space-48) var(--ds-space-96);
+}
+
+/* ---- טיפוגרפיה רוחבית ----
+   h1/h2/h3 החשופים שייכים גם לפורטל הלקוחות, ולכן הם נדרסים
+   כאן בתוך body.admin בלבד ולא בכלל הבסיס ב-style.css. */
+body.admin h1 { font-family: var(--ds-serif); letter-spacing: var(--ds-ls-section); }
+body.admin h2 {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-title);
+  letter-spacing: var(--ds-ls-section);
+  line-height: var(--ds-lh-snug);
+  color: var(--ds-ink);
+}
+body.admin h3 {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+}
+body.admin .view-title {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-section);
+  line-height: var(--ds-lh-tight);
+}
+body.admin .item-note { color: var(--ds-ink-soft); font-size: var(--ds-size-meta); }
+
+/* ---- פירוק התיבות ----
+   .block היה מלבן לבן ממוסגר סביב כמעט כל דבר. עכשיו הוא
+   משטח בלי מסגרת, והמרווח הוא שמפריד. */
+body.admin .block {
+  background: var(--ds-surface);
+  border: 0;
+  border-radius: var(--ds-radius);
+  padding: var(--ds-space-32);
+}
+
+/* ---- טבלת התיקים ----
+   בלי מסגרת חיצונית ובלי פסים מתחלפים: קו שיער מתחת לשורה,
+   וכותרת שהיא תווית ולא כותרת בתוך משבצת אפורה. */
+body.admin table.cases {
+  background: none; border: 0;
+  border-collapse: collapse; width: 100%;
+}
+body.admin table.cases thead th {
+  background: none; border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-ink);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  padding: 0 var(--ds-space-16) var(--ds-space-12);
+  text-align: start;
+}
+body.admin table.cases td {
+  background: none; border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  padding: var(--ds-space-24) var(--ds-space-16);
+  font-size: var(--ds-size-body);
+  vertical-align: baseline;
+}
+body.admin table.cases tbody tr {
+  transition: background-color var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin table.cases tbody tr:hover { background: var(--ds-accent-wash); }
+body.admin table.cases .client {
+  font-size: var(--ds-size-item);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+}
+body.admin table.cases .sub { font-size: var(--ds-size-meta); color: var(--ds-ink-soft); }
+
+/* שם לקוח ומספר תיק נשברו לשתיים ושלוש שורות: הריווח הנדיב
+   צר מדי לטבלה. מזהים אינם נשברים לעולם, והכפתור נשאר
+   בשורה אחת - הוא מטרת מגע ולא טקסט רץ. */
+body.admin table.cases .client,
+body.admin table.cases .num,
+body.admin table.cases .sub,
+body.admin table.cases .btn { white-space: nowrap; }
+body.admin table.cases th,
+body.admin table.cases td { padding-inline: var(--ds-space-8); }
+body.admin table.cases td { padding-block: var(--ds-space-16); }
+body.admin table.cases td:first-child { padding-inline-start: 0; }
+body.admin table.cases td:last-child  { padding-inline-end: 0; }
+body.admin .wide { overflow-x: auto; }
+
+/* ---- מונים ----
+   מספר בסריף, לא צ'יפ ממולא. */
+body.admin .count {
+  background: none; border: 0;
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-title);
+  font-weight: var(--ds-weight-bold);
+  padding: 0; min-width: 0;
+  color: var(--ds-ink-soft);
+  direction: ltr; unicode-bidi: plaintext;
+}
+body.admin .count.hot  { color: var(--ds-accent-ink); }   /* 6.19:1 על surface */
+body.admin .count.calm { color: var(--ds-done); }         /* 6.84:1 על surface */
+
+/* ---- תגי סטטוס ----
+   קו עליון דק במקום כדור ממולא. הסמל והמילים נשמרים כפי
+   שהם, ולכן הצבע ממשיך לא להיות הערוץ היחיד. */
+body.admin .tag {
+  background: none; border: 0;
+  border-top: 2px solid currentColor;
+  border-radius: var(--ds-radius);
+  padding: var(--ds-space-4) 0 0;
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+}
+body.admin .tag-ok      { color: var(--ds-done); }        /* 6.84:1 */
+body.admin .tag-warn    { color: var(--ds-accent-ink); }  /* 6.19:1 */
+body.admin .tag-wait    { color: var(--ds-ink-soft); }    /* 6.92:1 */
+body.admin .tag-stop    { color: var(--ds-risk); }        /* 8.95:1 */
+body.admin .tag-overdue { color: var(--ds-risk); }
+body.admin .tag-legal   { color: var(--ds-ink); }         /* 14.97:1 */
+
+/* ---- שבבי סינון ----
+   קו תחתון במקום מלבן. הפעיל מסומן בצבע, במשקל ובקו. */
+body.admin .chips { gap: var(--ds-space-24); flex-wrap: wrap; }
+body.admin .chip {
+  background: none; border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--ds-radius);
+  color: var(--ds-ink-soft);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  padding: 0 0 var(--ds-space-8);
+  min-height: var(--ds-touch-min);
+  transition: color var(--ds-motion-normal) var(--ds-ease),
+              border-color var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .chip:hover { color: var(--ds-ink); border-bottom-color: var(--ds-hairline); }
+body.admin .chip[aria-pressed="true"] {
+  color: var(--ds-ink);
+  font-weight: var(--ds-weight-medium);
+  border-bottom-color: var(--ds-accent);
+}
+body.admin .chip-n { opacity: .7; }
+body.admin .chip-zero { opacity: .45; }
+
+/* ---- כפתורים ----
+   מכוונים בתוך .page בלבד, כדי שכפתורי הסרגל העליון
+   שמעוצבים ב-ds.css לא ייתפסו כאן. */
+body.admin .page .btn {
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  min-height: var(--ds-touch-min);
+  transition: background-color var(--ds-motion-normal) var(--ds-ease),
+              color var(--ds-motion-normal) var(--ds-ease),
+              border-color var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .page .btn-primary {
+  background: var(--ds-ink); border-color: var(--ds-ink);
+  color: var(--ds-ground);                                /* 13.46:1 */
+}
+body.admin .page .btn-primary:hover {
+  background: var(--ds-accent-ink); border-color: var(--ds-accent-ink);
+}
+body.admin .page .btn-outline,
+body.admin .page .btn-quiet {
+  background: none;
+  border: var(--ds-hairline-w) solid var(--ds-ink-soft);
+  color: var(--ds-ink);
+}
+body.admin .page .btn-outline:hover,
+body.admin .page .btn-quiet:hover { background: var(--ds-accent-wash); }
+body.admin .page .btn-sm { font-size: var(--ds-size-label); }
+
+/* אישור ודחייה היו ירוק ואדום גנריים וממולאים, והם צרמו מול
+   הפלטה החמה. עכשיו שניהם שקטים: רקע רחיצה עדין, קו דק וטקסט
+   בצבע. הפעולה נשארת ברורה, אבל היא אינה צועקת מהמסך.
+
+   ההבדל ביניהם אינו רק הצבע: האישור נושא סימן ✓ והדחייה
+   נושאת מסגרת מלאה מול קו תחתון, ולכן הם נבדלים גם בלי צבע.
+   העיגול נשאר 0 - פינות חדות הן כלל בפרויקט. */
+body.admin .page .btn-ok {
+  background: var(--ds-done-wash);
+  border: var(--ds-hairline-w) solid var(--ds-done);
+  color: #33401f;                                         /* 8.17:1 על ה-wash */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .page .btn-ok:hover {
+  background: var(--ds-done); border-color: var(--ds-done);
+  color: var(--ds-ground);                                /* 6.15:1 */
+}
+body.admin .page .btn-stop {
+  background: none;
+  border: var(--ds-hairline-w) solid var(--ds-hairline);
+  color: var(--ds-risk);                                  /* 8.95:1 */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .page .btn-stop:hover {
+  background: var(--ds-risk-wash); border-color: var(--ds-risk);
+}
+
+/* ---- אזור בדיקת המסמכים ----
+   פחות מלבנים וצפיפות: כל מסמך מקבל אוויר, והפרדה בקו שיער
+   במקום בתיבה. הכפתורים יורדים לשורה משלהם עם מרווח, כדי
+   שהם לא ייראו כמו זוג משבצות דבוקות לטקסט. */
+body.admin .page .doc,
+body.admin .page .gap-row,
+body.admin .page .review-row {
+  background: none; border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  border-radius: var(--ds-radius);
+  padding-block: var(--ds-space-24);
+}
+body.admin .page .doc:last-child,
+body.admin .page .gap-row:last-child,
+body.admin .page .review-row:last-child { border-bottom: 0; }
+body.admin .page .doc .btn + .btn,
+body.admin .page .review-row .btn + .btn { margin-inline-start: var(--ds-space-12); }
+
+/* ---- סביבת התיק ---- */
+body.admin .case-head {
+  background: none; border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-ink);
+  padding: 0 0 var(--ds-space-24);
+  margin-bottom: var(--ds-space-32);
+}
+body.admin .case-head h1 { font-size: var(--ds-size-section); }
+body.admin .case-facts { font-size: var(--ds-size-meta); color: var(--ds-ink-soft); }
+body.admin .case-tabs {
+  background: none; border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  gap: var(--ds-space-24);
+}
+body.admin .case-tabs a {
+  background: none; border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--ds-radius);
+  color: var(--ds-ink-soft);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  padding: 0 0 var(--ds-space-12);
+  min-height: var(--ds-touch-min);
+  transition: color var(--ds-motion-normal) var(--ds-ease),
+              border-color var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .case-tabs a:hover { color: var(--ds-ink); border-bottom-color: var(--ds-hairline); }
+body.admin .case-tabs a[aria-current="page"] {
+  color: var(--ds-ink);
+  font-weight: var(--ds-weight-medium);
+  border-bottom-color: var(--ds-accent);
+}
+
+/* ---- באנר המועדים ואזהרת ההדגמה, בכל אזור ---- */
+body.admin .deadline-banner {
+  background: none; border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-risk);
+  padding: var(--ds-space-4) 0;
+  padding-inline-start: var(--ds-space-24);
+  margin: 0 0 var(--ds-space-32);
+}
+body.admin .deadline-banner .banner-toggle {
+  background: none; border: 0;
+  color: var(--ds-accent-ink);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  text-decoration: underline; text-underline-offset: 4px;
+  padding: 0 var(--ds-space-8);
+  min-height: var(--ds-touch-min);
+}
+body.admin .demo-warning {
+  background: none; border: 0;
+  color: var(--ds-ink-soft);
+  font-size: var(--ds-size-meta);
+  padding: 0; margin: 0 0 var(--ds-space-32);
+}
+body.admin .demo-warning code {
+  background: none; border: 0; padding: 0;
+  font-family: var(--ds-sans); color: var(--ds-ink-soft);
+}
+
+/* ---- שדות טופס ----
+   קו אחד מתחת לשדה במקום תיבה ממוסגרת. */
+body.admin .field label {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+}
+body.admin .field .hint { font-size: var(--ds-size-meta); color: var(--ds-ink-soft); }
+body.admin .field input,
+body.admin .field select,
+body.admin .field textarea {
+  background: var(--ds-surface);
+  border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-ink-soft);
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  color: var(--ds-ink);
+}
+body.admin .field input:focus-visible,
+body.admin .field select:focus-visible,
+body.admin .field textarea:focus-visible {
+  outline: var(--ds-focus); outline-offset: 2px;
+  border-bottom-color: var(--ds-accent);
+}
+
+/* ---- מסך הכניסה ----
+   נושא body.admin אך יושב מחוץ ל-.page, ולכן הוא מקבל
+   טיפוגרפיה משלו כאן. */
+body.admin #loginView .login-head h1 {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-display);
+  letter-spacing: var(--ds-ls-display);
+  line-height: var(--ds-lh-tight);
+}
+body.admin #loginView .firm {
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+}
+body.admin .demo-box {
+  background: none; border: 0;
+  border-top: var(--ds-hairline-w) solid var(--ds-hairline);
+  color: var(--ds-ink-soft);
+  font-size: var(--ds-size-meta);
+}
+
+/* ---- פאנלים פנימיים בתיק ----
+   הסרת מסגרות ומילויים בלבד. הסדר, התוכן וההתנהגות שלהם
+   נבדקו בשלבים א'-ג' ואינם משתנים כאן. */
+body.admin .state-block,
+body.admin .next-card,
+body.admin .attn-item,
+body.admin .task-row,
+body.admin .req-row,
+body.admin .legal-panel,
+body.admin .assist-msg,
+body.admin .log-row { border-radius: var(--ds-radius); }

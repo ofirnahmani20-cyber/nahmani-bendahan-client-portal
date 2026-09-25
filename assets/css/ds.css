@@ -1,0 +1,829 @@
+/* ==========================================================
+   DESIGN SYSTEM 2.0 - primitives, מעטפת ודשבורד
+   ----------------------------------------------------------
+   NAHMANI BEN-DAHAN · Legal Practice Management Platform
+
+   כל כלל בקובץ הזה פותח ב-body.admin. admin.html הוא הדף
+   היחיד שנושא את המחלקה, ולכן פורטל הלקוחות והדפים הציבוריים
+   אינם יכולים להיות מושפעים - גם אם מישהו יטען את הקובץ בטעות.
+   כל שם מחלקה נושא תחילית .ds-, כדי שלא ייווצר עימות עם מאה
+   שמות המחלקות הגנריים שכבר קיימים.
+
+   שתי רמות scope:
+   1. המעטפת מעוצבת תמיד. היא כהה גם היום וגם בשפה החדשה.
+   2. הקנבס הבהיר חל רק כש-body נושא .ds-on, וזה קורה רק
+      כשהדשבורד פעיל. בלי השער הזה כל הכללים שקובעים טקסט
+      בהיר על כהה (style.css:789-801) היו הופכים בהיר על בהיר.
+
+   ----------------------------------------------------------
+   ארבעת העקרונות שנלקחו מהשפה הוויזואלית שנמדדה:
+
+   א. הקפיצה בין המדרגות עצומה. כותרת מקטע גדולה פי שלושה
+      מכותרת פריט. ההיררכיה היא הטיפוגרפיה, לא מסגרות.
+
+   ב. ה-eyebrow גדול אך דק. הניגוד מגיע מהמשקל ומהצבע, לא
+      מהגודל בלבד - זה ההפך מתווית זעירה ומודגשת.
+
+   ג. רשימה = מונה תלוי בעמודה משלו, בגודל הכותרת, ולידו
+      קו אנכי דק וקצר. אפס כרטיסים, אפס מסגרות, אפס מילוי.
+
+   ד. מקטעים נחתכים בבלוקים של צבע מלא ולא בקווים.
+   ========================================================== */
+
+
+/* ==========================================================
+   1. מעטפת
+   ========================================================== */
+
+body.admin .topbar {
+  background: var(--ds-espresso);
+  padding: 0 var(--ds-gutter);
+  z-index: var(--ds-z-bar);
+  border-bottom: 0;
+  transition: box-shadow var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .topbar-in {
+  max-width: var(--ds-page-max);
+  min-height: 92px;
+  gap: var(--ds-space-24) var(--ds-space-48);
+}
+/* הסרגל נפרד מהתוכן רק אחרי גלילה. עד אז הוא חלק מהמסך.
+   admin.js מוסיף את המחלקה. */
+body.admin .topbar.ds-lifted {
+  box-shadow: 0 1px 0 0 #574d40;
+}
+
+/* ---- הניווט ----
+   גדול ונדיב. הפריט הפעיל מסומן בצבע, במשקל ובקו - שלושה
+   ערוצים. קו השיער שהפריד בין הפריטים יורד: המרווח מפריד. */
+body.admin .sitenav li + li::before { display: none; }
+body.admin .sitenav ul { gap: var(--ds-space-8) var(--ds-space-32); }
+body.admin .sitenav a {
+  min-height: var(--ds-touch-min);
+  font-family: var(--ds-sans);
+  font-size: 15px;
+  font-weight: var(--ds-weight-regular);
+  letter-spacing: 0.01em;
+  color: var(--ds-on-dark-dim);            /*  7.70:1 על החום */
+  border-bottom: 0;
+  padding: 0;
+  position: relative;
+  transition: color var(--ds-motion-normal) var(--ds-ease);
+}
+/* הקו נפתח מהמרכז במקום להופיע - התנועה היחידה בניווט */
+body.admin .sitenav a::after {
+  content: ""; position: absolute; inset-inline: 0; bottom: 22px;
+  height: 1px; background: var(--ds-accent-on-dark);
+  transform: scaleX(0); transform-origin: center;
+  transition: transform var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .sitenav a:hover { color: var(--ds-on-dark); }
+body.admin .sitenav a:hover::after { transform: scaleX(1); }
+body.admin .sitenav a[aria-current="page"] {
+  color: var(--ds-on-dark);                /* 10.17:1 */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .sitenav a[aria-current="page"]::after {
+  transform: scaleX(1);
+  height: 2px;
+  background: var(--ds-accent-on-dark);    /* 6.31:1 - קו, לא טקסט */
+}
+
+/* ---- הלוגו ---- */
+body.admin .topbar .logo { gap: var(--ds-space-16); }
+body.admin .topbar .who {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);
+}
+
+/* ---- המגירה ---- */
+body.admin .drawer { background: var(--ds-espresso); z-index: var(--ds-z-drawer); }
+body.admin .drawer-overlay { z-index: var(--ds-z-overlay); }
+body.admin .drawer-link {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  min-height: 52px;
+}
+body.admin .drawer-eyebrow {
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);
+}
+
+
+/* ==========================================================
+   2. שורת הפקודה
+   ----------------------------------------------------------
+   עובדת רק מול יכולות שכבר קיימות: סינון רשימת התיקים שכבר
+   נטענה, וניווט לאזורים. אין כאן AI ואין פעולות משפטיות,
+   ואין שום דבר שמדמה תוצאה שלא התרחשה.
+   ========================================================== */
+
+body.admin .ds-cmd {
+  background: var(--ds-espresso);
+  border-top: 1px solid #574d40;
+  position: sticky; top: 92px;
+  z-index: calc(var(--ds-z-bar) - 1);
+}
+body.admin .ds-cmd-in {
+  max-width: var(--ds-page-max);
+  margin-inline: auto;
+  padding: var(--ds-space-12) var(--ds-gutter);
+  position: relative;
+}
+body.admin .ds-cmd-field { position: relative; display: block; }
+body.admin .ds-cmd-input {
+  width: 100%;
+  min-height: 52px;
+  background: transparent;
+  border: 0;
+  color: var(--ds-on-dark);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-eyebrow);
+  font-weight: var(--ds-weight-regular);
+  padding: 0;
+  border-radius: var(--ds-radius);
+}
+body.admin .ds-cmd-input::placeholder {
+  color: var(--ds-on-dark-dim);            /*  7.70:1 */
+  opacity: 1;
+}
+body.admin .ds-cmd-input:focus { outline: none; }
+body.admin .ds-cmd-input:focus-visible {
+  outline: var(--ds-focus); outline-offset: var(--ds-focus-gap);
+}
+body.admin .ds-cmd-hint {
+  position: absolute; inset-inline-end: 0;
+  top: 50%; transform: translateY(-50%);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);
+  pointer-events: none;
+}
+
+body.admin .ds-cmd-panel {
+  position: absolute;
+  inset-inline: var(--ds-gutter);
+  top: 100%;
+  background: var(--ds-surface);
+  border: var(--ds-hairline-w) solid var(--ds-hairline);
+  border-radius: var(--ds-radius);
+  max-height: 60vh; overflow-y: auto;
+  z-index: var(--ds-z-drawer);
+}
+body.admin .ds-cmd-group {
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  padding: var(--ds-space-16) var(--ds-space-24) var(--ds-space-8);
+  margin: 0;
+}
+body.admin .ds-cmd-list { list-style: none; margin: 0; padding: 0; }
+body.admin .ds-cmd-opt {
+  display: block; width: 100%; text-align: start;
+  background: none; border: 0;
+  border-inline-start: var(--ds-rule-w) solid transparent;
+  font-family: var(--ds-sans); font-size: var(--ds-size-body);
+  color: var(--ds-ink);
+  padding: var(--ds-space-12) var(--ds-space-24);
+  min-height: var(--ds-touch-min);
+  cursor: pointer;
+  border-radius: var(--ds-radius);
+  transition: background-color var(--ds-motion-fast) var(--ds-ease);
+}
+body.admin .ds-cmd-opt:hover,
+body.admin .ds-cmd-opt[aria-selected="true"] {
+  background: var(--ds-accent-wash);
+  border-inline-start-color: var(--ds-accent);
+}
+body.admin .ds-cmd-opt .ds-cmd-sub {
+  display: block;
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+  margin-top: 2px;
+}
+body.admin .ds-cmd-empty {
+  padding: var(--ds-space-24);
+  margin: 0;
+  font-size: var(--ds-size-body);
+  color: var(--ds-ink-soft);
+}
+
+
+/* ==========================================================
+   3. הקנבס - רק כשהדשבורד פעיל
+   ========================================================== */
+
+body.admin.ds-on { background: var(--ds-ground); color: var(--ds-ink); }
+
+/* ביטול כללי הטקסט הבהיר שנכתבו לקנבס הכהה. בלי אלה
+   הכותרות היו בהירות על בהיר ונעלמות לגמרי. */
+body.admin.ds-on .page > h1,
+body.admin.ds-on .page > .lead,
+body.admin.ds-on .page > section > h1,
+body.admin.ds-on .page > section > .lead,
+body.admin.ds-on .page .view > h1,
+body.admin.ds-on .page .view > .lead,
+body.admin.ds-on .small-print { color: var(--ds-ink); }
+
+/* ---- פירוק התיבות ----
+   הממשק הישן עטף כמעט כל דבר במלבן ממוסגר: אזהרת ההדגמה,
+   באנר המועדים, כפתורי הסרגל, רמז המקלדת. זה מה שקורא
+   כמיושן. במקום מסגרת סגורה - קו אחד, צבע וטיפוגרפיה. */
+
+body.admin.ds-on .demo-warning {
+  background: none; border: 0;
+  color: var(--ds-ink-soft);
+  font-size: var(--ds-size-meta);
+  padding: 0; margin: 0 0 var(--ds-space-48);
+}
+body.admin.ds-on .demo-warning code {
+  background: none; border: 0; padding: 0;
+  font-family: var(--ds-sans); color: var(--ds-ink-soft);
+}
+
+/* באנר המועדים: פס צד אחד במקום מלבן ורוד ממוסגר */
+body.admin.ds-on .deadline-banner {
+  background: none;
+  border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-risk);
+  padding: var(--ds-space-4) 0 var(--ds-space-4) 0;
+  padding-inline-start: var(--ds-space-24);
+  margin: 0 0 var(--ds-space-48);
+}
+body.admin.ds-on .deadline-banner .banner-toggle {
+  background: none; border: 0;
+  color: var(--ds-accent-ink);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  padding: 0 var(--ds-space-8);
+}
+
+/* כפתורי הסרגל: קישורי טקסט, לא מלבנים */
+body.admin .topbar .btn-quiet {
+  background: none; border: 0;
+  min-width: 0; padding: 0;
+  min-height: var(--ds-touch-min);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  text-decoration-color: transparent;
+  transition: color var(--ds-motion-normal) var(--ds-ease),
+              text-decoration-color var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .topbar .btn-quiet:hover {
+  background: none;
+  color: var(--ds-on-dark);
+  text-decoration-color: var(--ds-accent-on-dark);
+}
+body.admin .topbar-actions { gap: var(--ds-space-24); }
+
+/* הרוחב המלא. עד כה התוכן נדחס ל-1180 ומחצית המסך נשארה ריקה. */
+body.admin.ds-on .page {
+  max-width: var(--ds-page-max);
+  padding-inline: var(--ds-gutter);
+  padding-block: var(--ds-space-64) var(--ds-space-128);
+}
+
+
+/* ==========================================================
+   4. Primitives
+   ========================================================== */
+
+/* ---- Eyebrow ----
+   גדול אך דק. בעברית אין אותיות רישיות, ולכן ההבחנה היא
+   משקל, צבע ומרווח אותיות - לא text-transform. */
+body.admin .ds-eyebrow {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-eyebrow);
+  font-weight: var(--ds-weight-regular);
+  line-height: var(--ds-lh-snug);
+  color: var(--ds-ink-soft);
+  margin: 0;
+}
+body.admin .ds-label {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  margin: 0;
+}
+
+/* ---- Section ----
+   מרווח מפריד, לא מסגרת. הכותרת ענקית ויושבת על שורה משלה. */
+body.admin .ds-section { margin: 0 0 var(--ds-space-96); }
+body.admin .ds-section:last-child { margin-bottom: 0; }
+
+body.admin .ds-section-head {
+  display: flex; align-items: baseline;
+  flex-wrap: wrap; gap: var(--ds-space-8) var(--ds-space-24);
+  margin: 0 0 var(--ds-space-48);
+  padding-bottom: var(--ds-space-16);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+body.admin .ds-section-title {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-section);
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-tight);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);
+  margin: 0;
+}
+body.admin .ds-section-meta {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  margin: 0;
+  margin-inline-start: auto;
+}
+
+/* מקטע משני: כותרת קטנה בסאנס, כדי שלא יתחרה בלב המסך */
+body.admin .ds-quiet .ds-section-title {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-title);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: normal;
+}
+
+/* ---- Feed ----
+   הדפוס המרכזי: מונה תלוי בעמודה משלו, בגודל הכותרת, ולידו
+   קו אנכי דק. הקו קצר ותלוי - הוא אינו מסגרת ואינו עוטף דבר.
+   אפס כרטיסים ואפס מילוי רקע. */
+body.admin .ds-feed { list-style: none; margin: 0; padding: 0; }
+body.admin .ds-feed > li + li { margin-top: var(--ds-space-48); }
+
+body.admin .ds-row {
+  display: grid;
+  grid-template-columns: clamp(48px, 5vw, 76px) 1fr;
+  gap: 0 var(--ds-space-24);
+  width: 100%; text-align: start;
+  background: none; border: 0;
+  padding: 0;
+  font-family: var(--ds-sans);
+  border-radius: var(--ds-radius);
+}
+body.admin button.ds-row { cursor: pointer; }
+body.admin .ds-row:focus-visible {
+  outline: var(--ds-focus); outline-offset: var(--ds-space-8);
+}
+
+/* המונה ומתחתיו הקו התלוי */
+body.admin .ds-enum {
+  grid-column: 1; grid-row: 1 / span 4;
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--ds-space-8);
+  padding-top: var(--ds-space-8);
+}
+/* סימון הדחיפות. קטן בכוונה - הוא נועד לסריקה מהירה בעין,
+   לא להתחרות בכותרת. מופיע רק בשורות דחופות, ורק כחיזוק:
+   התג שלמטה נושא את הסמל ואת המילים. */
+body.admin .ds-enum-mark {
+  width: 6px; height: 6px;
+  background: var(--ds-ink-soft);
+  flex: 0 0 auto;
+  transition: transform var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .ds-row-r .ds-enum-mark { background: var(--ds-risk); }
+body.admin .ds-row-a .ds-enum-mark { background: var(--ds-accent); }
+/* מסתובב 45 מעלות בריחוף - התנועה היחידה בשורה */
+body.admin button.ds-row:hover .ds-enum-mark,
+body.admin button.ds-row:focus-visible .ds-enum-mark { transform: rotate(45deg); }
+body.admin .ds-enum-n {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-enum);
+  /* המשקל הבסיסי בינוני, כדי שהמודגש של הרמה העליונה
+     יהיה הבדל שנראה ולא הצהרה ריקה. */
+  font-weight: var(--ds-weight-medium);
+  line-height: var(--ds-lh-snug);
+  direction: ltr; unicode-bidi: plaintext;
+  color: var(--ds-ink-soft);
+}
+body.admin .ds-enum-rule {
+  flex: 1 1 auto; width: 1px; min-height: var(--ds-space-24);
+  background: var(--ds-hairline);
+  transition: background-color var(--ds-motion-normal) var(--ds-ease);
+}
+/* הדחיפות נמצאת בקו ובמונה - וגם בתג שנושא סמל ומילים,
+   ולכן הצבע לעולם אינו הערוץ היחיד. */
+/* ---- סולם הדחיפות ----
+   ארבע רמות, וכל רמה מסלימה בארבעה ערוצים בבת אחת: עובי הקו,
+   גודל הסימן ומילויו, משקל המונה, וצבע הכותרת. כך "באיחור"
+   לעולם אינו נראה כמו "קרוב", וההבדל נקרא גם בלי לזהות צבע.
+
+   1  מועד שחלף        אוכמנית · קו 4px · ריבוע מלא · כותרת צבועה
+   2  מתקרב או קריטי   ברונזה  · קו 3px · מעוין מלא
+   3  דורש בדיקה שלי   ברונזה  · קו 2px · ריבוע חלול
+   4  ממתין ללקוח      ניטרלי  · קו שיער · בלי סימן */
+
+body.admin .ds-row-u1 .ds-enum-n {
+  color: var(--ds-risk); font-weight: var(--ds-weight-bold);
+}
+body.admin .ds-row-u1 .ds-enum-rule { background: var(--ds-risk); width: 4px; }
+body.admin .ds-row-u1 .ds-enum-mark {
+  background: var(--ds-risk); width: 10px; height: 10px;
+}
+body.admin .ds-row-u1 .ds-row-title { color: var(--ds-risk); }   /* 8.05:1 */
+
+body.admin .ds-row-u2 .ds-enum-n { color: var(--ds-accent-ink); }
+body.admin .ds-row-u2 .ds-enum-rule { background: var(--ds-accent); width: 3px; }
+body.admin .ds-row-u2 .ds-enum-mark {
+  background: var(--ds-accent); width: 9px; height: 9px;
+  transform: rotate(45deg);
+}
+body.admin button.ds-row:hover .ds-row-u2 .ds-enum-mark { transform: rotate(45deg); }
+
+body.admin .ds-row-u3 .ds-enum-n { color: var(--ds-ink-soft); }
+body.admin .ds-row-u3 .ds-enum-rule { background: var(--ds-accent); width: 2px; }
+body.admin .ds-row-u3 .ds-enum-mark {
+  background: none; border: 2px solid var(--ds-accent);
+  width: 8px; height: 8px;
+}
+
+body.admin .ds-row-u4 .ds-enum-n { color: var(--ds-ink-soft); opacity: .75; }
+body.admin .ds-row-u4 .ds-enum-rule { background: var(--ds-hairline); width: 1px; }
+
+/* צבע התג לפי הרמה */
+body.admin .ds-badge-u1 { color: var(--ds-risk); }        /* 8.05:1 */
+body.admin .ds-badge-u2 { color: var(--ds-accent-ink); }  /* 5.57:1 */
+body.admin .ds-badge-u3 { color: var(--ds-accent-ink); }
+body.admin .ds-badge-u4 { color: var(--ds-ink-soft); }    /* 6.23:1 */
+/* התג של הרמה העליונה נושא גם קו עבה יותר, ולא רק צבע */
+body.admin .ds-badge-u1 { border-top-width: 3px; }
+
+body.admin .ds-row-title {
+  grid-column: 2;
+  font-size: var(--ds-size-item);
+  font-weight: var(--ds-weight-medium);
+  line-height: var(--ds-lh-snug);
+  letter-spacing: -0.01em;
+  color: var(--ds-ink);
+  margin: 0 0 var(--ds-space-8);
+}
+body.admin .ds-row-why {
+  grid-column: 2;
+  font-size: var(--ds-size-body);
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);
+  max-width: var(--ds-measure);
+  margin: 0 0 var(--ds-space-12);
+}
+body.admin .ds-row-foot {
+  grid-column: 2;
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--ds-space-8) var(--ds-space-24);
+}
+body.admin .ds-row-go {
+  font-size: var(--ds-size-meta);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-ink);             /* 5.57:1 */
+  margin: 0;
+  margin-inline-start: auto;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity var(--ds-motion-normal) var(--ds-ease),
+              transform var(--ds-motion-normal) var(--ds-ease);
+}
+/* הפעולה נחשפת בריחוף ובמיקוד. היא לעולם אינה המידע היחיד -
+   כל השורה היא כפתור, וקורא מסך מקבל אותה תמיד. */
+body.admin button.ds-row:hover .ds-row-go,
+body.admin button.ds-row:focus-visible .ds-row-go { opacity: 1; transform: none; }
+body.admin button.ds-row:hover .ds-row-title { color: var(--ds-accent-ink); }
+
+/* ---- MetaRow ---- */
+body.admin .ds-meta {
+  display: flex; flex-wrap: wrap;
+  gap: var(--ds-space-4) var(--ds-space-16);
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+  margin: 0;
+}
+body.admin .ds-meta > span { display: inline-flex; align-items: center; }
+body.admin .ds-meta > span + span::before {
+  content: "·"; margin-inline-end: var(--ds-space-16);
+  color: var(--ds-hairline);
+}
+body.admin .ds-num { direction: ltr; unicode-bidi: plaintext; white-space: nowrap; }
+
+/* ---- Badge ----
+   קו עליון דק במקום מסגרת סגורה. סמל + מילים תמיד; הסמל
+   aria-hidden והמילים נושאות את המשמעות. */
+body.admin .ds-badge {
+  display: inline-flex; align-items: center; gap: var(--ds-space-8);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  padding: var(--ds-space-4) 0 0;
+  border-top: 2px solid currentColor;
+  white-space: nowrap;
+}
+body.admin .ds-badge-r { color: var(--ds-risk); }
+body.admin .ds-badge-a { color: var(--ds-accent-ink); }
+body.admin .ds-badge-d { color: var(--ds-done); }
+body.admin .ds-badge-n { color: var(--ds-ink-soft); }
+
+/* ---- Button ---- */
+body.admin .ds-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--ds-touch-min);
+  padding: 0 var(--ds-space-24);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  border-radius: var(--ds-radius);
+  cursor: pointer;
+  transition: background-color var(--ds-motion-normal) var(--ds-ease),
+              color var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin .ds-btn-quiet {
+  background: none;
+  border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-ink);
+  color: var(--ds-ink);
+  padding: 0 0 var(--ds-space-4);
+  min-height: var(--ds-touch-min);
+}
+body.admin .ds-btn-quiet:hover {
+  background: none;
+  color: var(--ds-accent-ink);
+  border-bottom-color: var(--ds-accent);
+}
+
+/* ---- Empty / Loading / Error ---- */
+body.admin .ds-empty,
+body.admin .ds-loading,
+body.admin .ds-error {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-eyebrow);
+  line-height: var(--ds-lh-body);
+  max-width: var(--ds-measure);
+  margin: 0; padding: var(--ds-space-16) 0;
+}
+body.admin .ds-empty, body.admin .ds-loading { color: var(--ds-ink-soft); }
+body.admin .ds-error { color: var(--ds-risk); }
+
+
+/* ==========================================================
+   5. הדשבורד
+   ========================================================== */
+
+/* ---- א. הפתיחה ----
+   editorial ולא hero שיווקי. הכותרת בקצה אחד ומשפט ההקשר
+   בקצה השני, על אותו בסיס שורה - כך הרוחב מנוצל ולא נשאר
+   חצי מסך מת, וזה גם מה שקונה את התחושה העריכותית. */
+body.admin .ds-greet {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: var(--ds-space-24) var(--ds-space-64);
+  margin: 0 0 var(--ds-space-128);
+  padding-bottom: var(--ds-space-32);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+body.admin .ds-greet .ds-label {
+  grid-column: 1 / -1;
+  margin-bottom: var(--ds-space-16);
+}
+body.admin .ds-greet .ds-display { grid-column: 1; white-space: nowrap; }
+body.admin .ds-greet .ds-lede {
+  grid-column: 2;
+  padding-bottom: var(--ds-space-12);
+}
+body.admin .ds-display {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-display);
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-tight);
+  letter-spacing: var(--ds-ls-display);
+  color: var(--ds-ink);
+  margin: 0;
+}
+body.admin .ds-display:focus-visible { outline: var(--ds-focus); outline-offset: 8px; }
+body.admin .ds-lede {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-lede);
+  font-weight: var(--ds-weight-regular);
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);
+  max-width: var(--ds-measure);
+  margin: 0;
+}
+
+/* ---- הפריסה האסימטרית ----
+   עמודה ראשית רחבה לאזור תשומת הלב, ועמודה משנית צרה לסדר
+   היום ולתמונת המצב. זה מה שמנצל את המסך במקום להשאיר חצי
+   ממנו מת. */
+body.admin .ds-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ds-col-side);
+  gap: var(--ds-space-96) clamp(var(--ds-space-48), 6vw, 112px);
+  align-items: start;
+  margin: 0 0 var(--ds-space-128);
+}
+body.admin .ds-col-side > * + * { margin-top: var(--ds-space-96); }
+
+/* לב המסך. הכותרת שלו גדולה משל כל השאר. */
+body.admin .ds-attn .ds-section-title { font-size: var(--ds-size-display); }
+body.admin .ds-attn .ds-section-head { border-bottom-color: var(--ds-ink); }
+
+/* בעמודה הצרה הכל יורד מדרגה, אחרת שני הטורים מתחרים */
+body.admin .ds-col-side .ds-section-title {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-title);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: normal;
+}
+body.admin .ds-col-side .ds-section-head { margin-bottom: var(--ds-space-32); }
+body.admin .ds-col-side .ds-feed > li + li { margin-top: var(--ds-space-32); }
+body.admin .ds-col-side .ds-row { grid-template-columns: 40px 1fr; gap: 0 var(--ds-space-16); }
+body.admin .ds-col-side .ds-row-title { font-size: var(--ds-size-body); }
+body.admin .ds-col-side .ds-row-why { font-size: var(--ds-size-meta); }
+body.admin .ds-col-side .ds-enum-n { font-size: var(--ds-size-body); }
+
+/* ---- תמונת מצב ----
+   שורת מספרים גדולים בסריף. לא כרטיסי KPI. */
+body.admin .ds-stats { display: grid; gap: var(--ds-space-32); margin: 0; }
+body.admin .ds-stat {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--ds-space-16);
+  margin: 0;
+  padding-bottom: var(--ds-space-12);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+body.admin .ds-stat dt {
+  font-size: var(--ds-size-meta); color: var(--ds-ink-soft); margin: 0;
+}
+body.admin .ds-stat dd {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-title);
+  font-weight: var(--ds-weight-bold);
+  line-height: 1; color: var(--ds-ink); margin: 0;
+  direction: ltr; unicode-bidi: plaintext;
+}
+
+/* ---- ד. הפס הכהה: מה קרה במערכת ----
+   בלוק צבע מלא, לא קו מפריד. זה מה שנותן למסך קומפוזיציה
+   במקום רצף רשימות. */
+body.admin .ds-band {
+  background: var(--ds-espresso);
+  color: var(--ds-on-dark);
+  padding: var(--ds-space-96) var(--ds-gutter);
+  margin-inline: calc(var(--ds-gutter) * -1);
+}
+body.admin .ds-band .ds-section-title { color: var(--ds-on-dark); }
+body.admin .ds-band .ds-section-head {
+  border-bottom-color: #574d40; margin-bottom: var(--ds-space-32);
+}
+body.admin .ds-band .ds-section-meta,
+body.admin .ds-band .ds-empty,
+body.admin .ds-band .ds-loading { color: var(--ds-on-dark-dim); }
+body.admin .ds-band .ds-error { color: var(--ds-accent-on-dark); }
+
+/* שני פידים לצד זה: מה שקרה בתיקים תופס את הרוחב, ואירועי
+   הגישה יושבים בחלון צר ומופרד בקו. */
+body.admin .ds-band-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: var(--ds-space-48) clamp(var(--ds-space-48), 5vw, 88px);
+  align-items: start;
+}
+body.admin .ds-sys {
+  padding-inline-start: clamp(var(--ds-space-24), 3vw, 48px);
+  border-inline-start: var(--ds-hairline-w) solid #574d40;
+}
+body.admin .ds-sys-h { color: var(--ds-on-dark-dim); margin: 0 0 var(--ds-space-16); }
+body.admin .ds-sys-list { list-style: none; margin: 0; padding: 0; }
+body.admin .ds-sys-row {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--ds-space-8) 0;
+  font-size: var(--ds-size-meta);
+}
+body.admin .ds-sys-time {
+  direction: ltr; unicode-bidi: plaintext;
+  font-size: var(--ds-size-label);
+  letter-spacing: 0.04em;
+  color: var(--ds-on-dark-dim);            /*  7.70:1 */
+}
+body.admin .ds-sys-what { color: var(--ds-on-dark-dim); }
+body.admin .ds-sys-empty {
+  margin: 0; font-size: var(--ds-size-meta); color: var(--ds-on-dark-dim);
+}
+
+body.admin .ds-activity { list-style: none; margin: 0; padding: 0; }
+body.admin .ds-act-day {
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-on-dark);         /* 6.31:1 על החום */
+  padding: var(--ds-space-24) 0 var(--ds-space-8);
+  break-inside: avoid;
+}
+body.admin .ds-act-row {
+  display: grid; grid-template-columns: 52px 1fr auto;
+  gap: var(--ds-space-16);
+  align-items: baseline;
+  padding: var(--ds-space-8) 0;
+  font-size: var(--ds-size-meta);
+  break-inside: avoid;
+}
+body.admin .ds-act-time {
+  direction: ltr; unicode-bidi: plaintext; white-space: nowrap;
+  color: var(--ds-on-dark-dim);            /*  7.70:1 */
+}
+body.admin .ds-act-what { color: var(--ds-on-dark); }
+body.admin .ds-act-who  { color: var(--ds-on-dark-dim); }
+
+/* הערת הפערים. נאמרת במפורש כדי שלא ייווצר רושם שהפיד
+   מציג הכול - הוא מציג את מה שיש לו מקור אמיתי. */
+body.admin .ds-note {
+  font-size: var(--ds-size-meta);
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);
+  max-width: var(--ds-measure);
+  margin: var(--ds-space-32) 0 0;
+  padding-top: var(--ds-space-16);
+  border-top: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+
+
+/* ==========================================================
+   6. רספונסיביות
+   ----------------------------------------------------------
+   הסקאלה כבר נושמת דרך clamp, ולכן כאן מטפלים רק במבנה.
+   מובייל אינו דסקטופ מוקטן: תשומת לב נשארת ראשונה, והמקטעים
+   השקטים יורדים. הסדר נקבע ב-HTML ולא ב-order, ולכן סדר
+   הקריאה וסדר המיקוד נשארים זהים.
+   ========================================================== */
+
+@media (max-width: 1180px) {
+  body.admin .ds-cols { grid-template-columns: minmax(0, 1fr); }
+  body.admin .ds-col-side > * + * { margin-top: var(--ds-space-64); }
+  body.admin .ds-col-side .ds-section-title { font-size: var(--ds-size-section); }
+}
+
+@media (max-width: 1140px) {
+  body.admin .topbar-in { min-height: 76px; }
+  body.admin .ds-cmd { top: 76px; }
+}
+
+/* admin.css מסתיר את הניווט מתחת ל-1140 כי שמונה פריטים לא
+   נכנסו. בשפה החדשה הם צרים יותר, ולכן במקום להסתיר אותם
+   מצמצמים - והמגירה נשארת לרוחב שבו הם באמת לא נכנסים. */
+@media (min-width: 981px) and (max-width: 1140px) {
+  body.admin .sitenav { display: block; }
+  body.admin .sitenav ul { gap: var(--ds-space-4) var(--ds-space-12); }
+  body.admin .sitenav a { font-size: 13.5px; }
+  body.admin .hamburger { display: none; }
+  /* הסרגל נשבר לשתי שורות בשוליים של שני פיקסלים, ולכן כאן
+     גם המרווחים וגם הלוגו מצטמצמים - לא רק הניווט. */
+  body.admin .topbar-in { gap: var(--ds-space-8) var(--ds-space-16); flex-wrap: nowrap; }
+  body.admin .topbar .logo { gap: var(--ds-space-8); }
+  body.admin .topbar-actions { gap: var(--ds-space-16); flex-wrap: nowrap; }
+}
+
+@media (max-width: 980px) {
+  body.admin .ds-band-cols { grid-template-columns: minmax(0, 1fr); }
+  body.admin .ds-sys {
+    padding-inline-start: 0; border-inline-start: 0;
+    padding-top: var(--ds-space-24);
+    border-top: var(--ds-hairline-w) solid #574d40;
+  }
+}
+
+@media (max-width: 860px) {
+  body.admin .ds-cmd { position: static; }
+}
+
+@media (max-width: 560px) {
+  body.admin.ds-on .page { padding-block: var(--ds-space-32) var(--ds-space-64); }
+  body.admin .ds-greet   { margin-bottom: var(--ds-space-64); max-width: none; }
+  body.admin .ds-cols    { gap: var(--ds-space-64); margin-bottom: var(--ds-space-64); }
+  body.admin .ds-section { margin-bottom: var(--ds-space-64); }
+  body.admin .ds-section-head { margin-bottom: var(--ds-space-32); }
+  body.admin .ds-feed > li + li { margin-top: var(--ds-space-32); }
+  body.admin .ds-band { padding: var(--ds-space-64) var(--ds-gutter); }
+
+  /* הפעולה נחשפת בריחוף, ובמגע אין ריחוף */
+  body.admin .ds-row-go { opacity: 1; transform: none; }
+
+  /* המונה עובר מעל הכותרת: 76px עמודה בטלפון גוזלים מחצית שורה */
+  body.admin .ds-row { grid-template-columns: 1fr; gap: var(--ds-space-8); }
+  body.admin .ds-enum {
+    grid-column: 1; grid-row: auto;
+    flex-direction: row; align-items: center; gap: var(--ds-space-12);
+  }
+  body.admin .ds-enum-rule { width: var(--ds-space-32); min-height: 0; height: 1px; flex: 0 0 auto; }
+  body.admin .ds-row-title, body.admin .ds-row-why, body.admin .ds-row-foot { grid-column: 1; }
+  body.admin .ds-col-side .ds-row { grid-template-columns: 1fr; }
+}

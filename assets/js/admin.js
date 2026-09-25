@@ -113,7 +113,9 @@
     links: '.sitenav a[data-view], .drawer-link[data-view], #view-dashboard a[data-view]',
     announce: 'adminAnnounce',
     titleSel: '.view-title',
-    fallback: 'cases',
+    /* מרכז הפיקוד הוא מסך הפתיחה: כניסה בלי hash נוחתת בו
+       ולא ברשימת התיקים. */
+    fallback: 'dashboard',
     onLink: function () { drawer.close(false); },
     onShow: function (name) {
       /* תיק פתוח ובחרו אזור עליון - יוצאים מסביבת התיק. */
@@ -145,11 +147,37 @@
     }
   });
 
+  /* ---- הדשבורד ----
+     מודול נפרד שמקבל את תלויותיו במפורש, בדפוס של viewnav.
+     admin.js אינו חושף דבר ל-global בשבילו. */
+  DsDashboard.init({
+    Api: Api,
+    el: el,
+    describe: describe,
+    dayLabel: dayLabel,
+    clockOf: clockOf,
+    timeLeft: timeLeft,
+    announce: announce,
+    topNav: topNav,
+    openCase: function (id, tab) { return openCase(id, tab); },
+    staffInfo: function () { return staff; }
+  });
+
+  /** הקנבס הבהיר של שפת העיצוב חל רק על הדשבורד.
+      שבעת האזורים האחרים וסביבת התיק נשארים על הגרפיט,
+      ולכן כל הכללים שקובעים טקסט בהיר על כהה ממשיכים לחול
+      עליהם בדיוק כפי שחלו עד כה. */
+  function setGround(on) {
+    document.body.classList.toggle('ds-on', !!on);
+  }
+
   /** כל אזור טוען את מה ששייך לו, ורק כשנכנסים אליו.
       הבאנר הוא היוצא מן הכלל: הוא נטען בכל אזור, כי מועד
       קריטי לא אמור להיעלם רק כי עברת למסך אחר. */
   function loadTopView(name) {
+    setGround(name === 'dashboard');
     if (name !== 'tasks') loadBanner();
+    if (name === 'dashboard') return DsDashboard.load();
     if (name === 'cases')   return showList();
     if (name === 'tasks')   return loadAttention();
     if (name === 'reports') return renderLog(null, 'firmLogList');
@@ -173,7 +201,7 @@
       return openCase(parts[1], caseNav.has(parts[2]) ? parts[2] : 'state');
     }
 
-    var name = topNav.has(parts[0]) ? parts[0] : 'cases';
+    var name = topNav.has(parts[0]) ? parts[0] : 'dashboard';
     topNav.show(name, false);
     return loadTopView(name);
   }
@@ -415,7 +443,13 @@
         li.appendChild(el('span', 'log-clock num', clockOf(entry.at)));
         var body = el('div', 'log-body');
         body.appendChild(el('p', 'log-what', describe(entry)));
-        body.appendChild(el('p', 'item-note', entry.actor || 'המערכת'));
+        /* ביומן כלל-המשרד השורה לא אמרה על מי מדובר, ולכן
+           "הלקוח העלה מסמך" היה חסר ערך. שם הלקוח קודם, כי
+           הוא ההקשר; שם איש הצוות אחריו, כשיש. */
+        var who = [];
+        if (entry.client) who.push(entry.client);
+        if (entry.actor)  who.push(entry.actor);
+        body.appendChild(el('p', 'item-note', who.join(' · ') || 'המערכת'));
         li.appendChild(body);
         list.appendChild(li);
       });
@@ -431,6 +465,9 @@
   function showList() {
     return Api.officeCases().then(function (data) {
       var cases   = data.cases;
+      /* שורת הפקודה מסננת את הרשימה שכבר נטענה, ולכן היא
+         מתעדכנת מכאן ואינה יורה קריאה משלה. */
+      DsDashboard.setCases(cases);
       var waiting = cases.reduce(function (n, c) { return n + c.awaitingReview; }, 0);
 
       $('listSummary').textContent = waiting === 0
@@ -495,6 +532,9 @@
   function openCase(caseId, tab) {
     openId = caseId;
     wasNew = {};
+    /* סביבת התיק לא עוצבה מחדש בסבב הזה, ולכן היא חוזרת
+       לקנבס הגרפיט שכל הצבעים שלה מכוילים אליו. */
+    setGround(false);
 
     /* הניתוח שייך לתיק - אסור שיישאר על המסך כשעוברים לתיק אחר */
     assistHistory = [];

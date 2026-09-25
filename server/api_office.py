@@ -438,10 +438,16 @@ def audit_log(request: Request, case_id: str | None = None,
             _owned_case(cur, case_id, identity)
             cur.execute(
                 """select a.action, a.entity_type, a.created_at, a.metadata,
+                          a.case_id,
+                          coalesce(cl.full_name, '') as client_name,
                           coalesce(u.full_name, '') as actor_name
                      from audit_log a
                      left join users u on u.id = a.actor_id
                                       and a.actor_type = 'user'
+                     left join cases c on c.id = a.case_id
+                                     and c.firm_id = a.firm_id
+                     left join clients cl on cl.id = c.client_id
+                                        and cl.firm_id = a.firm_id
                     where a.firm_id = %s and a.case_id = %s
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, case_id, limit),
@@ -449,18 +455,31 @@ def audit_log(request: Request, case_id: str | None = None,
         else:
             cur.execute(
                 """select a.action, a.entity_type, a.created_at, a.metadata,
+                          a.case_id,
+                          coalesce(cl.full_name, '') as client_name,
                           coalesce(u.full_name, '') as actor_name
                      from audit_log a
                      left join users u on u.id = a.actor_id
                                       and a.actor_type = 'user'
+                     left join cases c on c.id = a.case_id
+                                     and c.firm_id = a.firm_id
+                     left join clients cl on cl.id = c.client_id
+                                        and cl.firm_id = a.firm_id
                     where a.firm_id = %s
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, limit),
             )
         rows = cur.fetchall()
+    # caseId ו-client נוספו כדי שיומן כלל-המשרד יוכל לומר על מי
+    # מדובר. עד כה שורה כמו "הלקוח העלה מסמך" לא אמרה איזה לקוח,
+    # ולכן היומן היה כמעט חסר ערך מחוץ להקשר של תיק בודד.
+    # תוספת קריאה בלבד: אין שדה חדש במסד, הסינון לפי firm_id לא
+    # השתנה, ושתי ההצטרפויות נושאות את אותו firm_id.
     return {"entries": [{
         "action": r["action"],
         "actor": r["actor_name"],
+        "client": r["client_name"],
+        "caseId": str(r["case_id"]) if r["case_id"] else None,
         "entity": r["entity_type"],
         "at": r["created_at"].isoformat(),
         "metadata": r["metadata"],

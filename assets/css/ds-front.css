@@ -1,0 +1,325 @@
+/* ==========================================================
+   DESIGN SYSTEM 2.0 - הפרונט
+   ----------------------------------------------------------
+   מסך הכניסה של הלקוחות, האזור האישי והדף הציבורי.
+
+   אותה שפה של האדמין: קנבס עצם, ברונזה אחת, סריף לכותרות,
+   קווי שיער במקום מסגרות, ומרווח במקום תיבות.
+
+   ----------------------------------------------------------
+   מה שונה כאן מהאדמין, ולמה:
+
+   הפורטל כפוף לתקנות הנגישות הישראליות - ת"י 5568 ברמה AA -
+   וזו חובה חוקית לאתר שירות, לא המלצה. קהל היעד הוא נפגעי
+   עבודה, חולים ומבוגרים, חלקם עם מוגבלות ראייה.
+
+   לכן הפרופיל שנקבע לפורטל נשמר כאן במלואו ואינו יורש את
+   הסקאלה של האדמין:
+
+     טקסט בסיס      19px  (ולא 17)
+     מטרות מגע      52px  (ולא 44)
+     ניגודיות       7:1 ומעלה על כל טקסט
+     --scale        כפתור הגדלת הטקסט ממשיך לעבוד
+
+   כל גודל כאן נכתב כ-calc(Npx * var(--scale)), אחרת כפתור
+   הגדלת הטקסט היה מפסיק להשפיע על מה שנכתב מחדש - וזו בדיוק
+   התקלה שקיימת היום ב-admin.css.
+
+   ----------------------------------------------------------
+   scope: כל כלל פותח ב-body.front. שלושת הדפים נושאים את
+   המחלקה; admin.html אינו נושא אותה ואינו טוען את הקובץ.
+   ========================================================== */
+
+body.front {
+  background: var(--ds-ground);
+  color: var(--ds-ink);                      /* 13.46:1 */
+  font-family: var(--ds-sans);
+}
+
+/* ---- כותרות ----
+   אותה קפיצה דרמטית של האדמין, אבל מתוך רצפה גבוהה יותר. */
+body.front h1 {
+  font-family: var(--ds-serif);
+  font-size: calc(clamp(32px, 4.4vw, 52px) * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-tight);
+  letter-spacing: var(--ds-ls-display);
+  color: var(--ds-ink);
+}
+body.front h2 {
+  font-family: var(--ds-serif);
+  font-size: calc(clamp(24px, 2.6vw, 32px) * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-snug);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);
+}
+body.front h3 {
+  font-family: var(--ds-sans);
+  font-size: calc(21px * var(--scale));
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+}
+body.front .lead {
+  font-family: var(--ds-sans);
+  font-size: calc(21px * var(--scale));
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+}
+body.front .view-title { color: var(--ds-ink); font-family: var(--ds-serif); }
+body.front .view .lead { color: var(--ds-ink-soft); }
+
+/* ---- הפסים ----
+   הפס הכהה הופך לחום החם של המערכת, לא לגרפיט. */
+body.front .band-dark { background: var(--ds-espresso); }
+body.front .band-dark .view-title,
+body.front .band-dark h1, body.front .band-dark h2 { color: var(--ds-on-dark); }   /* 10.17:1 */
+body.front .band-dark .lead,
+body.front .band-dark .small-print { color: var(--ds-on-dark-dim); }               /*  7.70:1 */
+body.front .band-tint { background: var(--ds-surface); }
+
+/* ---- המעטפת ---- */
+body.front .topbar { background: var(--ds-espresso); }
+body.front .topbar .who { color: var(--ds-on-dark-dim); }
+body.front .sitenav li + li::before { display: none; }
+body.front .sitenav ul { gap: calc(8px * var(--scale)) calc(28px * var(--scale)); }
+body.front .sitenav a {
+  color: var(--ds-on-dark-dim);
+  font-size: calc(17px * var(--scale));
+  border-bottom: 2px solid transparent;
+  min-height: 52px;
+  transition: color var(--ds-motion-normal) var(--ds-ease);
+}
+body.front .sitenav a:hover { color: var(--ds-on-dark); }
+body.front .sitenav a[aria-current="page"] {
+  color: var(--ds-on-dark);
+  font-weight: var(--ds-weight-medium);
+  border-bottom-color: var(--ds-accent-on-dark);
+}
+body.front .drawer { background: var(--ds-espresso); }
+body.front .drawer-link { min-height: 56px; font-family: var(--ds-sans); }
+body.front .drawer-eyebrow { color: var(--ds-on-dark-dim); letter-spacing: var(--ds-ls-label); }
+/* הפוטר כהה, ולכן כלל ה-h2 הכללי שלמעלה היה צובע את כותרות
+   העמודות בדיו על חום - נמדד 1.32:1. כאן הן חוזרות לבהיר.
+   קישורי הפוטר היו 30px, מתחת למינימום; הם עולים ל-44. */
+body.front .sitefoot { background: var(--ds-espresso); }
+body.front .sitefoot h2 {
+  color: var(--ds-on-dark);                  /* 10.17:1 */
+  font-size: calc(17px * var(--scale));
+  font-family: var(--ds-sans);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+}
+body.front .sitefoot a,
+body.front .foot-col p { color: var(--ds-on-dark-dim); }   /* 7.70:1 */
+body.front .sitefoot a:hover { color: var(--ds-on-dark); }
+body.front .foot-col a {
+  display: inline-flex; align-items: center;
+  min-height: 44px;
+}
+body.front .sitefoot-legal { color: var(--ds-on-dark-dim); }
+
+/* ---- פירוק התיבות ----
+   אותו מהלך של האדמין: משטח בלי מסגרת, והמרווח מפריד. */
+body.front .block {
+  background: var(--ds-surface);
+  border: 0;
+  border-radius: var(--ds-radius);
+}
+body.front .demo-box,
+body.front .alert-note {
+  background: none; border: 0;
+  border-top: var(--ds-hairline-w) solid var(--ds-hairline);
+  color: var(--ds-ink-soft);
+}
+body.front .alert-error {
+  background: none; border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-risk);
+  color: var(--ds-risk);                     /* 8.95:1 על surface */
+  border-radius: var(--ds-radius);
+}
+
+/* ---- כפתורים ----
+   52px נשמר. זו מטרת המגע שנקבעה לקהל היעד. */
+body.front .btn {
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+  letter-spacing: 0.02em;
+  min-height: 52px;
+  transition: background-color var(--ds-motion-normal) var(--ds-ease),
+              color var(--ds-motion-normal) var(--ds-ease),
+              border-color var(--ds-motion-normal) var(--ds-ease);
+}
+body.front .btn-primary {
+  background: var(--ds-ink); border-color: var(--ds-ink);
+  color: var(--ds-ground);                   /* 13.46:1 */
+}
+body.front .btn-primary:hover {
+  background: var(--ds-accent-ink); border-color: var(--ds-accent-ink);
+}
+body.front .btn-outline,
+body.front .btn-quiet {
+  background: none;
+  border: var(--ds-hairline-w) solid var(--ds-ink-soft);
+  color: var(--ds-ink);
+}
+body.front .btn-outline:hover,
+body.front .btn-quiet:hover { background: var(--ds-accent-wash); }
+body.front .topbar .btn-quiet {
+  border-color: var(--ds-on-dark-dim); color: var(--ds-on-dark);
+}
+body.front .topbar .btn-quiet:hover { background: rgba(237, 232, 224, 0.12); }
+
+/* ---- שדות ----
+   56px נשמר. קו אחד מתחת לשדה במקום תיבה. */
+body.front .field label {
+  font-family: var(--ds-sans);
+  font-size: calc(17px * var(--scale));
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+}
+body.front .field .hint { color: var(--ds-ink-soft); }
+body.front .field input,
+body.front .field textarea,
+body.front .field select {
+  background: var(--ds-surface);
+  border: 0;
+  border-bottom: 2px solid var(--ds-ink-soft);
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+  color: var(--ds-ink);
+  min-height: 56px;
+}
+body.front .field textarea { min-height: 96px; }
+body.front .field input:focus-visible,
+body.front .field textarea:focus-visible,
+body.front .field select:focus-visible {
+  outline: var(--ds-focus); outline-offset: 2px;
+  border-bottom-color: var(--ds-accent);
+}
+
+/* ---- תגי סטטוס ----
+   קו עליון במקום כדור ממולא, כמו באדמין. הסמל והמילים
+   נשארים - הצבע אינו הערוץ היחיד. */
+body.front .tag {
+  background: none; border: 0;
+  border-top: 2px solid currentColor;
+  border-radius: var(--ds-radius);
+  padding: calc(4px * var(--scale)) 0 0;
+  font-family: var(--ds-sans);
+  font-size: calc(15px * var(--scale));
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+}
+body.front .tag-ok   { color: var(--ds-done); }        /* 6.84:1 */
+body.front .tag-warn { color: var(--ds-accent-ink); }  /* 6.19:1 */
+body.front .tag-wait { color: var(--ds-ink-soft); }    /* 6.92:1 */
+body.front .tag-stop { color: var(--ds-risk); }        /* 8.95:1 */
+
+/* ---- רשימות ומשימות מסמך ---- */
+body.front .doc-task,
+body.front .plain-list > li {
+  background: none;
+  border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  border-radius: var(--ds-radius);
+}
+body.front .doc-name {
+  font-family: var(--ds-sans);
+  font-size: calc(21px * var(--scale));
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+}
+body.front .item-note { color: var(--ds-ink-soft); }
+body.front .dropzone {
+  background: none;
+  border: var(--ds-hairline-w) dashed var(--ds-ink-soft);
+  border-radius: var(--ds-radius);
+}
+
+/* ---- השיחה ---- */
+body.front .chat-msg { border-color: var(--ds-hairline); border-radius: var(--ds-radius); }
+body.front .chat-inbound  { background: var(--ds-surface); border-inline-start-color: var(--ds-ink-soft); }
+body.front .chat-outbound { background: var(--ds-accent-wash); border-inline-end-color: var(--ds-accent); }
+body.front .chat-head { color: var(--ds-ink-soft); }
+body.front .chat-who  { color: var(--ds-ink); }
+
+/* ---- מחוון השלבים ---- */
+body.front .steps > li { border-radius: var(--ds-radius); }
+body.front .steps .mark { border-radius: 50%; }
+body.front .tick-done { background: var(--ds-accent); }
+body.front .tick-now  { background: var(--ds-ink); }
+
+/* ---- הדף הציבורי ---- */
+body.front .hero-eyebrow,
+body.front .eyebrow {
+  font-size: calc(15px * var(--scale));
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+}
+
+/* ---- הקשר כהה ----
+   הכללים למעלה קובעים דיו על עצם, וזו ברירת המחדל הנכונה.
+   בתוך פס כהה הם הופכים לכהה על כהה: ה-eyebrow נמדד 1.63:1
+   וכפתור מתאר 1:1 - כלומר בלתי נראה לגמרי.
+
+   הכלל נכתב על ההקשר ולא על האלמנט, כדי שגם פס כהה שייווצר
+   בעתיד יקבל את הצבע הנכון בלי לזכור להוסיף חריג. זה בדיוק
+   הדפוס שכבר קיים ב-style.css עבור .band-dark. */
+body.front .band-dark .hero-eyebrow,
+body.front .band-dark .eyebrow,
+body.front .band-dark p,
+body.front .band-dark li { color: var(--ds-on-dark-dim); }   /* 7.70:1 */
+body.front .band-dark h1,
+body.front .band-dark h3,
+body.front .band-dark strong { color: var(--ds-on-dark); }   /* 10.17:1 */
+
+body.front .band-dark .btn-outline,
+body.front .band-dark .btn-quiet,
+body.front .topbar .btn-outline {
+  border-color: var(--ds-on-dark-dim);
+  color: var(--ds-on-dark);
+}
+body.front .band-dark .btn-outline:hover,
+body.front .band-dark .btn-quiet:hover,
+body.front .topbar .btn-outline:hover {
+  background: rgba(237, 232, 224, 0.12);
+  color: var(--ds-on-dark);
+}
+body.front .band-dark .btn-primary {
+  background: var(--ds-on-dark); border-color: var(--ds-on-dark);
+  color: var(--ds-espresso);                 /* 10.17:1 */
+}
+body.front .band-dark .btn-primary:hover {
+  background: var(--ds-accent-on-dark); border-color: var(--ds-accent-on-dark);
+  color: var(--ds-espresso);                 /*  6.31:1 */
+}
+body.front .card {
+  background: var(--ds-surface);
+  border: 0;
+  border-radius: var(--ds-radius);
+}
+body.front .card-cat {
+  background: none; border: 0;
+  border-top: 2px solid var(--ds-accent);
+  border-radius: var(--ds-radius);
+  color: var(--ds-accent-ink);
+  letter-spacing: var(--ds-ls-label);
+}
+body.front .acc-q,
+body.front .faq-q {
+  background: none;
+  border: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-serif);
+  color: var(--ds-ink);
+}
+
+/* ---- מספרים ומזהים ----
+   הדפוס קיים באדמין ולא הוחל על הפורטל: מספר תיק ותאריך
+   נשברו לפי כיוון הטקסט העברי. */
+body.front .num,
+body.front .chat-when {
+  direction: ltr; unicode-bidi: plaintext; white-space: nowrap;
+}
