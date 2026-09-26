@@ -287,10 +287,14 @@ body.admin .topbar .btn-quiet:hover {
 body.admin .topbar-actions { gap: var(--ds-space-24); }
 
 /* הרוחב המלא. עד כה התוכן נדחס ל-1180 ומחצית המסך נשארה ריקה. */
+/* padding-block ירד מכאן ב-27.09. הוא הוצהר על אותו סלקטור
+   בדיוק בחמישה מקומות שונים לאורך הקובץ, עם חמישה ערכים
+   שונים, וארבעה מהם היו מתים - האחרון פשוט ניצח. מי שקרא
+   את הקובץ ראה ערך שאינו מרונדר. הערך החי היחיד יושב עכשיו
+   במקום אחד, בסוף הקובץ, ליד שאר הקצב האנכי של הדשבורד. */
 body.admin.ds-on .page {
   max-width: var(--ds-page-max);
   padding-inline: var(--ds-gutter);
-  padding-block: var(--ds-space-64) var(--ds-space-128);
 }
 
 
@@ -1038,7 +1042,6 @@ body.admin .ds-hero-dash {
   margin-top: calc(var(--ds-space-48) * -1);
   margin-bottom: var(--ds-space-64);
 }
-body.admin.ds-on .page { padding-block: var(--ds-space-48) var(--ds-space-128); }
 
 body.admin .ds-hero-dash .ds-hero-in {
   padding-block: var(--ds-space-48) var(--ds-space-32);
@@ -1209,7 +1212,6 @@ body.admin .ds-col-side .ds-empty {
 
 /* ---- קצב אנכי ----
    הריווח הענק בתחתית הותיר קנבס ריק שאינו משרת דבר. */
-body.admin.ds-on .page { padding-block: var(--ds-space-48) var(--ds-space-64); }
 body.admin .ds-band { margin-bottom: 0; }
 
 @media (max-width: 1180px) {
@@ -1579,7 +1581,6 @@ body.admin .ds-dash-context {
 /* ---- פריסה ---- */
 body.admin .ds-cols { gap: var(--ds-space-20) clamp(var(--ds-space-20), 2vw, 28px); }
 body.admin .ds-col-side > * + * { margin-top: var(--ds-space-20); }
-body.admin.ds-on .page { padding-block: 0 var(--ds-space-48); }
 body.admin .ds-hero-dash { margin-top: 0; }
 
 /* הרצועה הכהה שסוגרת את העמוד */
