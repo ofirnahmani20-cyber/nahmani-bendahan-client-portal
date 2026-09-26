@@ -1831,3 +1831,94 @@ body.admin .ds-access-empty {
    כאן במקום להימחק, כדי שאם מסך אחר ישתמש ב-ds-band בעתיד
    הוא לא יירש רצועה שלא התכוונו אליה. */
 body.admin .ds-band-slim { display: none; }
+
+
+/* ==========================================================
+   18. הצילום ב-Hero
+   ----------------------------------------------------------
+   הצילום נושא את ה-lockup של המשרד על קיר האבן, ולכן המותג
+   אינו חוזר ב-HTML - הוא היה מיתוג כפול על אותו מסך.
+
+   הכיסוי הגלובלי ירד מ-62% ל-18%. נמדד על הפיקסלים עצמם
+   שהרצועה הנראית בהירה לכל רוחבה (0.33 עד 0.94) ואין בה
+   פינה כהה; החשכה גורפת עד כדי 3:1 הייתה דורשת 55% והייתה
+   מוחקת את האור, את העץ ואת הספרים.
+
+   הקריאוּת מושגת אחרת: רקע מקומי מתחת לסלוגן בלבד, שדוהה
+   לחלוטין לפני שהוא מגיע ל-lockup שבצילום.
+   ========================================================== */
+
+body.admin .ds-hero-dash {
+  background-image: var(--ds-hero-image);
+  background-size: cover;
+  background-position: var(--ds-hero-position);
+  background-repeat: no-repeat;
+}
+/* הכיסוי הגלובלי: נגיעה בלבד, למראה אחיד עם המעטפת הכהה
+   שמעליו. הוא אינו מה שמאפשר את הקריאוּת. */
+body.admin .ds-hero-dash::after {
+  background: linear-gradient(to bottom,
+    rgba(26, 23, 20, 0.30) 0%,
+    rgba(26, 23, 20, 0.10) 38%,
+    rgba(26, 23, 20, 0.22) 100%);
+}
+
+/* ---- הרקע המקומי של הסלוגן ----
+   אליפסה רכה שמתמקדת בטקסט ודוהה עד אפס בתוך כשליש מרוחב
+   ה-Hero. ה-lockup שבצילום יושב ב-23%-53% מהשמאל ואינו
+   מגיע אליה. */
+body.admin .ds-slogan {
+  position: relative;
+  padding: var(--ds-space-20) var(--ds-space-32) var(--ds-space-16);
+  margin-inline-end: calc(var(--ds-space-32) * -1);
+  border-bottom: 0;
+}
+body.admin .ds-slogan::before {
+  content: ""; position: absolute; inset: -18% -8% -14% -34%;
+  background: radial-gradient(118% 128% at 88% 52%,
+    rgba(26, 23, 20, 0.86) 0%,
+    rgba(26, 23, 20, 0.70) 42%,
+    rgba(26, 23, 20, 0.34) 68%,
+    rgba(26, 23, 20, 0.00) 88%);
+  z-index: -1;
+  pointer-events: none;
+}
+/* הקו נשאר, אבל מעל הרקע המקומי ולא מתחת לכל הבלוק */
+body.admin .ds-slogan::after {
+  content: ""; display: block;
+  width: 64px; height: 3px;
+  margin-top: var(--ds-space-16);
+  background: var(--ds-accent-on-dark);
+}
+
+/* ---- Responsive ----
+   הצילום רחב (1.78:1) וה-Hero שטוח, ולכן החיתוך הוא אנכי
+   בכל הרוחבים ואין גלישה אופקית בשום נקודה. המיקום האנכי
+   נבדק מול ארבעה רוחבים ו-20% מחזיק את ה-lockup בכולם. */
+@media (max-width: 1140px) {
+  body.admin .ds-hero-dash { background-position: center 18%; }
+}
+@media (max-width: 860px) {
+  /* בטאבלט הרצועה גבוהה יחסית לרוחב, ולכן נראה יותר מהקיר */
+  body.admin .ds-hero-dash { background-position: center 22%; }
+  body.admin .ds-slogan {
+    margin-inline-end: 0;
+    padding-inline: var(--ds-space-20);
+  }
+  body.admin .ds-slogan::before { inset: -16% -12% -12% -18%; }
+}
+@media (max-width: 560px) {
+  /* במובייל אין חיתוך אופקי כלל - הצילום מתכווץ לרוחב המסך
+     ונראים 80% מגובהו. מיקוד מעט גבוה יותר כדי לשמור על
+     ה-lockup ועל צמרת העץ במסגרת. */
+  body.admin .ds-hero-dash {
+    background-position: center 26%;
+    min-height: 170px;
+  }
+  body.admin .ds-slogan { font-size: clamp(22px, 7vw, 30px); }
+  body.admin .ds-slogan::before { inset: -14% -14% -10% -10%; }
+}
+
+/* התנועה היחידה ב-Hero היא הריחוף על הקו, והיא מבוטלת
+   גלובלית ב-prefers-reduced-motion. אין כאן parallax ואין
+   אנימציית כניסה, בכוונה. */
