@@ -292,3 +292,32 @@ def test_a_case_with_no_stage_still_returns_requirements_and_stages(api, temp_ca
     for key in ["stages", "documents", "requirements", "messages"]:
         assert key in data, "המפתח %s נעלם מתשובת הלקוח" % key
     assert len(data["stages"]) == 8, "קטלוג השלבים נחתך יחד עם השלב הנוכחי"
+
+# ================================================================
+#  6. פרטי עורך הדין שה-API אינו מחזיר
+# ================================================================
+
+def test_the_client_case_declares_no_lawyer(api, temp_case):
+    """
+    רגרסיה ל-26.09: תשובת הלקוח אינה כוללת lawyer, ולכן
+    normalise ב-dashboard.js קובע אותו ל-null במפורש.
+
+    renderDecision קרא caseFile.lawyer.phone בלי הגנה וזרק.
+    הוא השלישי ב-paint, ולכן תשעת הרינדורים שמתחתיו - מה
+    נדרש, מסמכים, דרישות, שיחה, שלבים, הודעות וקשר - לא רצו
+    כלל, והמסך נראה ריק בלי הודעת שגיאה. זו בדיוק אותה
+    תבנית של currentStage שלמעלה: שדה שה-API מצהיר עליו
+    כריק, ונקודת קריאה אחת ששכחה להגן.
+
+    הבדיקה נועלת את החוזה. אם השדה יתווסף בעתיד - היא תיפול,
+    וזו התזכורת לבדוק שכל נקודות הקריאה מטפלות בשתי הצורות.
+    """
+    case_id = temp_case["case_id"]
+
+    api.cookies.clear()
+    client_login(api, client_of(case_id))
+    data = api.get("/api/client/cases/%s" % case_id).json()
+
+    assert data.get("lawyer") is None, (
+        "ה-API התחיל להחזיר lawyer - צריך לוודא שכל נקודות "
+        "הקריאה ב-dashboard.js מטפלות גם במקרה שהוא חסר")

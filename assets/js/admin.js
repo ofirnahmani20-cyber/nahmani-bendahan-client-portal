@@ -595,6 +595,69 @@
       wrap.appendChild(el('dd', f[2] ? 'num' : null, f[1] || '-'));
       dl.appendChild(wrap);
     });
+
+    renderRoad(file);
+  }
+
+  /* ---- מסלול התביעה ----
+     "שלב 4" לבדו אינו אומר איפה התיק עומד. הוא אומר את זה רק
+     מול המסלול כולו: מה כבר נסגר ומה עוד לפניו.
+
+     הנתונים כבר בתשובה - stageOptions נשלף ממילא עבור הבורר
+     בלשונית הוועדות, ו-currentStage כבר מוצג בכותרת. אין כאן
+     קריאה נוספת, שדה חדש או שינוי חוזה.
+
+     המסלול יושב בכותרת הקבועה ולכן נראה בכל שש הלשוניות.
+     הוא מחוון ולא פקד: מעבר שלב נעשה בלשונית "ועדות, החלטות
+     ומועדים" בלבד, שם יש אישור ורישום אודיט.
+
+     המצב אינו נשען על צבע: הקו משנה גם עובי, ולקורא המסך
+     נאמר במילים. */
+  function renderRoad(file) {
+    var road = $('caseRoad');
+    if (!road) return;
+
+    road.textContent = '';
+
+    var stages = file.stageOptions || [];
+    var now    = file.currentStage || 0;
+
+    /* תיק שטרם נרשם לו שלב הוא מצב חוקי, לא תקלה. בלי הענף
+       הזה המסלול היה מציג שמונה שלבים "עתידיים" בלי עוגן,
+       וזה קורא כאילו לא קרה דבר. */
+    if (!stages.length) {
+      road.hidden = true;
+      return;
+    }
+    road.hidden = false;
+    road.setAttribute('aria-label', now
+      ? 'מסלול התביעה. התיק בשלב ' + now + ' מתוך ' + stages.length + '.'
+      : 'מסלול התביעה. טרם נרשם שלב לתיק.');
+
+    stages.forEach(function (st) {
+      var done = now && st.position <  now;
+      var here = now && st.position === now;
+
+      var cell = el('li', 'ds-road-step ' +
+        (done ? 'is-done' : here ? 'is-now' : 'is-next'));
+      if (here) cell.setAttribute('aria-current', 'step');
+
+      /* title נותן את השם המלא בריחוף גם כשהתא צר.
+         הוא תוספת ולא תחליף: השם עצמו נמצא בטקסט. */
+      cell.setAttribute('title', st.position + '. ' + st.title);
+
+      cell.appendChild(el('span', 'ds-road-rule', '', true));
+
+      var top = el('p', 'ds-road-head');
+      top.appendChild(el('span', 'ds-road-n',
+        (st.position < 10 ? '0' : '') + st.position));
+      top.appendChild(el('span', 'visually-hidden',
+        done ? ' הושלם: ' : here ? ' השלב הנוכחי: ' : ' טרם החל: '));
+      cell.appendChild(top);
+
+      cell.appendChild(el('p', 'ds-road-t', st.title));
+      road.appendChild(cell);
+    });
   }
 
   /* ================= דרישות ותקשורת =================

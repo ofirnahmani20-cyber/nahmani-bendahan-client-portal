@@ -8,11 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260926214142">
-<link rel="stylesheet" href="assets/css/style.css?v=20260926214142">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260926214142">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260926214142">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260926214142">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260926231723">
+<link rel="stylesheet" href="assets/css/style.css?v=20260926231723">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260926231723">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260926231723">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260926231723">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20260926231723">
 </head>
 <body class="admin">
 
@@ -440,6 +441,14 @@
         <dl class="case-facts" id="caseFacts"></dl>
       </div>
 
+      <!-- מסלול התביעה. נבנה מ-stageOptions ו-currentStage
+           שכבר חוזרים מ-GET /api/office/cases/{id} - אין כאן
+           קריאה נוספת, שדה חדש או שינוי חוזה.
+
+           הוא יושב בכותרת הקבועה ולכן נראה בכל שש הלשוניות:
+           זה עמוד השדרה של התיק, ולא תוכן של לשונית אחת. -->
+      <ol class="ds-road" id="caseRoad"></ol>
+
       <nav class="case-tabs" id="caseTabs" aria-label="ניווט בתוך התיק">
         <ul>
           <li><a href="#state" data-view="state">מצב התיק</a></li>
@@ -840,9 +849,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260926214142"></script>
-<script src="assets/js/viewnav.js?v=20260926214142"></script>
-<script src="assets/js/ds-dashboard.js?v=20260926214142"></script>
-<script src="assets/js/admin.js?v=20260926214142"></script>
+<script src="assets/js/api.js?v=20260926231723"></script>
+<script src="assets/js/viewnav.js?v=20260926231723"></script>
+<script src="assets/js/ds-dashboard.js?v=20260926231723"></script>
+<script src="assets/js/admin.js?v=20260926231723"></script>
 </body>
 </html>

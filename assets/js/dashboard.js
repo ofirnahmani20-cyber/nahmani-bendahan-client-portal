@@ -405,9 +405,18 @@
       body.appendChild(dl);
     }
 
+    /* caseFile.lawyer הוא null בכל תיק היום, ולכן הקריאה
+       הישירה ל---lawyer.phone זרקה כאן. renderDecision הוא
+       השלישי ב-paint, ומכאן שתשעת הרינדורים שמתחתיו - מה
+       נדרש, מסמכים, דרישות, שיחה, שלבים, הודעות וקשר -
+       לא רצו כלל. המסך נראה ריק בלי שום הודעת שגיאה.
+
+       אותה תקלה בדיוק כמו CLAIM_STAGES[null-1]: שדה שה-API
+       מצהיר עליו כריק, ונקודת קריאה אחת ששכחה להגן. */
+    var c = contactInfo();
     var call = el('a', 'btn btn-primary decision-call',
-      'התקשרות למשרד: ' + caseFile.lawyer.phone);
-    call.href = 'tel:' + caseFile.lawyer.phone.replace(/[^0-9+]/g, '');
+      'התקשרות למשרד: ' + c.phone);
+    call.href = telHref(c.phone);
     body.appendChild(call);
 
     body.appendChild(el('p', 'decision-legal',
@@ -637,27 +646,45 @@
 
   /* ---- 7. יצירת קשר ---- */
 
-  function renderContact() {
+  /* ---- פרטי הקשר של המשרד ----
+     ה-API טרם מחזיר את עורך הדין המטפל, ולכן caseFile.lawyer
+     הוא null בכל תיק. זה מצב חוקי ולא תקלה.
+
+     הפונקציה הזאת היא מקור האמת היחיד לנפילה-לאחור. קודם היו
+     שתי נקודות שקראו את caseFile.lawyer.phone, אחת מהן בלי
+     הגנה - ומספר המשרד היה כתוב פעם אחת בלבד, במקום שכן הגן.
+     עכשיו שתיהן עוברות כאן. */
+  var OFFICE = {
+    name:  'משרד עורכי הדין Nahmani Ben-Dahan',
+    role:  'הצוות המטפל בתיק',
+    phone: '03-5551234',
+    email: 'office@nahmani-bendahan.co.il'
+  };
+
+  function contactInfo() {
     var l = caseFile.lawyer;
-    if (!l) {
-      /* ה-API טרם מחזיר את פרטי עורך הדין המטפל. מציגים את
-         פרטי המשרד במקום להשאיר שדות ריקים. */
-      $('lawyerName').textContent = 'משרד עורכי הדין Nahmani Ben-Dahan';
-      $('lawyerRole').textContent = 'הצוות המטפל בתיק';
-      var p = $('lawyerPhone');
-      p.textContent = 'התקשרות למשרד: 03-5551234';
-      p.href = 'tel:035551234';
-      $('lawyerEmail').href = 'mailto:office@nahmani-bendahan.co.il';
-      return;
-    }
-    $('lawyerName').textContent = l.name;
-    $('lawyerRole').textContent = l.role;
+    if (!l || !l.phone) return OFFICE;
+    return {
+      name:  l.name  || OFFICE.name,
+      role:  l.role  || OFFICE.role,
+      phone: l.phone,
+      email: l.email || OFFICE.email
+    };
+  }
+
+  function telHref(phone) { return 'tel:' + phone.replace(/[^0-9+]/g, ''); }
+
+  function renderContact() {
+    var c = contactInfo();
+
+    $('lawyerName').textContent = c.name;
+    $('lawyerRole').textContent = c.role;
 
     var phone = $('lawyerPhone');
-    phone.textContent = 'התקשרות למשרד: ' + l.phone;
-    phone.href = 'tel:' + l.phone.replace(/[^0-9+]/g, '');
+    phone.textContent = 'התקשרות למשרד: ' + c.phone;
+    phone.href = telHref(c.phone);
 
-    $('lawyerEmail').href = 'mailto:' + l.email;
+    $('lawyerEmail').href = 'mailto:' + c.email;
   }
 
   /* ---- העלאת מסמכים ---- */

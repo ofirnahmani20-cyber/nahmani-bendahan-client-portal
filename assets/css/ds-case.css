@@ -1,0 +1,472 @@
+/* ==========================================================
+   ds-case.css - סביבת העבודה של התיק
+   ----------------------------------------------------------
+   שלב 3 בהגירת Design System 2.0.
+
+   מה משתנה כאן: presentation בלבד. שש הלשוניות שומרות שם,
+   סדר ומשמעות; אף מזהה לא נמחק ולא שונה; #caseFacts נשאר
+   <dl> ו-#caseRows נשאר <tbody> בן שבע עמודות. הלוגיקה של
+   משימות, דרישות, תקשורת, שלבים, מסמכים והתראות לא נגעה.
+
+   שלוש החלטות שקבעו את המסך:
+
+   1. אין כאן Hero ואין תמונת רקע. זו סביבת עבודה, והמסך
+      שייך לתיק. הזהות מגיעה מהטיפוגרפיה, מהצבע ומהמסלול -
+      לא ממשטח דקורטיבי שגוזל שליש מהגובה.
+
+   2. הכותרת והמסלול קבועים בכל שש הלשוניות. מעבר לשונית
+      אינו אמור להרגיש כמו יציאה מהתיק, ובלי עוגן קבוע הוא
+      מרגיש בדיוק כך.
+
+   3. רכיבים משותפים מעוצבים גלובלית תחת body.admin ולא
+      בתוך #caseWorkspace בלבד. task-row, attn-row ו-log-row
+      מופיעים גם באזור "דורש טיפול" ובפיד המשרד. עיצוב שלהם
+      רק בתוך התיק היה יוצר את אותו רכיב בשני מראות - בדיוק
+      התקלה שהשיחה עם הלקוח כבר סבלה ממנה בהגירה החלקית.
+      זו חריגה מודעת מגבול השלב, לטובת עקביות.
+
+   נטען אחרי ds-admin.css, ולכן יכול לחדד אותו בלי important.
+   ========================================================== */
+
+
+/* ==========================================================
+   1. כותרת התיק
+   ----------------------------------------------------------
+   שם הלקוח הוא הכותרת; חמשת הפרטים הם שורת מטא אחת מתחתיו.
+   הם נמדדו כבר ותוקנו ב-ds-admin (dt 6.23:1 · dd 13.46:1);
+   כאן רק הקצב והמשקל.
+   ========================================================== */
+
+body.admin .case-head {
+  display: block;
+  padding-bottom: var(--ds-space-16);
+  margin-bottom: var(--ds-space-16);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-ink);
+}
+body.admin .page .case-head > h1 {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-section);
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-tight);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);                       /* 13.46:1 על העצם */
+  margin: 0 0 var(--ds-space-8);
+}
+body.admin .case-facts {
+  gap: var(--ds-space-4) var(--ds-space-16);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+}
+body.admin .case-fact dt {
+  letter-spacing: var(--ds-ls-label);
+}
+body.admin .case-fact dd {
+  font-weight: var(--ds-weight-medium);
+}
+
+
+/* ==========================================================
+   2. מסלול התביעה
+   ----------------------------------------------------------
+   "שלב 4" לבדו אינו אומר איפה התיק עומד - רק מול המסלול
+   כולו. הנתונים כבר בתשובת ה-API (stageOptions), ולכן אין
+   כאן שדה חדש ולא קריאה נוספת.
+
+   זהו מחוון ולא פקד: מעבר שלב נעשה בלשונית הוועדות בלבד,
+   שם יש אישור ורישום אודיט. לכן אין כאן cursor: pointer
+   ואין מצב hover שמרמז על לחיצה.
+
+   המצב אינו צבע בלבד - הקו משנה גם עובי (1/3/4px), והמילה
+   נאמרת לקורא המסך.
+   ========================================================== */
+
+body.admin .ds-road {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: var(--ds-space-8);
+  list-style: none;
+  margin: 0 0 var(--ds-space-24);
+  padding: 0;
+}
+body.admin .ds-road[hidden] { display: none; }
+
+body.admin .ds-road-step {
+  min-width: 0;   /* בלעדיו שם ארוך מרחיב את התא וגורם לגלישה */
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+
+body.admin .ds-road-rule {
+  display: block; width: 100%;
+  height: 1px;
+  background: var(--ds-hairline);
+}
+body.admin .ds-road-step.is-done .ds-road-rule {
+  height: 3px; background: var(--ds-accent);
+}
+body.admin .ds-road-step.is-now .ds-road-rule {
+  height: 4px; background: var(--ds-ink);
+}
+
+body.admin .ds-road-head { margin: 0; line-height: 1; }
+body.admin .ds-road-n {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);                  /* 6.23:1 */
+  direction: ltr;
+}
+body.admin .ds-road-step.is-done .ds-road-n { color: var(--ds-accent-ink); }  /* 5.57:1 */
+body.admin .ds-road-step.is-now  .ds-road-n { color: var(--ds-ink); }         /* 13.46:1 */
+
+/* השם נשאר ב-ink-soft גם בשלב שטרם החל. היה מפתה להעמיק את
+   העמעום כדי לומר "עוד לא", וזה היה מוריד טקסט אמיתי מתחת
+   לרף. ה"עוד לא" נאמר בקו, במשקל ובמילה המוסתרת. */
+body.admin .ds-road-t {
+  margin: 0;
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  line-height: 1.3;
+  color: var(--ds-ink-soft);                  /* 6.23:1 */
+  overflow-wrap: anywhere;
+}
+body.admin .ds-road-step.is-now .ds-road-t {
+  color: var(--ds-ink);                       /* 13.46:1 */
+  font-weight: var(--ds-weight-medium);
+}
+
+
+/* ==========================================================
+   3. סרגל הלשוניות
+   ----------------------------------------------------------
+   הצורה כבר הוגרה ב-ds-admin. כאן רק הצמדה למסלול שמעליו
+   וריווח שמחזיק שש לשוניות בשורה אחת בצפיפות החדשה.
+   ========================================================== */
+
+body.admin .case-tabs {
+  margin: 0 0 var(--ds-space-24);
+  gap: 0;
+}
+body.admin .case-tabs ul { gap: 0 var(--ds-space-24); }
+body.admin .case-tabs a { padding-inline: 0; }
+
+
+/* ==========================================================
+   4. המקטעים בתוך הלשוניות
+   ----------------------------------------------------------
+   block הופך לכרטיס באותה שפה של הדשבורד: משטח לבן, קו
+   שיער, עיגול עדין. אין כאן markup חדש - אותו section
+   בדיוק, רק מוצג אחרת.
+   ========================================================== */
+
+body.admin #caseWorkspace .block {
+  background: var(--ds-card-bg);
+  border: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-radius: var(--ds-radius-card);
+  padding: var(--ds-card-pad);
+  margin: 0 0 var(--ds-space-20);
+}
+
+/* בלוק הניתוח נושא פס צד ומקבל גם את הכרטיס. הפס הוא
+   שאומר "זה לא עוד מקטע".
+   attention-block אינו כאן: הוא יושב באזור "דורש טיפול"
+   של המשרד ולא בתוך התיק, ומטופל ב-ds-admin. */
+body.admin #caseWorkspace .assist-block {
+  border: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  padding-inline-start: var(--ds-card-pad);
+}
+
+body.admin #caseWorkspace .block > h3 {
+  font-family: var(--ds-serif);
+  font-size: clamp(16px, 1.2vw, 19px);
+  font-weight: var(--ds-weight-bold);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);                       /* 16.42:1 על לבן */
+  margin: 0 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-12);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+/* כותרת שהיא visually-hidden אינה אמורה לגרור קו וריפוד */
+body.admin #caseWorkspace .block > h3.visually-hidden {
+  margin: 0; padding: 0; border: 0;
+}
+
+
+/* ==========================================================
+   5. מצב התיק
+   ========================================================== */
+
+body.admin .state-line {
+  gap: var(--ds-space-8) var(--ds-space-16);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  color: var(--ds-ink);                       /* 16.42:1 */
+}
+body.admin .state-num {
+  font-family: var(--ds-serif);
+  font-size: clamp(21px, 1.7vw, 28px);
+  color: var(--ds-accent-ink);                /* 6.79:1 על לבן */
+}
+body.admin .state-stage {
+  font-family: var(--ds-serif);
+  font-size: clamp(16px, 1.2vw, 19px);
+  font-weight: var(--ds-weight-bold);
+}
+body.admin .state-since {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                  /* 7.59:1 על לבן */
+}
+
+
+/* ==========================================================
+   6. "מה הלאה" - שלושה כרטיסים
+   ----------------------------------------------------------
+   הרחיצות הקרות (stop-soft, warn-soft) הן מהמערכת הישנה
+   ואינן במשפחת הצבע החמה. כאן הן עוברות לרחיצות של
+   הטוקנים, והפס הצדדי נשאר הערוץ הראשון.
+   ========================================================== */
+
+body.admin .next-grid { gap: var(--ds-space-12); }
+body.admin .next-card {
+  border: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  background: none;
+  padding: var(--ds-space-12) var(--ds-space-16);
+}
+body.admin .next-label {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-ink);                /* 6.79:1 על לבן */
+  margin: 0 0 var(--ds-space-4);
+}
+body.admin .next-title {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+  margin: 0;
+}
+body.admin .next-note {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  margin: var(--ds-space-4) 0 0;
+}
+
+/* מדרגת המועד. רחיצה רק לדרגה העליונה - מועד שחלף. מתחת
+   לזה הפס לבדו, אחרת כל המסך צבוע ושום דבר אינו בולט. */
+body.admin .next-card.b-overdue {
+  border-inline-start-color: var(--ds-risk);
+  background: var(--ds-risk-wash);            /* ink עליה: 12.15:1 */
+}
+body.admin .next-card.b-critical {
+  border-inline-start-color: var(--ds-risk);
+  background: none;
+}
+body.admin .next-card.b-warning {
+  border-inline-start-color: var(--ds-accent);
+  background: none;
+}
+body.admin .next-card.b-normal {
+  border-inline-start-color: var(--ds-hairline);
+  background: none;
+}
+
+
+/* ==========================================================
+   7. "דורש תשומת לב"
+   ========================================================== */
+
+body.admin .attn-list > li {
+  padding: var(--ds-space-12) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .attn-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
+body.admin .attn-row { gap: var(--ds-space-8) var(--ds-space-16); }
+body.admin .attn-text {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+  margin: var(--ds-space-4) 0 0;
+}
+body.admin .attn-more { padding-top: var(--ds-space-12); }
+
+
+/* ==========================================================
+   8. הניתוח המקצועי
+   ----------------------------------------------------------
+   המסגרת המקווקוות של המצב הריק נשמרת בכוונה: היא אומרת
+   "כאן עוד לא רץ ניתוח", וזה בדיוק ההבדל בין ריק לבין תקלה.
+   ========================================================== */
+
+body.admin .assist-empty {
+  border: 1px dashed var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  padding: var(--ds-space-12) var(--ds-space-16);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+}
+body.admin .assist-empty p:first-child {
+  color: var(--ds-ink);
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .assist-note {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+}
+body.admin .assist-actions { gap: var(--ds-space-8); }
+
+
+/* ==========================================================
+   9. דרישות ותקשורת
+   ========================================================== */
+
+body.admin .req-list > li,
+body.admin .task-list > li {
+  padding: var(--ds-space-16) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .req-list > li:last-child,
+body.admin .task-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
+
+body.admin .req-kind {
+  background: none;
+  border: 0; border-top: 2px solid var(--ds-accent);
+  border-radius: var(--ds-radius);
+  padding: var(--ds-space-4) 0 0;
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink);                       /* 16.42:1 */
+}
+body.admin .req-row.req-closed .task-title { color: var(--ds-ink-soft); }
+
+
+/* ==========================================================
+   10. שורת משימה
+   ----------------------------------------------------------
+   גלובלי ולא בתוך #caseWorkspace: אותה שורה מופיעה גם
+   באזור "דורש טיפול" של המשרד.
+   ========================================================== */
+
+body.admin .task-row { gap: var(--ds-space-8) var(--ds-space-16); }
+body.admin .task-title {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+  margin: 0 0 var(--ds-space-4);
+}
+body.admin .task-title.task-closed {
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  font-weight: var(--ds-weight-regular);
+}
+body.admin .task-where,
+body.admin .task-when {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+}
+body.admin .task-desc {
+  font-size: var(--ds-size-meta);
+  border-inline-start: 2px solid var(--ds-hairline);
+  padding-inline-start: var(--ds-space-12);
+  margin: var(--ds-space-8) 0 0;
+  color: var(--ds-ink);
+}
+body.admin .task-legal-note {
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);
+}
+body.admin .task-actions { gap: var(--ds-space-8); }
+
+/* אותה מדרגה של "מה הלאה", ובאותו כלל: רחיצה רק למועד שחלף. */
+body.admin .task-bar {
+  border-inline-start: var(--ds-rule-w) solid var(--ds-hairline);
+  padding-block: var(--ds-space-8);
+  padding-inline: var(--ds-space-12) 0;
+}
+body.admin .task-bar.b-overdue {
+  border-inline-start-color: var(--ds-risk);
+  background: var(--ds-risk-wash);            /* ink עליה: 12.15:1 */
+}
+body.admin .task-bar.b-critical { border-inline-start-color: var(--ds-risk);     background: none; }
+body.admin .task-bar.b-warning  { border-inline-start-color: var(--ds-accent);   background: none; }
+body.admin .task-bar.b-normal   { border-inline-start-color: var(--ds-ink-soft); background: none; }
+body.admin .task-bar.b-later    { border-inline-start-color: var(--ds-hairline); background: none; }
+body.admin .task-bar.b-closed   { border-inline-start-color: var(--ds-done);     background: none; }
+
+/* ---- טופס משימה ופאנל המועד המשפטי ---- */
+body.admin .task-form {
+  border-top: var(--ds-hairline-w) solid var(--ds-card-border);
+  padding-top: var(--ds-space-16);
+  margin: var(--ds-space-16) 0 0;
+}
+body.admin .legal-panel {
+  border: var(--ds-hairline-w) solid var(--ds-accent);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: var(--ds-radius-card);
+  background: none;
+  padding: var(--ds-space-16) var(--ds-space-16) var(--ds-space-4);
+  margin: 0 0 var(--ds-space-16);
+}
+
+
+/* ==========================================================
+   11. יומן הפעולות
+   ========================================================== */
+
+body.admin .log-day {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-ink);                /* 6.79:1 על לבן */
+  padding: var(--ds-space-16) 0 var(--ds-space-4);
+}
+body.admin .log-row { gap: var(--ds-space-12); padding: var(--ds-space-8) 0; }
+body.admin .log-clock {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+}
+body.admin .log-what {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-regular);
+  color: var(--ds-ink);
+  margin: 0;
+}
+body.admin .log-body .item-note {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+}
+
+
+/* ==========================================================
+   12. רספונסיביות
+   ----------------------------------------------------------
+   המסלול נשבר לשורות שלמות ולא לגלילה אופקית, והטקסט אינו
+   מתכווץ - אחרת שמות השלבים הופכים ללא קריאים בדיוק במסך
+   שבו הם הכי נחוצים.
+   ========================================================== */
+
+@media (max-width: 1180px) {
+  body.admin .ds-road { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  body.admin .case-tabs ul { gap: 0 var(--ds-space-16); }
+}
+@media (max-width: 620px) {
+  body.admin .ds-road {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ds-space-12) var(--ds-space-8);
+  }
+}
+
+@media (prefers-contrast: more) {
+  body.admin .ds-road-rule { background: var(--ds-ink-soft); }
+  body.admin #caseWorkspace .block { border-color: var(--ds-ink-soft); }
+}
