@@ -8,12 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260927000747">
-<link rel="stylesheet" href="assets/css/style.css?v=20260927000747">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260927000747">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260927000747">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927000747">
-<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927000747">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260927001534">
+<link rel="stylesheet" href="assets/css/style.css?v=20260927001534">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260927001534">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260927001534">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927001534">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927001534">
 </head>
 <body class="admin">
 
@@ -699,11 +699,15 @@
             </form>
           </section>
 
-          <!-- פניות מהלקוח -->
-          <section class="block" aria-labelledby="h-replies">
-            <h3 id="h-replies">פניות מהלקוח</h3>
-            <ul class="plain-list" id="replyList"></ul>
-          </section>
+          <!-- 27.09: המקטעים "פניות מהלקוח" ו"עדכונים שנשלחו"
+               הוסרו. אף שורת JavaScript לא מילאה אותם - נבדק
+               בחיפוש מלא על assets/js - ולכן הם היו רשימות
+               ריקות לתמיד. השיחה הדו-כיוונית שנבנתה בשלב ג'
+               (#chatList מעל) היא מה שמחליף אותם בפועל.
+
+               עד שלב 4 הם היו בלתי נראים כמעט; מרגע ש-.block
+               הפך לכרטיס לבן ממוסגר, שתי הרשימות הריקות הפכו
+               לשני כרטיסים ריקים על המסך. -->
 
           <!-- שליחת עדכון -->
           <section class="block" aria-labelledby="h-send">
@@ -726,11 +730,6 @@
             </form>
           </section>
 
-          <!-- עדכונים קיימים -->
-          <section class="block" aria-labelledby="h-sent">
-            <h3 id="h-sent">עדכונים שנשלחו</h3>
-            <ul class="plain-list" id="sentList"></ul>
-          </section>
       </div>
 
       <!-- ============ 3. מסמכי התיק ============ -->
@@ -872,9 +871,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260927000747"></script>
-<script src="assets/js/viewnav.js?v=20260927000747"></script>
-<script src="assets/js/ds-dashboard.js?v=20260927000747"></script>
-<script src="assets/js/admin.js?v=20260927000747"></script>
+<script src="assets/js/api.js?v=20260927001534"></script>
+<script src="assets/js/viewnav.js?v=20260927001534"></script>
+<script src="assets/js/ds-dashboard.js?v=20260927001534"></script>
+<script src="assets/js/admin.js?v=20260927001534"></script>
 </body>
 </html>

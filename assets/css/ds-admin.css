@@ -502,7 +502,22 @@ body.admin .hamburger {
   color: var(--ds-on-dark); border-radius: var(--ds-radius);
 }
 body.admin .empty { color: var(--ds-ink-soft); font-size: var(--ds-size-meta); }
-body.admin .check { color: var(--ds-ink); }
+/* תיבת סימון: יעד המגע הוא התווית, לא הריבוע בן 13px
+   שהדפדפן מצייר. נמדד 28px גובה - מתחת ל-44 שנקבע לאדמין.
+   fit-content כדי שהיעד יהיה על הטקסט ולא על רוחב הטופס
+   כולו, אחרת לחיצה בשוליים מהפכת את המצב בלי כוונה. */
+body.admin .check {
+  display: flex; align-items: center;
+  gap: var(--ds-space-8);
+  width: fit-content;
+  min-height: var(--ds-touch-min);
+  color: var(--ds-ink);
+}
+body.admin .check input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  accent-color: var(--ds-accent-ink);
+}
 
 
 /* ==========================================================
