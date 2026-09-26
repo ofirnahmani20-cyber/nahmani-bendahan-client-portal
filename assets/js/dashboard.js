@@ -594,6 +594,93 @@
 
   /* ---- 5. כל שלבי התביעה ---- */
 
+  /* ==========================================================
+     אירועים קרובים
+
+     המערכת מחזיקה שני מועדים עתידיים ולא יותר:
+     next_hearing_at (תאריך בלבד - api_client חותך את השעה
+     ב-.date()) ו-appeal_deadline מתוך ההחלטה.
+
+     מה שאין במסד ולכן אינו מוצג כאן: שעת הדיון, מיקום
+     הוועדה, מה להביא, וועדות או פגישות עתידיות כישויות
+     בפני עצמן. המקטע אומר את זה במפורש במקום למלא את
+     החסר בטקסט כללי - לקוח שיגיע לוועדה לפי שעה מומצאת
+     יפספס אותה.
+     ========================================================== */
+
+  function renderEvents() {
+    var host = $('eventsBody');
+    if (!host) return;
+    host.textContent = '';
+
+    var events = [];
+
+    if (caseFile.nextHearing) {
+      events.push({
+        title: 'ועדה רפואית',
+        date:  caseFile.nextHearing,
+        left:  daysUntil(caseFile.nextHearing),
+        note:  'המשרד יצור אתך קשר לפני המועד ויתאם הכנה.'
+      });
+    }
+
+    var d = caseFile.decision;
+    if (d && d.appealDeadline) {
+      events.push({
+        title: 'המועד האחרון להגשת ערר',
+        date:  d.appealDeadline,
+        left:  daysUntil(d.appealDeadline),
+        note:  'זהו מועד מחייב. אחריו לא ניתן להגיש ערר.',
+        hard:  true
+      });
+    }
+
+    if (!events.length) {
+      host.appendChild(el('p', 'measure',
+        'אין כרגע מועד עתידי רשום בתיק. ברגע שייקבע דיון או ' +
+        'ועדה, הם יופיעו כאן והמשרד גם יצור אתך קשר.'));
+      return;
+    }
+
+    /* מה שלפנינו קודם, ומה שחלף אחריו. המקטע נקרא "אירועים
+       קרובים", ומועד שכבר עבר בראשו דוחף את הדיון הקרוב
+       מתחת לקו הקיפול. הוא נשאר מוצג - זה מידע, והלקוח
+       צריך לדעת שחלון הערר נסגר - אבל לא ראשון. */
+    events.sort(function (a, b) {
+      var ap = a.left != null && a.left < 0;
+      var bp = b.left != null && b.left < 0;
+      if (ap !== bp) return ap ? 1 : -1;
+      return a.date < b.date ? -1 : 1;
+    });
+
+    var list = el('ul', 'events');
+    events.forEach(function (e) {
+      var li = el('li', 'event' + (e.hard ? ' event-hard' : '') +
+                        (e.left != null && e.left < 0 ? ' event-passed' : ''));
+
+      li.appendChild(el('p', 'event-when num', formatDate(e.date)));
+      li.appendChild(el('p', 'event-title', e.title));
+
+      var left = e.left;
+      var rel  = left == null ? ''
+               : left < 0  ? 'המועד חלף'
+               : left === 0 ? 'היום'
+               : left === 1 ? 'מחר'
+               : 'בעוד ' + left + ' ימים';
+      if (rel) li.appendChild(el('p', 'event-left', rel));
+
+      li.appendChild(el('p', 'event-note', e.note));
+      list.appendChild(li);
+    });
+    host.appendChild(list);
+
+    /* מה שאיננו יודעים נאמר, ולא מושלם בניחוש. */
+    host.appendChild(el('p', 'event-gap measure',
+      'המערכת מחזיקה את התאריך בלבד. שעת ההתייצבות, כתובת ' +
+      'הוועדה ומה להביא אתך אינם רשומים בה - הם יימסרו לך ' +
+      'מהמשרד ובזימון הרשמי מביטוח לאומי.'));
+  }
+
   function renderStages() {
     var list = $('stepsList');
     list.textContent = '';
@@ -1181,6 +1268,7 @@
     renderRequirements();
     renderChat();
     renderNextSteps();
+    renderEvents();
     renderStages();
     renderDuration();
     renderMessages();

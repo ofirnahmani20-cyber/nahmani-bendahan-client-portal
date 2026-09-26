@@ -7,10 +7,10 @@
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <!-- tokens מצהיר בלבד; ds-front מעצב, והכול בתוכו תחת body.front.
      admin.html אינו נושא את המחלקה ואינו טוען את הקובץ. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260926235256">
-<link rel="stylesheet" href="assets/css/style.css?v=20260926235256">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260926235256">
-<link rel="stylesheet" href="assets/css/ds-front.css?v=20260926235256">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260927000747">
+<link rel="stylesheet" href="assets/css/style.css?v=20260927000747">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260927000747">
+<link rel="stylesheet" href="assets/css/ds-front.css?v=20260927000747">
 </head>
 <body class="front">
 
@@ -216,6 +216,15 @@
         <h1 class="view-title" id="roadmapTitle" tabindex="-1">מפת ההליך</h1>
         <p class="lead measure">איפה התיק שלך נמצא, מה נשאר, וכמה זמן זה כבר לוקח.</p>
 
+        <!-- אירועים קרובים. נבנה משני שדות שכבר קיימים -
+             next_hearing_at ו-appeal_deadline - ולא מהמצאה.
+             מה שהמערכת אינה יודעת נאמר במפורש ואינו מולא
+             בטקסט כללי. -->
+        <section aria-labelledby="h-events">
+          <h2 id="h-events">אירועים קרובים</h2>
+          <div id="eventsBody"></div>
+        </section>
+
         <section aria-labelledby="h-duration">
           <h2 id="h-duration">משך ההליך עד כה</h2>
           <div id="durationBody"></div>
@@ -317,9 +326,9 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260926235256"></script>
-<script src="assets/js/quality.js?v=20260926235256"></script>
-<script src="assets/js/dashboard.js?v=20260926235256"></script>
-<script src="assets/js/nav.js?v=20260926235256"></script>
+<script src="assets/js/api.js?v=20260927000747"></script>
+<script src="assets/js/quality.js?v=20260927000747"></script>
+<script src="assets/js/dashboard.js?v=20260927000747"></script>
+<script src="assets/js/nav.js?v=20260927000747"></script>
 </body>
 </html>

@@ -1077,3 +1077,66 @@ body.front .public-link {
   body.front .faq-item { border-color: var(--ds-ink-soft); }
   body.front .section-head .ghost { opacity: .12; }
 }
+
+/* ---- אירועים קרובים ----
+   שני מועדים לכל היותר, ולכן רשימה ולא לוח שנה. התאריך
+   גדול כי הוא מה שהלקוח בא לחפש; הכותרת אחריו.
+
+   מועד מחייב - המועד להגשת ערר - הוא היחיד שמקבל אוכמנית.
+   מועד שכבר חלף מאבד את הפס ולא את הקריאוּת: הוא עדיין
+   מידע, ולקוח שמסתכל עליו צריך להבין מה קרה. */
+body.front .events { list-style: none; margin: 0; padding: 0; }
+body.front .event {
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  padding: calc(4px * var(--scale)) 0;
+  padding-inline-start: calc(18px * var(--scale));
+  margin: 0 0 calc(22px * var(--scale));
+}
+body.front .event-hard { border-inline-start-color: var(--ds-risk); }
+body.front .event-passed { border-inline-start-color: var(--ds-hairline); }
+
+body.front .event-when {
+  font-family: var(--ds-serif);
+  font-size: calc(27px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  line-height: 1.15;
+  color: var(--ds-ink);                      /* 13.46:1 */
+  margin: 0;
+}
+body.front .event-hard .event-when { color: var(--ds-risk); }   /* 8.05:1 */
+body.front .event-title {
+  font-size: calc(19px * var(--scale));
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+  margin: calc(2px * var(--scale)) 0 0;
+}
+body.front .event-left {
+  font-size: calc(16px * var(--scale));
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-ink);               /* 5.57:1 */
+  margin: calc(4px * var(--scale)) 0 0;
+}
+body.front .event-hard .event-left { color: var(--ds-risk); }
+body.front .event-passed .event-left,
+body.front .event-passed .event-when { color: var(--ds-ink-soft); }   /* 6.23:1 */
+body.front .event-note {
+  font-size: calc(17px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+  margin: calc(6px * var(--scale)) 0 0;
+  max-width: 60ch;
+}
+
+/* מה שהמערכת אינה יודעת. מסגרת מקווקוות - אותה חתימה של
+   מצב ריק באדמין - כדי שייקרא כהיעדר מידע ולא כאזהרה. */
+body.front .event-gap {
+  border: 1px dashed var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+  margin: calc(4px * var(--scale)) 0 0;
+  font-size: calc(16px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+}
+
+@media (prefers-contrast: more) {
+  body.front .event-gap { border-color: var(--ds-ink-soft); }
+}
