@@ -552,3 +552,501 @@ body.front .stage-now .stage-t {
 @media (prefers-contrast: more) {
   body.front .stage-rule { background: var(--ds-on-dark-dim); }
 }
+
+
+/* ==========================================================
+   11. פורטל הלקוח - הרכיבים שנותרו (שלב 5)
+   ----------------------------------------------------------
+   שמונה משפחות שעד כה נשארו לגמרי במערכת הישנה:
+   steps · decision-* · quality-* · reply-* · todo-strip ·
+   doc-task · dz-* · stat-*.
+
+   שני כללים חלים על כל מה שכאן, ואין מהם חריגה:
+
+   1. כל גודל נכתב כ-calc(Npx * var(--scale)). גודל קבוע
+      היה מנתק את הרכיב מכפתור הגדלת הטקסט, וזו בדיוק
+      התקלה שקיימת היום באדמין.
+
+   2. מטרות מגע 52px ולא 44. הפורטל כפוף לת"י 5568 ברמה AA
+      וקהל היעד הוא נפגעי עבודה, חולים ומבוגרים.
+
+   הרחיצות הקרות של המערכת הישנה - stop-soft, warn-soft,
+   wait-soft - יורדות לטובת רחיצות הטוקנים, שנשארות באותה
+   משפחה חמה. בכל מקום הצבע מלווה בסמל או במילים ואינו
+   הערוץ היחיד.
+   ========================================================== */
+
+
+/* ---- שמונת השלבים, בתצוגת "מפת ההליך" ----
+   העיגול הממולא הפך לספרה על קו. הסימון אינו צבע בלבד:
+   הקו משנה עובי, והמצב כתוב במילים מתחת לשם. */
+
+body.front .steps > li {
+  gap: calc(16px * var(--scale));
+  padding: calc(16px * var(--scale)) 0;
+  border-top: 1px solid var(--ds-hairline);
+}
+body.front .steps .mark {
+  width: calc(40px * var(--scale));
+  height: calc(40px * var(--scale));
+  border-radius: 0;
+  background: none;
+  border: 0;
+  border-top: 2px solid var(--ds-hairline);
+  align-items: flex-start;
+  font-family: var(--ds-serif);
+  font-size: calc(18px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+  direction: ltr;
+}
+body.front .steps .done .mark {
+  border-top: 3px solid var(--ds-accent);
+  color: var(--ds-accent-ink);               /* 5.57:1 */
+  background: none;
+}
+body.front .steps .now {
+  background: none;
+  padding-inline: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-ink);
+  padding-inline-start: calc(16px * var(--scale));
+}
+body.front .steps .now .mark {
+  border-top: 4px solid var(--ds-ink);
+  color: var(--ds-ink);                      /* 13.46:1 */
+  background: none;
+}
+body.front .steps .name {
+  font-family: var(--ds-serif);
+  font-size: calc(20px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);
+}
+body.front .steps .now .name { font-size: calc(23px * var(--scale)); }
+body.front .steps .when {
+  font-size: calc(16px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+  letter-spacing: normal;
+}
+
+
+/* ---- ההחלטה שהתקבלה ----
+   המסך החשוב ביותר בפורטל: כאן הלקוח מבין מה נקבע לו וכמה
+   זמן נשאר לו להגיב. */
+
+body.front .decision {
+  border: 1px solid var(--ds-hairline);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: var(--ds-radius-card);
+}
+body.front .decision-headline {
+  font-family: var(--ds-serif);
+  font-size: calc(28px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  line-height: 1.25;
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);                      /* 13.46:1 */
+}
+body.front .decision-when {
+  font-size: calc(17px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+}
+body.front .decision-list > li::before {
+  content: "\2014";                          /* קו ולא נקודה */
+  color: var(--ds-accent-ink);               /* 5.57:1 */
+}
+body.front .decision-pending {
+  background: none;
+  border: 1px solid var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+}
+body.front .decision-note {
+  background: none;
+  border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: 0;
+  padding: calc(4px * var(--scale)) 0;
+  padding-inline-start: calc(16px * var(--scale));
+}
+
+/* מועד הערר. הפריט היחיד בפורטל שמקבל רחיצה מלאה - הוא
+   היחיד שאיחור בו אינו הפיך. */
+body.front .decision-deadline {
+  border: 1px solid var(--ds-accent);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: var(--ds-radius-card);
+  background: var(--ds-attention-wash);      /* ink עליה: 12.06:1 */
+  padding: calc(16px * var(--scale)) calc(18px * var(--scale));
+}
+body.front .decision-deadline strong {
+  font-family: var(--ds-serif);
+  font-size: calc(21px * var(--scale));
+  color: var(--ds-ink);
+}
+body.front .decision-deadline.urgent {
+  border-color: var(--ds-risk);
+  background: var(--ds-risk-wash);
+}
+body.front .decision-deadline.urgent strong,
+body.front .decision-deadline.urgent p { color: var(--ds-risk); }   /* 7.26:1 */
+body.front .decision-deadline.passed {
+  border-color: var(--ds-ink-soft);
+  background: var(--ds-neutral-wash);
+}
+body.front .decision-legal {
+  font-size: calc(16px * var(--scale));
+  color: var(--ds-ink-soft);
+}
+
+
+/* ---- משוב על איכות הצילום ----
+   הצילום אינו קריא, ולכן המשרד לא יוכל להשתמש בו. זו
+   אזהרה אמיתית ולא הערה, ולכן היא מקבלת את האוכמנית. */
+
+body.front .quality-checking { color: var(--ds-ink-soft); }
+body.front .quality-box {
+  background: var(--ds-risk-wash);           /* ink עליה: 12.15:1 */
+  border: 1px solid var(--ds-risk);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-risk);
+  border-radius: var(--ds-radius-card);
+  padding: calc(16px * var(--scale)) calc(18px * var(--scale));
+}
+body.front .quality-title {
+  font-family: var(--ds-serif);
+  font-size: calc(20px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-risk);                     /* 7.26:1 על הרחיצה */
+}
+body.front .quality-reasons > li { border-top-color: #d3bdb6; }
+body.front .quality-reasons strong { color: var(--ds-ink); }
+body.front .quality-fix {
+  font-size: calc(17px * var(--scale));
+  color: var(--ds-ink);                      /* 12.15:1 */
+}
+body.front .quality-override-note {
+  border-top-color: #d3bdb6;
+  font-size: calc(17px * var(--scale));
+  color: var(--ds-ink);
+}
+
+
+/* ---- תגובה למשרד על מסמך ---- */
+
+body.front .reply-box {
+  border-top: 1px dashed var(--ds-hairline);
+  padding-top: calc(14px * var(--scale));
+}
+body.front .reply-lead {
+  font-size: calc(17px * var(--scale));
+  color: var(--ds-ink-soft);
+}
+body.front .reply-pick {
+  min-height: calc(52px * var(--scale));
+  font-size: calc(17px * var(--scale));
+  border-radius: var(--ds-radius);
+}
+body.front .reply-pick.on {
+  background: var(--ds-espresso);
+  border-color: var(--ds-espresso);
+  color: var(--ds-on-dark);                  /* 10.17:1 */
+}
+body.front .reply-text {
+  background: var(--ds-card-bg);
+  border: 1px solid var(--ds-ink-soft);      /* גבול פקד, לא קו שיער */
+  border-radius: var(--ds-radius);
+  color: var(--ds-ink);                      /* 16.42:1 */
+  font-size: calc(18px * var(--scale));
+}
+body.front .reply-small {
+  font-size: calc(15px * var(--scale));
+  color: var(--ds-ink-soft);
+}
+
+
+/* ---- רצועת "מה נדרש ממך" ---- */
+
+body.front .todo-strip {
+  background: none;
+  border: 1px solid var(--ds-hairline);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: var(--ds-radius-card);
+  padding: calc(20px * var(--scale)) calc(24px * var(--scale));
+  gap: calc(24px * var(--scale));
+}
+body.front .todo-count {
+  font-family: var(--ds-serif);
+  font-size: calc(25px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);                      /* 13.46:1 */
+}
+body.front .todo-sub {
+  font-size: calc(16px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+}
+body.front .meter { background: var(--ds-hairline); }
+body.front .meter-fill { background: var(--ds-accent); }
+
+
+/* ---- כרטיס המסמך ---- */
+
+body.front .doc-task {
+  background: var(--ds-card-bg);
+  border: 1px solid var(--ds-card-border);
+  border-top: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: var(--ds-radius-card);
+  padding: calc(22px * var(--scale)) calc(24px * var(--scale));
+  margin: 0 0 calc(18px * var(--scale));
+}
+/* מה שכבר התקבל אינו משימה, ולכן הוא שקט יותר */
+body.front .doc-task-done {
+  background: none;
+  border-top-color: var(--ds-hairline);
+}
+body.front .doc-name h3 {
+  font-family: var(--ds-serif);
+  font-size: calc(21px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);                      /* 16.42:1 על לבן */
+}
+body.front .doc-optional {
+  font-size: calc(15px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 7.59:1 */
+}
+
+
+/* ---- אזור ההעלאה ----
+   מצב הגרירה מסומן בעובי הקו ובצבע יחד, ולא בצבע בלבד. */
+
+body.front .dropzone {
+  background: none;
+  border: 2px dashed var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+}
+body.front .dropzone:hover { background: var(--ds-surface); }
+body.front .dropzone.dz-over {
+  background: var(--ds-accent-wash);         /* ink עליה: 12.06:1 */
+  border-style: solid;
+  border-width: 3px;
+  border-color: var(--ds-accent);
+}
+body.front .dz-head .icon { color: var(--ds-accent-ink); }
+body.front .dz-title {
+  font-family: var(--ds-serif);
+  font-size: calc(19px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);
+}
+body.front .dz-hint {
+  font-size: calc(15px * var(--scale));
+  color: var(--ds-ink-soft);
+}
+body.front .dz-btn { min-height: calc(52px * var(--scale)); }
+
+
+/* ---- זמני ההליך, בתצוגת "מפת ההליך" ---- */
+
+body.front .stat {
+  border: 1px solid var(--ds-card-border);
+  border-radius: var(--ds-radius-card);
+  padding: calc(16px * var(--scale)) calc(18px * var(--scale));
+}
+body.front .stat-label {
+  font-size: calc(14px * var(--scale));
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-ink);               /* 5.57:1 - ולא ברונזה 4.59 */
+}
+body.front .stat-value {
+  font-family: var(--ds-serif);
+  font-size: calc(27px * var(--scale));
+  color: var(--ds-ink);                      /* 13.46:1 */
+}
+body.front .stat-note {
+  font-size: calc(15px * var(--scale));
+  color: var(--ds-ink-soft);
+}
+body.front .compare { border-top-color: var(--ds-hairline); }
+body.front .compare-bar { background: var(--ds-hairline); border-radius: 0; }
+
+
+@media (prefers-contrast: more) {
+  body.front .steps > li,
+  body.front .doc-task,
+  body.front .stat,
+  body.front .todo-strip { border-color: var(--ds-ink-soft); }
+  body.front .dropzone { border-color: var(--ds-ink-soft); }
+}
+
+
+/* ==========================================================
+   12. מסך הכניסה והדף הציבורי (שלב 6)
+   ----------------------------------------------------------
+   שני המשטחים הראשונים שאדם רואה. כאן הזהות היא התוכן,
+   ולכן הם נדיבים יותר מסביבת העבודה - אבל באותה שפה בדיוק.
+   ========================================================== */
+
+
+/* ---- 🔴 תקלה חיה שההגירה שלי יצרה ----
+   בשלב 1 הסרתי את הרקע מ-.card-cat והשארתי את הטקסט ב-
+   accent-ink. התג יושב absolute מעל .card-media, שהוא
+   תצלום או משטח אספרסו - ושם accent-ink נמדד 1.83:1.
+   כלומר תג הקטגוריה היה בלתי נראה.
+
+   תג שיושב מעל תמונה כלשהי חייב קרקע משלו; אי אפשר להסתמך
+   על בהירות התצלום. accent-on-dark על אספרסו הוא 6.31:1
+   בכל מצב, ולא משנה מה יש בתמונה מתחת. */
+body.front .card-cat {
+  background: var(--ds-espresso);
+  color: var(--ds-accent-on-dark);           /* 6.31:1 - מובטח */
+  border: 0;
+  border-top: 2px solid var(--ds-accent-on-dark);
+  padding: calc(7px * var(--scale)) calc(14px * var(--scale));
+}
+
+
+/* ---- מסך הכניסה של הלקוחות ---- */
+
+body.front .login-head .firm {
+  font-family: var(--ds-serif);
+  font-weight: var(--ds-weight-bold);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+}
+
+/* התיבה אומרת שזו סביבת הדגמה. היא צריכה להיקרא, ולא
+   להיראות כמו אזהרה - ולכן קו צד ולא רחיצה. */
+body.front .demo-box {
+  background: none;
+  border: 1px solid var(--ds-hairline);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  border-radius: var(--ds-radius-card);
+  padding: calc(16px * var(--scale)) calc(18px * var(--scale));
+  font-size: calc(16px * var(--scale));
+  color: var(--ds-ink);                      /* 13.46:1 */
+}
+
+/* הלוקאפ על רצועת האספרסו של מסך הכניסה */
+body.front .logo-wm b { color: var(--ds-on-dark); }          /* 10.17:1 */
+body.front .logo-wm i { color: var(--ds-accent-on-dark); }   /*  6.31:1 */
+body.front .logo-wm .who { color: var(--ds-on-dark-dim); }   /*  7.70:1 */
+body.front .topbar .who { color: var(--ds-on-dark-dim); }
+
+
+/* ---- כותרת מקטע עם המספר הרפאים ----
+   המחווה נשמרת; רק הגוון עובר לטוקן. 7% אטימות הוא
+   דקורטיבי בלבד ואינו נושא מידע. */
+
+body.front .section-head h2 {
+  font-family: var(--ds-serif);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);
+}
+body.front .section-head .ghost {
+  font-family: var(--ds-serif);
+  color: var(--ds-espresso);
+  opacity: .07;
+}
+
+
+/* ---- כרטיסי המאמרים ---- */
+
+body.front .cards { gap: calc(24px * var(--scale)); }
+body.front .card-rule { background: var(--ds-accent); }
+body.front .card-when {
+  font-family: var(--ds-serif);
+  font-style: italic;
+  font-size: calc(16px * var(--scale));
+  color: var(--ds-accent-ink);               /* 6.19:1 על surface */
+}
+body.front .card-title {
+  font-family: var(--ds-serif);
+  font-size: calc(21px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);                      /* 14.97:1 */
+}
+body.front .card-sum {
+  font-size: calc(17px * var(--scale));
+  color: var(--ds-ink-soft);                 /* 6.92:1 על surface */
+}
+
+
+/* ---- אקורדיון תחומי הטיפול והשאלות ----
+   הצורה כבר הוגרה למעלה. כאן הסימן והקו. */
+
+body.front .acc-item,
+body.front .faq-item { border-top-color: var(--ds-hairline); }
+body.front .acc-q {
+  min-height: calc(64px * var(--scale));
+  font-size: calc(20px * var(--scale));
+}
+body.front .acc-q::after {
+  border: 1px solid var(--ds-ink-soft);
+  color: var(--ds-accent-ink);               /* 5.57:1 */
+  font-family: var(--ds-sans);
+}
+
+
+/* ---- התצלומים ----
+   מה שאין - נאמר. משבצת ממתינה לתצלום אינה מוסתרת ואינה
+   מוחלפת בתמונת stock. */
+
+body.front .photo-row { gap: calc(24px * var(--scale)); }
+body.front .photo-box {
+  background: none;
+  border: 1px dashed var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+  font-size: calc(15px * var(--scale));
+  letter-spacing: var(--ds-ls-label);
+}
+body.front .photo-ph figcaption {
+  font-family: var(--ds-serif);
+  font-size: calc(17px * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);
+}
+body.front .ph { background: var(--ds-espresso); border-radius: var(--ds-radius); }
+
+
+/* ---- הפוטר ----
+   יושב על אספרסו. כל צבע כאן נמדד מולו ולא מול העצם. */
+
+body.front .foot-col h2 {
+  font-family: var(--ds-sans);
+  font-size: calc(13px * var(--scale));
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-on-dark);           /* 6.31:1 */
+}
+body.front .foot-col a,
+body.front .foot-col p {
+  color: var(--ds-on-dark-dim);              /* 7.70:1 */
+  font-size: calc(16px * var(--scale));
+}
+body.front .foot-col a { min-height: calc(30px * var(--scale)); }
+body.front .foot-col a:hover { color: var(--ds-on-dark); }
+body.front .sitefoot-legal {
+  border-top-color: #574d40;
+  color: var(--ds-on-dark-dim);              /* 7.70:1 */
+  font-size: calc(15px * var(--scale));
+}
+
+
+/* ---- קבוצת הכפתורים בגיבור ---- */
+body.front .cta-btns { gap: calc(12px * var(--scale)); }
+
+/* הקישור היחיד במסך הכניסה שאינו כפתור. נמדד 25px גובה -
+   מעל המינימום של 24px, אך זו הדרך היחידה מהמסך הזה אל
+   המידע המקצועי, והקהל כולל אנשים עם קושי מוטורי. */
+body.front .public-link {
+  display: inline-flex; align-items: center;
+  min-height: calc(44px * var(--scale));
+}
+
+
+@media (prefers-contrast: more) {
+  body.front .demo-box,
+  body.front .photo-box,
+  body.front .acc-item,
+  body.front .faq-item { border-color: var(--ds-ink-soft); }
+  body.front .section-head .ghost { opacity: .12; }
+}
