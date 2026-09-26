@@ -323,3 +323,53 @@ body.front .num,
 body.front .chat-when {
   direction: ltr; unicode-bidi: plaintext; white-space: nowrap;
 }
+
+
+/* ==========================================================
+   תיקון תקלות שההגירה החלקית השאירה
+   ----------------------------------------------------------
+   הקנבס התהפך לעצם, אבל כללים שנכתבו לקנבס הכהה נשארו.
+   ========================================================== */
+
+/* הקישור היחיד במסך הכניסה שלא קיבל מקבילה. נמדד 1.67:1
+   על העצם - כלומר כמעט בלתי נראה. */
+body.front .public-link { color: var(--ds-accent-ink); }     /* 5.57:1 */
+body.front .band-dark .public-link { color: var(--ds-on-dark-dim); }
+
+/* .band נשאר לבן טהור בחמש תצוגות של הפורטל, בעוד המערכת
+   כולה על עצם. לבן טהור קורא כמסך ולא כנייר.
+
+   ה-:not חיוני. בלעדיו הכלל דורס את .band-dark - אותה
+   ספציפיות, מוצהר אחריו - וה-hero הופך לבהיר עם טקסט בהיר
+   עליו. נמדד 1:1. זו הפעם השלישית שהמלכודת הזאת תופסת אותי,
+   ולכן: כלל רקע נכתב תמיד כך שלא ייגע בווריאנטים שלו. */
+body.front .band:not(.band-dark):not(.band-tint) {
+  background: var(--ds-ground);
+}
+body.front .card-body { background: transparent; }
+
+/* רצועת המותג מעל מסך הכניסה הייתה שחור-דיו מעל מערכת חומה */
+body.front .login-brand { background: var(--ds-espresso); }
+
+/* רכיבים שלא הוגרו כלל */
+body.front .toast {
+  background: var(--ds-ink); color: var(--ds-ground);        /* 13.46:1 */
+  border: 0; border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+}
+body.front .skip-link {
+  background: var(--ds-ink); color: var(--ds-ground);
+  border-radius: var(--ds-radius); font-family: var(--ds-sans);
+}
+body.front .hamburger { color: var(--ds-on-dark); border-radius: var(--ds-radius); }
+body.front .drawer-badge {
+  background: var(--ds-accent-on-dark); color: var(--ds-espresso);
+  border-radius: var(--ds-radius);
+}
+body.front .drawer-rule { border-color: #574d40; }
+body.front .drawer-foot { color: var(--ds-on-dark-dim); }
+
+/* טקסט חופשי של הלקוח יכול לגלוש, כמו ב-.chat-body */
+body.front .reply-text,
+body.front .reject-note,
+body.front .item-note { overflow-wrap: anywhere; }
