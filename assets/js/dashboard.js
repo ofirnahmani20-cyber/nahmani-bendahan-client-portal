@@ -231,14 +231,44 @@
     head.appendChild(title);
     host.appendChild(head);
 
-    /* מחוון מקוטע - שמונה משבצות שאפשר לספור בעין */
-    var track = el('div', 'ticks');
-    track.setAttribute('role', 'img');
-    track.setAttribute('aria-label',
-      'שלב ' + n + ' מתוך ' + total + ' בתביעה');
+    /* ---- סרגל השלבים ----
+       הגרסה הקודמת הייתה שמונה משבצות ריקות עם aria-label.
+       קורא מסך שמע "שלב 4 מתוך 8", אבל מי שהסתכל במסך ראה
+       שמונה קווים ולא ידע מה כל אחד מהם אומר - לא מה כבר
+       נעשה, לא מה קורה עכשיו ולא מה מגיע אחר כך.
+
+       עכשיו כל משבצת נושאת את שם השלב. השמות כבר קיימים
+       ב-stage_templates ומגיעים ב-API, ולכן אין כאן שום
+       נתון חדש ושום המצאה - רק הצגה שלהם.
+
+       הסימון אינו נשען על צבע בלבד: הקו מעל כל שלב משנה גם
+       עובי, והמצב נאמר במילים מוסתרות לקורא המסך. */
+    var track = el('ol', 'stagebar');
+    track.setAttribute('aria-label', 'שלבי התביעה. אתה נמצא בשלב ' +
+      n + ' מתוך ' + total + '.');
+
     for (var i = 1; i <= total; i++) {
-      var cls = 'tick' + (i < n ? ' tick-done' : i === n ? ' tick-now' : '');
-      track.appendChild(el('span', cls, '', true));
+      var st   = CLAIM_STAGES[i - 1];
+      var done = i < n;
+      var now  = i === n;
+
+      var step = el('li', 'stage-step ' +
+        (done ? 'stage-done' : now ? 'stage-now' : 'stage-next'));
+      if (now) step.setAttribute('aria-current', 'step');
+
+      /* הקו הוא הסרגל עצמו. aria-hidden כי המצב נאמר בטקסט. */
+      step.appendChild(el('span', 'stage-rule', '', true));
+
+      /* שם אחר מ-head שלמעלה: var אינו מוגבל לבלוק, ושימוש
+         חוזר באותו שם היה דורס את כותרת הסיכום. */
+      var line = el('p', 'stage-head');
+      line.appendChild(el('span', 'stage-n', pad2(i)));
+      line.appendChild(el('span', 'visually-hidden',
+        done ? ' הושלם: ' : now ? ' השלב הנוכחי: ' : ' טרם החל: '));
+      step.appendChild(line);
+
+      step.appendChild(el('p', 'stage-t', st ? st.title : 'שלב ' + i));
+      track.appendChild(step);
     }
     host.appendChild(track);
 

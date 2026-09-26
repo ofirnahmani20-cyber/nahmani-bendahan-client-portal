@@ -1240,14 +1240,9 @@ img.ph::after { content: none; }
   color: var(--on-bg); margin: 0;
 }
 
-/* מחוון מקוטע - אפשר לספור את השלבים בעין, בניגוד לסרגל רציף */
-.ticks { display: flex; gap: 6px; margin: 0 0 24px; }
-.tick {
-  flex: 1 1 0; height: 10px;
-  background: #4a4236;
-}
-.tick-done { background: var(--bronze-light); }
-.tick-now  { background: #fff; }
+/* סרגל השלבים עבר ל-ds-front.css כ-.stagebar. הכללים הישנים
+   (.ticks / .tick) הוסרו ולא נדרסו: המשבצות היו ריקות מטקסט,
+   והמבנה החדש נושא את שם כל שלב ולכן אינו אותו רכיב. */
 
 .sum-what {
   color: var(--on-bg); max-width: 60ch;
@@ -1290,7 +1285,6 @@ img.ph::after { content: none; }
   .sum-head { gap: 18px; margin: 20px 0; }
   .sum-num-now { font-size: calc(40px * var(--scale)); }
   .sum-stage { font-size: calc(24px * var(--scale)); }
-  .ticks { gap: 4px; }
 }
 
 /* ==========================================================

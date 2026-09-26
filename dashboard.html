@@ -7,10 +7,10 @@
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <!-- tokens מצהיר בלבד; ds-front מעצב, והכול בתוכו תחת body.front.
      admin.html אינו נושא את המחלקה ואינו טוען את הקובץ. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260926230000">
-<link rel="stylesheet" href="assets/css/style.css?v=20260926230000">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260926230000">
-<link rel="stylesheet" href="assets/css/ds-front.css?v=20260926230000">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260926214142">
+<link rel="stylesheet" href="assets/css/style.css?v=20260926214142">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260926214142">
+<link rel="stylesheet" href="assets/css/ds-front.css?v=20260926214142">
 </head>
 <body class="front">
 
@@ -128,6 +128,21 @@
 
   <!-- ===================== סקירה ===================== -->
   <div class="view" id="view-home">
+
+    <!-- ה-Hero של הפורטל. אותו צילום של הדשבורד, מאותו טוקן
+         --ds-hero-image. הוא יושב בתוך #view-home ולכן נעלם
+         יחד אתה כשעוברים לתצוגה אחרת - חמש האחרות נשארות
+         סביבת עבודה נקייה.
+
+         המותג אינו נכתב כאן: הצילום כבר נושא את NB ואת
+         NAHMANI - BEN-DAHAN על קיר האבן. הסלוגן נשאר טקסט
+         חי כדי שקורא מסך וחיפוש בדף ימצאו אותו. -->
+    <header class="ds-hero ds-hero-home" id="portalHero">
+      <div class="ds-hero-in">
+        <p class="ds-slogan">אנשים.<br>זכויות.<br>תוצאות.</p>
+      </div>
+    </header>
+
     <div class="band band-dark">
       <div class="band-in">
         <h1 class="view-title" id="greeting" tabindex="-1">האזור האישי שלי</h1>
@@ -302,9 +317,9 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260926230000"></script>
-<script src="assets/js/quality.js?v=20260926230000"></script>
-<script src="assets/js/dashboard.js?v=20260926230000"></script>
-<script src="assets/js/nav.js?v=20260926230000"></script>
+<script src="assets/js/api.js?v=20260926214142"></script>
+<script src="assets/js/quality.js?v=20260926214142"></script>
+<script src="assets/js/dashboard.js?v=20260926214142"></script>
+<script src="assets/js/nav.js?v=20260926214142"></script>
 </body>
 </html>

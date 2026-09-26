@@ -786,7 +786,7 @@ body.admin .ds-note {
 @media (min-width: 981px) and (max-width: 1140px) {
   body.admin .sitenav { display: block; }
   body.admin .sitenav ul { gap: var(--ds-space-4) var(--ds-space-12); }
-  body.admin .sitenav a { font-size: 13.5px; }
+  body.admin .sitenav a { font-size: 12.5px; }
   body.admin .hamburger { display: none; }
   /* הסרגל נשבר לשתי שורות בשוליים של שני פיקסלים, ולכן כאן
      גם המרווחים וגם הלוגו מצטמצמים - לא רק הניווט. */
@@ -1066,7 +1066,7 @@ body.admin .ds-hero h1,
 body.admin .ds-hero h2 { color: var(--ds-on-dark); }         /* 10.17:1 */
 
 body.admin .ds-hero-dash .ds-hero-line {
-  font-size: clamp(34px, 4.2vw, 56px);
+  font-size: clamp(25px, 2.9vw, 38px);
 }
 
 /* משפט ההקשר יורד אל הקנבס הבהיר, מתחת לרצועה */
@@ -1153,7 +1153,7 @@ body.admin .ds-dash-strip .ds-stat:first-child {
 }
 body.admin .ds-dash-strip .ds-stat dd {
   font-family: var(--ds-serif);
-  font-size: clamp(26px, 2.4vw, 34px);
+  font-size: clamp(20px, 1.7vw, 25px);
   font-weight: var(--ds-weight-bold);
   line-height: 1; color: var(--ds-ink);
   margin: 0 0 var(--ds-space-4);
@@ -1186,8 +1186,8 @@ body.admin .ds-attn .ds-row {
   border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
 }
 body.admin .ds-attn .ds-feed > li:last-child .ds-row { border-bottom: 0; }
-body.admin .ds-attn .ds-enum-n { font-size: clamp(24px, 2.4vw, 32px); }
-body.admin .ds-attn .ds-row-title { font-size: clamp(21px, 2vw, 27px); }
+body.admin .ds-attn .ds-enum-n { font-size: clamp(18px, 1.7vw, 23px); }
+body.admin .ds-attn .ds-row-title { font-size: clamp(16px, 1.4vw, 20px); }
 body.admin .ds-attn .ds-row-why   { font-size: var(--ds-size-eyebrow); }
 
 /* ---- מצבי ריק שהם אמירה ולא הערה ----
@@ -1195,7 +1195,7 @@ body.admin .ds-attn .ds-row-why   { font-size: var(--ds-size-eyebrow); }
    שורת טקסט אפורה בתוך חלל. */
 body.admin .ds-empty {
   font-family: var(--ds-serif);
-  font-size: clamp(19px, 1.8vw, 24px);
+  font-size: clamp(16px, 1.3vw, 19px);
   line-height: var(--ds-lh-snug);
   color: var(--ds-ink-soft);
   padding-block: var(--ds-space-32);
@@ -1237,13 +1237,13 @@ body.admin .ds-band { margin-bottom: 0; }
    ========================================================== */
 
 /* ---- א. הכותרת חוזרת להיות כותרת מקטע ----
-   הברכה היא clamp(34px, 4.2vw, 56px); המקטע חייב לשבת
+   הברכה היא clamp(22px, 2.0vw, 29px); המקטע חייב לשבת
    מתחתיה בבירור ולא לצדה. */
-body.admin .ds-attn .ds-section-title { font-size: clamp(28px, 2.7vw, 40px); }
+body.admin .ds-attn .ds-section-title { font-size: clamp(21px, 1.9vw, 29px); }
 
 /* ופריטי הפיד מקבלים יותר נוכחות מהכותרת שמעליהם */
-body.admin .ds-attn .ds-row-title { font-size: clamp(20px, 1.75vw, 25px); }
-body.admin .ds-attn .ds-enum-n    { font-size: clamp(22px, 2vw, 29px); }
+body.admin .ds-attn .ds-row-title { font-size: clamp(16px, 1.25vw, 19px); }
+body.admin .ds-attn .ds-enum-n    { font-size: clamp(17px, 1.4vw, 21px); }
 body.admin .ds-attn .ds-row       { padding-block: var(--ds-space-24); }
 
 /* ---- ב. יחס הטורים 67/33 ----
@@ -1256,7 +1256,7 @@ body.admin .ds-cols {
 /* הכותרות בטור המשני משניות, אך לא זניחות */
 body.admin .ds-col-side .ds-section-title {
   font-family: var(--ds-serif);
-  font-size: clamp(21px, 1.7vw, 26px);
+  font-size: clamp(17px, 1.25vw, 20px);
   font-weight: var(--ds-weight-bold);
   letter-spacing: var(--ds-ls-section);
 }
@@ -1380,10 +1380,10 @@ body.admin .ds-card > .ds-section-head {
 }
 body.admin .ds-card .ds-section-title {
   font-family: var(--ds-serif);
-  font-size: clamp(20px, 1.6vw, 24px);
+  font-size: clamp(16px, 1.2vw, 19px);
   letter-spacing: var(--ds-ls-section);
 }
-body.admin .ds-attn.ds-card .ds-section-title { font-size: clamp(22px, 1.9vw, 27px); }
+body.admin .ds-attn.ds-card .ds-section-title { font-size: clamp(17px, 1.35vw, 20px); }
 body.admin .ds-card .ds-section-meta {
   font-size: var(--ds-size-meta);
   color: var(--ds-ink-soft);                 /* 7.59:1 על לבן */
@@ -1406,7 +1406,7 @@ body.admin .ds-kpi .ds-stat {
 body.admin .ds-kpi .ds-stat:first-child { border-inline-start: 0; padding-inline-start: 0; }
 body.admin .ds-kpi .ds-stat dd {
   font-family: var(--ds-serif);
-  font-size: clamp(28px, 2.4vw, 38px);
+  font-size: clamp(21px, 1.7vw, 28px);
   font-weight: var(--ds-weight-bold);
   line-height: 1; margin: 0 0 var(--ds-space-8);
   color: var(--ds-ink);                      /* 16.42:1 על לבן */
@@ -1522,7 +1522,7 @@ body.admin .ds-card .ds-empty {
 /* ה-Hero חוזר להיות גדול. הוא מופיע רק בדשבורד; שאר מסכי
    העבודה נשארים נקיים כדי לא לגזול שטח עבודה. */
 body.admin .ds-hero-dash {
-  min-height: clamp(240px, 24vw, 320px);
+  min-height: clamp(180px, 17vw, 240px);
   margin-bottom: var(--ds-space-32);
   align-items: center;
 }
@@ -1537,7 +1537,7 @@ body.admin .ds-hero-brand { margin: 0; align-self: flex-start; }
    צריך. הקו מתחתיו הוא המחווה שמחברת אותו למותג. */
 body.admin .ds-slogan {
   font-family: var(--ds-serif);
-  font-size: clamp(26px, 2.6vw, 40px);
+  font-size: clamp(21px, 1.9vw, 30px);
   font-weight: var(--ds-weight-bold);
   line-height: 1.12;
   letter-spacing: var(--ds-ls-display);
@@ -1559,7 +1559,7 @@ body.admin .ds-greet-date {
 }
 body.admin .ds-greet-h {
   font-family: var(--ds-serif);
-  font-size: clamp(30px, 3.2vw, 46px);
+  font-size: clamp(23px, 2.2vw, 33px);
   font-weight: var(--ds-weight-bold);
   line-height: var(--ds-lh-tight);
   letter-spacing: var(--ds-ls-display);
@@ -1587,7 +1587,7 @@ body.admin .ds-band-slim { border-radius: var(--ds-radius-card); margin-top: var
 
 @media (max-width: 860px) {
   body.admin .ds-hero-dash .ds-hero-in { flex-direction: column; align-items: flex-start; }
-  body.admin .ds-slogan { text-align: start; font-size: clamp(22px, 6vw, 30px); }
+  body.admin .ds-slogan { text-align: start; font-size: clamp(19px, 5vw, 25px); }
   body.admin .ds-kpi { grid-template-columns: repeat(2, 1fr); gap: var(--ds-space-16) 0; }
   body.admin .ds-kpi .ds-stat:nth-child(3) { border-inline-start: 0; padding-inline-start: 0; }
 }
@@ -1664,7 +1664,7 @@ body.admin .ds-hero-mark { display: none; }
    הסלוגן הוא הקול של ה-Hero, והמותג שקט לצדו. */
 body.admin .ds-hero-brand { align-self: flex-end; margin: 0; }
 body.admin .ds-slogan {
-  font-size: clamp(30px, 3.1vw, 48px);
+  font-size: clamp(23px, 2.2vw, 35px);
   line-height: 1.08;
   padding-bottom: var(--ds-space-12);
   border-bottom-width: 3px;
@@ -1674,7 +1674,7 @@ body.admin .ds-slogan {
 body.admin.ds-on .page { padding-block: var(--ds-space-32) var(--ds-space-48); }
 body.admin .ds-greet-block { margin: 0 0 var(--ds-space-20); }
 body.admin .ds-greet-h {
-  font-size: clamp(28px, 2.7vw, 38px);
+  font-size: clamp(22px, 2.0vw, 29px);
   font-weight: var(--ds-weight-medium);
   letter-spacing: var(--ds-ls-section);
   margin-bottom: var(--ds-space-4);
@@ -1915,7 +1915,7 @@ body.admin .ds-slogan::after {
     background-position: center 26%;
     min-height: 170px;
   }
-  body.admin .ds-slogan { font-size: clamp(22px, 7vw, 30px); }
+  body.admin .ds-slogan { font-size: clamp(19px, 6vw, 25px); }
   body.admin .ds-slogan::before { inset: -14% -14% -10% -10%; }
 }
 

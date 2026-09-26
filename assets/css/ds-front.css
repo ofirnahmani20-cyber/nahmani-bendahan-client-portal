@@ -247,8 +247,6 @@ body.front .chat-who  { color: var(--ds-ink); }
 /* ---- מחוון השלבים ---- */
 body.front .steps > li { border-radius: var(--ds-radius); }
 body.front .steps .mark { border-radius: 50%; }
-body.front .tick-done { background: var(--ds-accent); }
-body.front .tick-now  { background: var(--ds-ink); }
 
 /* ---- הדף הציבורי ---- */
 body.front .hero-eyebrow,
@@ -373,3 +371,184 @@ body.front .drawer-foot { color: var(--ds-on-dark-dim); }
 body.front .reply-text,
 body.front .reject-note,
 body.front .item-note { overflow-wrap: anywhere; }
+
+
+/* ==========================================================
+   9. ה-Hero בבית של פורטל הלקוח
+   ----------------------------------------------------------
+   אותו צילום של הדשבורד, ומאותו טוקן אחד - --ds-hero-image.
+   הוא מופיע רק ב-#view-home; חמש התצוגות האחרות של הפורטל
+   נשארות נקיות, בדיוק כפי ששאר מסכי האדמין נקיים.
+
+   למה רצועה מעל התוכן ולא רקע מתחתיו: הפס הכהה שמתחת נושא
+   את הברכה, את מספר השלב, את סרגל השלבים ואת שורות הסטטוס -
+   הרבה טקסט. תצלום בהיר מאחורי כל זה היה מוריד את הניגודיות
+   מ-10.17:1 אל סביבות 2:1. הפורטל מחויב לת"י 5568 ברמה AA
+   ולטקסט חי, ולכן הצילום נעצר מעל הפס ולא נכנס מתחתיו.
+   ========================================================== */
+
+body.front .ds-hero-home {
+  min-height: var(--ds-hero-h-home);
+  align-items: center;
+}
+
+/* יישור לרוחב .band-in שמתחתיו (1180/32), ולא ל---ds-page-max.
+   בלי זה הסלוגן והברכה יושבים על שני קווי ימין שונים. */
+body.front .ds-hero-home .ds-hero-in {
+  max-width: 1180px;
+  padding: calc(24px * var(--scale)) 32px;
+  display: flex;
+  justify-content: flex-start;   /* ב-RTL: לצד ימין */
+}
+
+/* הסלוגן. אותו טקסט חי של הדשבורד, ולא חלק מהתמונה. */
+body.front .ds-slogan {
+  position: relative;
+  font-family: var(--ds-serif);
+  font-size: calc(clamp(22px, 2.6vw, 34px) * var(--scale));
+  font-weight: var(--ds-weight-bold);
+  line-height: 1.12;
+  letter-spacing: var(--ds-ls-display);
+  color: var(--ds-on-dark);
+  text-align: end;
+  margin: 0;
+  padding-bottom: calc(12px * var(--scale));
+  border-bottom: 2px solid var(--ds-accent-on-dark);   /* 6.31:1 */
+}
+
+/* הרקע המקומי מתחת לסלוגן בלבד.
+   הצילום נמדד ב-0.33 עד 0.94 לומיננס ואין בו אזור כהה;
+   החשכה גורפת שמגיעה ל-3:1 דרשה 55% והייתה הורגת את האור.
+   הפתרון הוא אותו רקע רדיאלי של הדשבורד, שנמדד שם 8.34:1
+   מול הפיקסל הבהיר ביותר שמתחת לטקסט. */
+body.front .ds-slogan::before {
+  content: ""; position: absolute; inset: -18% -8% -14% -34%;
+  background: radial-gradient(118% 128% at 88% 52%,
+    rgba(26, 23, 20, 0.86) 0%,
+    rgba(26, 23, 20, 0.70) 42%,
+    rgba(26, 23, 20, 0.34) 68%,
+    rgba(26, 23, 20, 0.00) 88%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* אותו חיתוך אנכי שנמדד לדשבורד. הצילום רחב (1.78:1)
+   והרצועה שטוחה, ולכן אין גלישה אופקית בשום רוחב. */
+@media (max-width: 1140px) {
+  body.front .ds-hero-home { background-position: center 18%; }
+}
+@media (max-width: 860px) {
+  body.front .ds-hero-home { background-position: center 22%; }
+  body.front .ds-slogan::before { inset: -16% -12% -12% -18%; }
+}
+@media (max-width: 560px) {
+  body.front .ds-hero-home {
+    background-position: center 26%;
+    min-height: calc(150px * var(--scale));
+  }
+  body.front .ds-hero-home .ds-hero-in { padding-inline: 20px; }
+  body.front .ds-slogan { font-size: calc(clamp(20px, 6vw, 26px) * var(--scale)); }
+  body.front .ds-slogan::before { inset: -14% -14% -10% -10%; }
+}
+
+
+/* ==========================================================
+   10. סרגל השלבים
+   ----------------------------------------------------------
+   מה שהיה כאן: שמונה משבצות ריקות בגובה 10px. הן אמרו
+   "אתה בשלב הרביעי" למי שטרח לספור, ולא אמרו דבר על מה
+   קרה בשלושת הקודמים או מה יקרה בחמשת הבאים. זה בדיוק
+   מה שהלקוח רוצה לדעת כשהוא נכנס לאזור האישי.
+
+   עכשיו כל משבצת נושאת מספר ואת שם השלב. השמות כבר קיימים
+   ב-stage_templates ומגיעים ב-API - אין כאן נתון חדש.
+
+   שלוש מדידות שקבעו את הפרטים:
+
+   1. הניגודיות אינה משתנה לפי המצב. גם שלב שטרם החל נכתב
+      ב---ds-on-dark-dim (7.70:1). היה מפתה להעמיק את העמעום
+      כדי לומר "עוד לא", אבל זה היה מוריד טקסט אמיתי מתחת
+      לרף - והפורטל מחויב לת"י 5568 ברמה AA. המצב נאמר בקו,
+      במשקל ובמילים מוסתרות, ולא בהנמכת ניגודיות.
+
+   2. הקו אינו צבע בלבד. הושלם = ברונזה 3px, עכשיו = בהיר
+      5px, טרם החל = 1px. מי שאינו מבחין בגוון רואה עובי.
+      שלושת הגוונים עוברים את 3:1 מול האספרסו.
+
+   3. הפריסה נשברת לשורות שלמות ולא לגלילה אופקית. הטקסט
+      נשאר בגודל מלא בכל רוחב, כי --scale חייב להמשיך לעבוד
+      עד 200% בלי שהסרגל ייחתך.
+   ========================================================== */
+
+body.front .stagebar {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: calc(10px * var(--scale)) calc(8px * var(--scale));
+  list-style: none;
+  margin: 0 0 calc(26px * var(--scale));
+  padding: 0;
+}
+
+body.front .stage-step {
+  min-width: 0;   /* בלעדיו שם ארוך מרחיב את העמודה וגורם לגלישה */
+  display: flex;
+  flex-direction: column;
+  gap: calc(6px * var(--scale));
+}
+
+body.front .stage-rule {
+  display: block;
+  width: 100%;
+  background: #8a7e70;   /* 3.13:1 על האספרסו - טרם החל */
+  height: 1px;
+}
+body.front .stage-done .stage-rule {
+  height: 3px;
+  background: var(--ds-accent-on-dark);   /* 6.31:1 */
+}
+body.front .stage-now .stage-rule {
+  height: 5px;
+  background: var(--ds-on-dark);          /* 10.17:1 */
+}
+
+body.front .stage-head { margin: 0; }
+body.front .stage-n {
+  font-family: var(--ds-sans);
+  font-size: calc(12px * var(--scale));
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);           /* 7.70:1 */
+  direction: ltr;
+  display: inline-block;
+}
+body.front .stage-done .stage-n { color: var(--ds-accent-on-dark); }
+body.front .stage-now  .stage-n { color: var(--ds-on-dark); }
+
+body.front .stage-t {
+  font-family: var(--ds-sans);
+  font-size: calc(14px * var(--scale));
+  line-height: 1.35;
+  color: var(--ds-on-dark-dim);           /* 7.70:1 - גם למה שטרם החל */
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+body.front .stage-now .stage-t {
+  color: var(--ds-on-dark);               /* 10.17:1 */
+  font-weight: var(--ds-weight-medium);
+}
+
+/* שמונה טורים בעברית דורשים רוחב. מתחת לזה עוברים לשורות
+   שלמות - ארבע ואז שתיים - ולא לטקסט קטן יותר. */
+@media (max-width: 1080px) {
+  body.front .stagebar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  body.front .stagebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(14px * var(--scale)) calc(10px * var(--scale));
+  }
+}
+
+@media (prefers-contrast: more) {
+  body.front .stage-rule { background: var(--ds-on-dark-dim); }
+}
