@@ -321,3 +321,63 @@ def test_the_client_case_declares_no_lawyer(api, temp_case):
     assert data.get("lawyer") is None, (
         "ה-API התחיל להחזיר lawyer - צריך לוודא שכל נקודות "
         "הקריאה ב-dashboard.js מטפלות גם במקרה שהוא חסר")
+
+# ================================================================
+#  7. התחברות מוצלחת נושאת את מי שנכנס
+# ================================================================
+
+def test_a_successful_staff_login_records_who_logged_in(api):
+    """
+    26.09: עד היום staff.login_success נכתב דרך record_anonymous,
+    ולכן נשמר עם actor_type='system' ו-actor_id ריק. נמדד על
+    המסד: 1963 שורות התחברות, כולן בלי מזהה.
+
+    התוצאה בממשק: דוח "כניסות למערכת" יכול היה לומר כמה כניסות
+    היו, אבל לא מי נכנס - וזה בדיוק מה שהופך אותו לרשומת אבטחה
+    שאפשר להשתמש בה.
+
+    הבדיקה נועלת את הייחוס. היא גם נועלת את ההפך עבור כישלון:
+    שם אין זהות מאומתת, ולייחס שורה למשתמש על סמך אימייל
+    שהוקלד היה רישום של טענה ולא של עובדה.
+    """
+    before = _last_login_row()
+
+    r = api.post("/api/office/auth/login",
+                 json={"email": STAFF_EMAIL, "password": STAFF_PASSWORD})
+    assert r.status_code == 200, r.text
+
+    row = _last_login_row()
+    assert row is not None and row != before, "לא נכתבה שורת התחברות"
+    assert row["actor_type"] == "user", "ההתחברות עדיין נרשמת כ-system"
+    assert row["actor_id"] is not None, "ההתחברות נרשמה בלי מזהה משתמש"
+    assert row["actor_name"], "שם איש הצוות אינו נשלף מהשורה"
+
+
+def test_a_failed_staff_login_stays_anonymous(api):
+    """
+    ההפך של הבדיקה שמעליה, ובמכוון: כשל התחברות נשאר אנונימי.
+    """
+    api.post("/api/office/auth/login",
+             json={"email": STAFF_EMAIL, "password": "definitely-not-it"})
+
+    with cursor() as cur:
+        cur.execute("""select actor_type, actor_id from audit_log
+                        where action = 'staff.login_failed'
+                        order by created_at desc limit 1""")
+        row = cur.fetchone()
+
+    assert row is not None, "כשל ההתחברות לא נרשם כלל"
+    assert row["actor_type"] == "system"
+    assert row["actor_id"] is None, (
+        "כשל התחברות יוחס למשתמש - זה רישום של טענה ולא של עובדה")
+
+
+def _last_login_row():
+    with cursor() as cur:
+        cur.execute("""select a.id, a.actor_type, a.actor_id,
+                              coalesce(u.full_name, '') as actor_name
+                         from audit_log a
+                         left join users u on u.id = a.actor_id
+                        where a.action = 'staff.login_success'
+                        order by a.created_at desc limit 1""")
+        return cur.fetchone()

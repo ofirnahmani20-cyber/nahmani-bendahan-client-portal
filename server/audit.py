@@ -74,6 +74,41 @@ def record(identity, action, *, entity_type=None, entity_id=None,
         print("[audit] רישום נכשל: %s" % exc)
 
 
+def record_actor(firm_id, subject_type, subject_id, action, *,
+                 request=None, metadata=None):
+    """
+    רישום מיוחס כשעוד אין אובייקט Identity.
+
+    הצורך היחיד נכון להיום: התחברות מוצלחת. ברגע שהסיסמה
+    אומתה אנחנו כן יודעים מי נכנס, אבל ה-Identity נבנה משורת
+    session רק בבקשה הבאה. עד 26.09 כל התחברות נרשמה דרך
+    record_anonymous, ולכן 1963 שורות התחברות נשמרו עם
+    actor_type='system' ו-actor_id ריק - ודוח "כניסות למערכת"
+    לא יכול היה לומר מי נכנס.
+
+    כישלון התחברות ממשיך להיכתב דרך record_anonymous, במכוון:
+    שם אין זהות מאומתת, ולייחס שורה למשתמש על סמך אימייל
+    שהוקלד היה רישום של טענה ולא של עובדה.
+    """
+    try:
+        with cursor(commit=True) as cur:
+            cur.execute(
+                """insert into audit_log
+                     (firm_id, actor_type, actor_id, action, ip,
+                      user_agent, metadata)
+                   values (%s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    firm_id, subject_type, subject_id, action,
+                    request.client.host if request and request.client else None,
+                    (request.headers.get("user-agent", "")[:500]
+                     if request else None),
+                    json.dumps(_safe(metadata), ensure_ascii=False),
+                ),
+            )
+    except Exception as exc:                       # pragma: no cover
+        print("[audit] רישום נכשל: %s" % exc)
+
+
 def record_anonymous(firm_id, action, *, request=None, metadata=None):
     """רישום כשאין עדיין זהות - למשל כשל התחברות."""
     try:
