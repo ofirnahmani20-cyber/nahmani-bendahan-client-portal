@@ -605,16 +605,43 @@ body.front .steps .done .mark {
   color: var(--ds-accent-ink);               /* 5.57:1 */
   background: none;
 }
+/* 🔴 המלכודת, בפעם הרביעית: כלל שנכתב על האלמנט ולא על ההקשר.
+
+   style.css:768 מצייר את השלב הנוכחי כקופסה כהה, ולא על ה-li
+   אלא על ה-div שבתוכו - ".steps .now > div". הסתכלתי על .now,
+   על .name ועל .when, ולא על העטיפה שנושאת את הרקע.
+
+   התוצאה: הכלל שלי צבע את השם ב-ink (0-3-1 מנצח את 0-3-0),
+   הקופסה נשארה כהה, והשם נמדד 1.09:1 וה-when 1.98:1. כלומר
+   השלב שבו התיק נמצא - הפריט המרכזי במפת ההליך - היה בלתי
+   קריא לגמרי.
+
+   התיקון הוא על העטיפה. "כאן נמצא התיק" נאמר עכשיו בקו,
+   במשקל ובגודל, כמו בסרגל השלבים ובמסלול של האדמין, ולא
+   בהיפוך צבע. */
 body.front .steps .now {
   background: none;
   padding-inline: 0;
+}
+body.front .steps .now > div {
+  background: none;
+  color: var(--ds-ink);                      /* 13.46:1 */
   border-inline-start: var(--ds-rule-w) solid var(--ds-ink);
+  border-radius: 0;
+  padding: calc(2px * var(--scale)) 0;
   padding-inline-start: calc(16px * var(--scale));
+  margin-top: 0;
+}
+body.front .steps .now .name { color: var(--ds-ink); }        /* 13.46:1 */
+body.front .steps .now .when {
+  color: var(--ds-ink-soft);                 /*  6.23:1 */
+  letter-spacing: normal;
 }
 body.front .steps .now .mark {
   border-top: 4px solid var(--ds-ink);
   color: var(--ds-ink);                      /* 13.46:1 */
   background: none;
+  outline: 0;                                /* העיגול כבר אינו ממולא */
 }
 body.front .steps .name {
   font-family: var(--ds-serif);

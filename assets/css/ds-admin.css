@@ -617,3 +617,55 @@ body.admin .view section + section { margin-top: var(--ds-space-20); }
   body.admin .block { border-color: var(--ds-ink-soft); }
   body.admin .view > .view-title + .lead { border-bottom-color: var(--ds-ink-soft); }
 }
+
+/* ---- הציר הצדדי בדוחות: כניסות למערכת ----
+   רשומת אבטחה אמיתית, אבל לא פעילות מקצועית. היא מקבלת
+   פחות משקל מהציר המרכזי - גופן קטן יותר, בלי סריף, בלי
+   קווי הפרדה - וממשיכה להיות קריאה במלוא הניגודיות.
+
+   ניסיון כושל הוא החריג היחיד שמקבל צבע. הוא האירוע היחיד
+   כאן שדורש מבט. */
+body.admin .access-list > li { border: 0; padding: 0; }
+body.admin .access-row {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--ds-space-4) var(--ds-space-8);
+  padding: var(--ds-space-8) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .access-row:last-child { border-bottom: 0; }
+body.admin .access-when {
+  flex: 0 0 auto;
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);                 /* 7.59:1 על לבן */
+}
+body.admin .access-who {
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink);                      /* 16.42:1 */
+  overflow-wrap: anywhere;
+}
+/* המונה אומר "שמונה כניסות באותו יום" בלי שמונה שורות */
+body.admin .access-n {
+  flex: 0 0 auto;
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);
+  direction: ltr;
+}
+body.admin .access-fail .access-who {
+  color: var(--ds-risk);                     /* 9.82:1 על לבן */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .access-fail .access-when { color: var(--ds-risk); }
+
+/* הכותרת בציר הצדדי שקטה מזו שבמרכז */
+body.admin .ds-col-side .block > h2 {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  margin: 0 0 var(--ds-space-8);
+}
+
+/* שני הטורים בדוחות מתחלקים כמו בדשבורד, אבל בלי המרווח
+   האנכי העצום של הפיד - כאן זה מקטע אחד בכל צד. */
+body.admin #view-reports .ds-col-side > * + * { margin-top: var(--ds-space-20); }

@@ -8,12 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260926233846">
-<link rel="stylesheet" href="assets/css/style.css?v=20260926233846">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260926233846">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260926233846">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260926233846">
-<link rel="stylesheet" href="assets/css/ds-case.css?v=20260926233846">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260926235256">
+<link rel="stylesheet" href="assets/css/style.css?v=20260926235256">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260926235256">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260926235256">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260926235256">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20260926235256">
 </head>
 <body class="admin">
 
@@ -410,11 +410,34 @@
         <h1 class="view-title" tabindex="-1">דוחות</h1>
         <p class="lead">יומן הפעולות של כל המשרד.</p>
 
-        <section class="block" aria-labelledby="h-firmlog">
-          <h2 id="h-firmlog">יומן פעולות הצוות</h2>
-          <p class="item-note" id="firmLogIntro"></p>
-          <ul class="plain-list" id="firmLogList"></ul>
-        </section>
+        <!-- שני צירים, ובמכוון לא רשימה אחת.
+             1066 מתוך 1277 שורות האודיט הן התחברויות (83%).
+             ברשימה אחת הן מציפות את הפעולות בתיקים ואי אפשר
+             לראות מה באמת קרה במשרד.
+
+             הציר המרכזי: מה נעשה בתיקים.
+             הציר הצדדי: מי נכנס למערכת ומתי - רשומת אבטחה
+             אמיתית, אבל לא פעילות מקצועית.
+
+             החלוקה היא בתצוגה בלבד. שום שורת אודיט אינה
+             נמחקת, אינה מסוננת בשרת, ואינה משנה סמנטיקה. -->
+        <div class="ds-cols">
+          <div class="ds-col-main">
+            <section class="block" aria-labelledby="h-firmlog">
+              <h2 id="h-firmlog">יומן פעולות הצוות</h2>
+              <p class="item-note" id="firmLogIntro"></p>
+              <ul class="plain-list" id="firmLogList"></ul>
+            </section>
+          </div>
+
+          <aside class="ds-col-side">
+            <section class="block ds-quiet" aria-labelledby="h-firmaccess">
+              <h2 id="h-firmaccess">כניסות למערכת</h2>
+              <p class="item-note" id="firmAccessIntro"></p>
+              <ul class="plain-list access-list" id="firmAccessList"></ul>
+            </section>
+          </aside>
+        </div>
       </div>
 
       <!-- ---- הגדרות ---- -->
@@ -849,9 +872,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260926233846"></script>
-<script src="assets/js/viewnav.js?v=20260926233846"></script>
-<script src="assets/js/ds-dashboard.js?v=20260926233846"></script>
-<script src="assets/js/admin.js?v=20260926233846"></script>
+<script src="assets/js/api.js?v=20260926235256"></script>
+<script src="assets/js/viewnav.js?v=20260926235256"></script>
+<script src="assets/js/ds-dashboard.js?v=20260926235256"></script>
+<script src="assets/js/admin.js?v=20260926235256"></script>
 </body>
 </html>

@@ -423,17 +423,76 @@
       : pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
+  /* ---- שני צירים ביומן המשרד ----
+     1066 מתוך 1277 שורות האודיט הן התחברויות - 83%. ברשימה
+     אחת הן מציפות את הפעולות בתיקים, ובחלון של 200 שורות
+     נשארות מהן בודדות.
+
+     ACCESS הוא אירוע גישה: מי נכנס, מתי, והאם הצליח. זו
+     רשומת אבטחה אמיתית ולכן היא נשארת ומוצגת - אבל בציר
+     הצדדי ולא במרכז.
+
+     NOISE נרשם בכל פתיחת תיק ואינו פעילות כלל.
+
+     החלוקה היא בתצוגה בלבד. אין מחיקה, אין סינון בשרת,
+     ואין שינוי בסמנטיקת האודיט. הסטים זהים לאלה שב-
+     ds-dashboard.js - אותה הגדרה משמשת את שני המסכים. */
+  var ACCESS = {
+    'staff.login_success': true, 'staff.login_failed': true,
+    'staff.logout': true, 'client.logout': true,
+    'client.login_success': true, 'client.login_failed': true,
+    'client.otp_requested': true
+  };
+  var NOISE = {
+    'office.case_viewed': true, 'client.case_viewed': true
+  };
+
+  /* תווית לכל סוג אירוע גישה. משמשת רק כשאין שם - ראה
+     ההערה ב-renderAccess. */
+  var ACCESS_LABEL = {
+    'staff.login_success':  'כניסת צוות',
+    'staff.login_failed':   'כניסת צוות',
+    'staff.logout':         'יציאת צוות',
+    'client.login_success': 'כניסת לקוח',
+    'client.login_failed':  'כניסת לקוח',
+    'client.logout':        'יציאת לקוח',
+    'client.otp_requested': 'לקוח ביקש קוד'
+  };
+
   function renderLog(caseId, listId) {
     var list = $(listId || 'logList');
     if (!list) return Promise.resolve();
-    return Api.auditLog(caseId).then(function (data) {
+
+    /* הפיצול חל על יומן המשרד בלבד. בהיסטוריה של תיק בודד
+       אין אירועי גישה מלכתחילה, ואין מה לפצל. */
+    var isFirm = listId === 'firmLogList';
+
+    /* בברירת המחדל של 50 שורות נמדדו 46 התחברויות ושתי
+       פעולות בתיקים. כלומר היומן של המשרד הראה כמעט כלום.
+       200 היא תקרת השרת, ולא ערך שנבחר כאן. */
+    return Api.auditLog(caseId, isFirm ? 200 : undefined).then(function (data) {
       list.textContent = '';
-      if (!data.entries.length) {
+
+      var entries = data.entries;
+      if (isFirm) {
+        renderAccess(entries);
+        entries = entries.filter(function (e) {
+          return !ACCESS[e.action] && !NOISE[e.action];
+        });
+        var intro = $('firmLogIntro');
+        if (intro) {
+          intro.textContent = entries.length
+            ? entries.length + ' פעולות בתיקים. כניסות הצוות מופיעות בצד.'
+            : 'אין עדיין פעולות בתיקים.';
+        }
+      }
+
+      if (!entries.length) {
         list.appendChild(el('li', 'item-note', 'אין עדיין פעולות רשומות.'));
         return;
       }
       var lastDay = null;
-      data.entries.forEach(function (entry) {
+      entries.forEach(function (entry) {
         var day = dayLabel(entry.at);
         if (day !== lastDay) {
           list.appendChild(el('li', 'log-day', day));
@@ -456,6 +515,86 @@
     }).catch(function () {
       list.textContent = '';
       list.appendChild(el('li', 'item-note', 'לא הצלחנו לטעון את היומן.'));
+    });
+  }
+
+  /* ---- הציר הצדדי: מי נכנס למערכת ----
+     מקובץ לפי איש צוות ולפי יום. עורך דין שנכנס אחת-עשרה
+     פעמים ביום הוא שורה אחת שאומרת אחת-עשרה, ולא אחת-עשרה
+     שורות זהות.
+
+     ניסיון כושל אינו מתאחד לעולם. הוא האירוע היחיד כאן
+     שדורש מבט, ולכן הוא יושב בראש עם השעה המדויקת. */
+  function renderAccess(entries) {
+    var list  = $('firmAccessList');
+    var intro = $('firmAccessIntro');
+    if (!list) return;
+
+    list.textContent = '';
+
+    var ok = [], failed = [];
+    entries.forEach(function (e) {
+      if (!ACCESS[e.action]) return;
+      (/_failed$/.test(e.action) ? failed : ok).push(e);
+    });
+
+    if (!ok.length && !failed.length) {
+      if (intro) intro.textContent = 'אין אירועי גישה בחלון הזה.';
+      list.appendChild(el('li', 'item-note', 'אין אירועי גישה.'));
+      return;
+    }
+
+    if (intro) {
+      intro.textContent = failed.length
+        ? (failed.length === 1 ? 'ניסיון כניסה אחד נכשל.'
+                               : failed.length + ' ניסיונות כניסה נכשלו.')
+        : 'כל הכניסות בחלון הזה הצליחו.';
+    }
+
+    /* הכישלונות קודם, כל אחד בנפרד */
+    failed.forEach(function (e) {
+      var li = el('li', 'access-row access-fail');
+      li.appendChild(el('span', 'access-when num',
+        dayLabel(e.at) + ' ' + clockOf(e.at)));
+      li.appendChild(el('span', 'access-who',
+        (e.actor || ACCESS_LABEL[e.action] || 'ניסיון כניסה') + ' - נכשל'));
+      list.appendChild(li);
+    });
+
+    /* ואז המוצלחות, מאוחדות לפי מי ומתי.
+
+       שם איש הצוות אינו זמין: api_auth.py רושם את
+       staff.login_success דרך record_anonymous, ולכן השורה
+       נשמרת עם actor_type='system' ו-actor_id ריק. נמדד על
+       המסד: 1963 שורות התחברות, כולן בלי מזהה משתמש.
+
+       במקום להמציא שם, השורה אומרת איזה סוג כניסה זו. ברגע
+       שהרישום יישא מזהה - e.actor יתמלא לבדו והשם יופיע כאן
+       בלי שינוי נוסף בקוד הזה. */
+    var seen = {}, order = [];
+    ok.forEach(function (e) {
+      var who = e.actor || ACCESS_LABEL[e.action] || 'כניסה למערכת';
+      var day = dayLabel(e.at);
+      var key = who + '|' + day;
+      if (!seen[key]) {
+        seen[key] = { who: who, day: day, n: 0, last: e.at };
+        order.push(key);
+      }
+      seen[key].n++;
+      if (e.at > seen[key].last) seen[key].last = e.at;
+    });
+
+    order.forEach(function (key) {
+      var g = seen[key];
+      var li = el('li', 'access-row');
+      li.appendChild(el('span', 'access-when num',
+        g.day + ' ' + clockOf(g.last)));
+      var who = el('span', 'access-who', g.who);
+      li.appendChild(who);
+      if (g.n > 1) {
+        li.appendChild(el('span', 'access-n', '×' + g.n));
+      }
+      list.appendChild(li);
     });
   }
 
