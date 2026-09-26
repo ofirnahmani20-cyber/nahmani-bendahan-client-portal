@@ -161,23 +161,9 @@ body.admin .case-tabs a { padding-inline: 0; }
    בדיוק, רק מוצג אחרת.
    ========================================================== */
 
-body.admin #caseWorkspace .block {
-  background: var(--ds-card-bg);
-  border: var(--ds-hairline-w) solid var(--ds-card-border);
-  border-radius: var(--ds-radius-card);
-  padding: var(--ds-card-pad);
-  margin: 0 0 var(--ds-space-20);
-}
-
-/* בלוק הניתוח נושא פס צד ומקבל גם את הכרטיס. הפס הוא
-   שאומר "זה לא עוד מקטע".
-   attention-block אינו כאן: הוא יושב באזור "דורש טיפול"
-   של המשרד ולא בתוך התיק, ומטופל ב-ds-admin. */
-body.admin #caseWorkspace .assist-block {
-  border: var(--ds-hairline-w) solid var(--ds-card-border);
-  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
-  padding-inline-start: var(--ds-card-pad);
-}
+/* הכרטיס עצמו אינו מוגדר כאן. ב-26.09, שלב 4, .block הפך
+   לכרטיס לבן בכל האזורים ב-ds-admin, ושכפול הכלל כאן היה
+   מייצר שני מקורות לאותו ערך. נשאר רק מה שייחודי לתיק. */
 
 body.admin #caseWorkspace .block > h3 {
   font-family: var(--ds-serif);
@@ -453,7 +439,10 @@ body.admin .log-body .item-note {
    שבו הם הכי נחוצים.
    ========================================================== */
 
-@media (max-width: 1180px) {
+/* 1280 ולא 1180: ב-1180 שמונת הטורים יוצאים ברוחב 140px
+   ושם באורך 23 תווים נשבר לארבע שורות. נמדד: מעל 1280
+   הטור הוא 150px ומעלה, וזה הרוחב שבו השמות עוד נקראים. */
+@media (max-width: 1280px) {
   body.admin .ds-road { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {

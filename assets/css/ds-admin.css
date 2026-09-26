@@ -71,11 +71,16 @@ body.admin .item-note { color: var(--ds-ink-soft); font-size: var(--ds-size-meta
 /* ---- פירוק התיבות ----
    .block היה מלבן לבן ממוסגר סביב כמעט כל דבר. עכשיו הוא
    משטח בלי מסגרת, והמרווח הוא שמפריד. */
+/* 26.09, שלב 4: המשטח הפך לכרטיס לבן ממוסגר, אותו כרטיס
+   של הדשבורד ושל סביבת התיק. קודם הוא היה משטח בהיר בלי
+   מסגרת, וזה עבד כשהיה בלוק אחד למסך - אבל באזורים עם כמה
+   מקטעים בזה אחר זה לא היה שום קו שאומר איפה אחד נגמר. */
 body.admin .block {
-  background: var(--ds-surface);
-  border: 0;
-  border-radius: var(--ds-radius);
-  padding: var(--ds-space-32);
+  background: var(--ds-card-bg);
+  border: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-radius: var(--ds-radius-card);
+  padding: var(--ds-card-pad);
+  margin: 0 0 var(--ds-space-20);
 }
 
 /* ---- טבלת התיקים ----
@@ -434,9 +439,9 @@ body.admin #firmLogList > li {
    הם חוזרים כפס צד, שהוא הדפוס של השפה החדשה. */
 body.admin .attention-block,
 body.admin .assist-block {
-  border: 0;
+  border: var(--ds-hairline-w) solid var(--ds-card-border);
   border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
-  padding-inline-start: var(--ds-space-24);
+  padding-inline-start: var(--ds-card-pad);
 }
 
 /* ---- שבב הסינון: המונה נשאר מלא בתוך שבב שטוח ---- */
@@ -498,3 +503,117 @@ body.admin .hamburger {
 }
 body.admin .empty { color: var(--ds-ink-soft); font-size: var(--ds-size-meta); }
 body.admin .check { color: var(--ds-ink); }
+
+
+/* ==========================================================
+   9. שבעת אזורי המשרד - שלב 4
+   ----------------------------------------------------------
+   ניהול משימות · התיקים בטיפולי · הושלמו ושכר טרחה ·
+   מסמכים · לקוחות · דוחות · הגדרות.
+
+   אין כאן Hero ואין תמונת רקע, בדיוק כמו בסביבת התיק.
+   הדשבורד הוא המשטח היחיד באדמין שמקבל תצלום.
+
+   ארבעה מהשבעה הם מצבי ריק מנוסחים - סגירת תיק, קלסר
+   המסמכים, ניהול לקוחות והקטלוגים טרם נבנו. הם לא מוסתרים
+   ולא מנוסחים כתקלה: הם אומרים מה חסר ומתי הוא מגיע.
+   ========================================================== */
+
+/* ---- כותרת האזור ----
+   אותה חיה של כותרת התיק: שם, משפט הקשר, וקו שסוגר אותם.
+   בלי הקו הכותרת והתוכן נקראים כרצף אחד. */
+body.admin .view > .view-title {
+  margin: 0 0 var(--ds-space-8);
+}
+body.admin .view > .view-title + .lead {
+  font-size: var(--ds-size-lede);
+  line-height: var(--ds-lh-body);
+  max-width: var(--ds-measure);
+  margin: 0 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-16);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+
+/* ---- מצב ריק מנוסח ----
+   אזור שטרם נבנה אינו אמור להיראות כמו אזור שנשבר. הקו
+   המקווקו אומר "כאן עוד אין תוכן", ולא "משהו השתבש".
+
+   הכלל מכוון ל-.item-note שהוא הילד היחיד של .block - זו
+   החתימה של ארבעת מצבי הריק, ואינה קיימת באזורים מלאים. */
+body.admin .view > .block > .item-note:only-child {
+  margin: 0;
+  border: 1px dashed var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  padding: var(--ds-space-24);
+  font-size: var(--ds-size-body);
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);                   /* 7.59:1 על לבן */
+  max-width: var(--ds-measure);
+}
+
+/* ---- ניהול משימות: "דורש טיפול" ----
+   הכרטיס והפס כבר מוגדרים למעלה. כאן הקצב שבתוכו. */
+body.admin .attention-head {
+  gap: var(--ds-space-4) var(--ds-space-16);
+  margin: 0 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-12);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .attention-head h2 {
+  font-family: var(--ds-serif);
+  font-size: clamp(17px, 1.35vw, 20px);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);                        /* 16.42:1 על לבן */
+}
+body.admin .attention-head .item-note {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                   /* 7.59:1 */
+}
+body.admin .attention-filters {
+  gap: 0 var(--ds-space-24);
+  margin: 0 0 var(--ds-space-12);
+  padding-bottom: var(--ds-space-16);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .attention-filters .field { margin-bottom: var(--ds-space-8); }
+body.admin .attention-filters .check { margin-bottom: var(--ds-space-16); }
+
+/* ---- התיקים בטיפולי ----
+   .table-block { overflow-x: auto } ב-admin.css:43 הוא מה
+   שמציל את הטבלה מגלישה ברוחב צר. הוא נשאר. הכרטיס יושב
+   סביבו, ולכן הריפוד יורד - אחרת הטבלה נגמרת לפני הקצה
+   והגלילה נראית שבורה. */
+body.admin .table-block { padding: 0; overflow-x: auto; }
+body.admin .table-block > table.cases { margin: 0; }
+body.admin .table-block th:first-child,
+body.admin .table-block td:first-child { padding-inline-start: var(--ds-card-pad); }
+body.admin .table-block th:last-child,
+body.admin .table-block td:last-child  { padding-inline-end: var(--ds-card-pad); }
+
+/* ---- דוחות: יומן פעולות הצוות ----
+   שורות היומן עצמן מעוצבות ב-ds-case, כי אותה שורה מופיעה
+   גם בלשונית ההיסטוריה של התיק. כאן רק הכותרת והפתיח. */
+body.admin #view-reports .block > h2 {
+  font-family: var(--ds-serif);
+  font-size: clamp(17px, 1.35vw, 20px);
+  letter-spacing: var(--ds-ls-section);
+  color: var(--ds-ink);
+  margin: 0 0 var(--ds-space-8);
+}
+body.admin #firmLogIntro {
+  margin: 0 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-16);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+
+/* ---- מרווח בין מקטעים באזור ---- */
+body.admin .view section + section { margin-top: var(--ds-space-20); }
+
+@media (max-width: 860px) {
+  body.admin .attention-filters { gap: 0 var(--ds-space-16); }
+}
+
+@media (prefers-contrast: more) {
+  body.admin .block { border-color: var(--ds-ink-soft); }
+  body.admin .view > .view-title + .lead { border-bottom-color: var(--ds-ink-soft); }
+}
