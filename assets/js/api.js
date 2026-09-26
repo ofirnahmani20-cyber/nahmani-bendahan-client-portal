@@ -166,9 +166,14 @@
       return Api.get('/api/office/cases/' + encodeURIComponent(caseId) +
                      '/document-templates');
     },
-    auditLog: function (caseId) {
-      return Api.get('/api/office/audit-log' +
-                     (caseId ? '?case_id=' + encodeURIComponent(caseId) : ''));
+    /* limit נדרש כי כניסות למערכת נרשמות בתדירות גבוהה, ובלי
+       חלון גדול מספיק הן דוחקות את הפעולות המשמעותיות מחוץ
+       ל-N האחרונים. השרת מגביל ל-200 ממילא. */
+    auditLog: function (caseId, limit) {
+      var q = [];
+      if (caseId) q.push('case_id=' + encodeURIComponent(caseId));
+      if (limit)  q.push('limit=' + encodeURIComponent(limit));
+      return Api.get('/api/office/audit-log' + (q.length ? '?' + q.join('&') : ''));
     },
 
     // ---- חיפוש רוחבי ----

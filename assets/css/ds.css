@@ -1349,3 +1349,485 @@ body.admin .ds-band-slim .ds-sys-row {
 @media (max-width: 1180px) {
   body.admin .ds-cols { grid-template-columns: minmax(0, 1fr); }
 }
+
+
+/* ==========================================================
+   13. שפת הכרטיסים
+   ----------------------------------------------------------
+   ההנחיה הקודמת - radius 0, בלי כרטיסים, פירוק כל תיבה -
+   בוטלה במפורש. ה-reference שאושר עובד בכרטיסים בהירים
+   ממוסגרים, עיגול עדין וגלולות סטטוס, וזו השפה עכשיו.
+
+   מה שנשאר מהקודם: אין צללים כבדים, אין gradient, אין
+   glassmorphism, והמסך אינו נהיה גריד גנרי של KPI. אזור
+   תשומת הלב נשאר האלמנט המקצועי המרכזי.
+   ========================================================== */
+
+/* ---- Card ---- */
+body.admin .ds-card {
+  background: var(--ds-card-bg);
+  border: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-radius: var(--ds-radius-card);
+  padding: var(--ds-card-pad);
+}
+body.admin .ds-card + .ds-card { margin-top: var(--ds-space-20); }
+
+/* כותרת בתוך כרטיס: שם המקטע בקצה אחד, מונה או קישור בשני */
+body.admin .ds-card > .ds-section-head {
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+  margin: 0 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-16);
+}
+body.admin .ds-card .ds-section-title {
+  font-family: var(--ds-serif);
+  font-size: clamp(20px, 1.6vw, 24px);
+  letter-spacing: var(--ds-ls-section);
+}
+body.admin .ds-attn.ds-card .ds-section-title { font-size: clamp(22px, 1.9vw, 27px); }
+body.admin .ds-card .ds-section-meta {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                 /* 7.59:1 על לבן */
+}
+
+/* ---- KPI ----
+   תא לכל מדד, מופרדים בקו שיער בתוך כרטיס אחד. נוכחות של
+   דשבורד, אבל לא ארבעה כרטיסים מרחפים. */
+body.admin .ds-kpi {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0 0 var(--ds-space-20);
+  padding: 0;
+}
+body.admin .ds-kpi .ds-stat {
+  margin: 0; padding: var(--ds-space-4) var(--ds-card-pad);
+  border: 0;
+  border-inline-start: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .ds-kpi .ds-stat:first-child { border-inline-start: 0; padding-inline-start: 0; }
+body.admin .ds-kpi .ds-stat dd {
+  font-family: var(--ds-serif);
+  font-size: clamp(28px, 2.4vw, 38px);
+  font-weight: var(--ds-weight-bold);
+  line-height: 1; margin: 0 0 var(--ds-space-8);
+  color: var(--ds-ink);                      /* 16.42:1 על לבן */
+  direction: ltr; unicode-bidi: plaintext;
+}
+body.admin .ds-kpi .ds-stat dt {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+  margin: 0; white-space: nowrap;
+}
+
+/* ---- Pill ----
+   גלולה מעוגלת עם מילוי רך. הסמל והמילים נשארים, ולכן
+   הצבע ממשיך לא להיות הערוץ היחיד. */
+body.admin .ds-pill {
+  display: inline-flex; align-items: center; gap: var(--ds-space-4);
+  border: 0; border-radius: var(--ds-radius-pill);
+  padding: 3px var(--ds-space-12);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+body.admin .ds-pill-u1 { background: #f6e7e3; color: var(--ds-risk); }        /* 8.16:1 */
+body.admin .ds-pill-u2 { background: #f5ecdd; color: var(--ds-accent-ink); }  /* 5.80:1 */
+body.admin .ds-pill-u3 { background: #f5ecdd; color: var(--ds-accent-ink); }
+body.admin .ds-pill-u4 { background: #eeebe4; color: var(--ds-ink-soft); }    /* 6.38:1 */
+body.admin .ds-pill-done { background: #e7ecdc; color: var(--ds-done); }      /* 6.23:1 */
+
+/* ---- שורת עבודה בתוך כרטיס ----
+   הסדר הוא סדר הסריקה: פס דחיפות -> סטטוס -> הפעולה ->
+   לקוח ותיק -> מועד. צפוף מספיק לסרוק חמש שורות בשניות. */
+body.admin .ds-card .ds-feed > li + li { margin-top: 0; }
+body.admin .ds-card .ds-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--ds-space-16);
+  padding: var(--ds-space-16) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-radius: 0;
+}
+body.admin .ds-card .ds-feed > li:last-child .ds-row { border-bottom: 0; }
+body.admin button.ds-row:hover { background: var(--ds-accent-wash); }
+
+/* פס הדחיפות בתחילת השורה */
+body.admin .ds-bar {
+  grid-column: 1; grid-row: 1 / span 3;
+  width: 3px; align-self: stretch;
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-hairline);
+}
+body.admin .ds-row-u1 .ds-bar { background: var(--ds-risk); }
+body.admin .ds-row-u2 .ds-bar { background: var(--ds-accent); }
+body.admin .ds-row-u3 .ds-bar { background: var(--ds-accent-on-dark); }
+
+body.admin .ds-card .ds-c-what { grid-column: 2; }
+body.admin .ds-card .ds-row-title {
+  font-size: var(--ds-size-eyebrow);
+  font-weight: var(--ds-weight-medium);
+  line-height: var(--ds-lh-snug);
+  color: var(--ds-ink);
+  margin: 0 0 var(--ds-space-4);
+}
+body.admin .ds-card .ds-row-why {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+  margin: 0; max-width: none;
+}
+body.admin .ds-card .ds-meta { font-size: var(--ds-size-meta); margin-top: 2px; }
+
+body.admin .ds-card .ds-c-side {
+  grid-column: 3;
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: var(--ds-space-8);
+  text-align: end;
+}
+body.admin .ds-when-t {
+  font-size: var(--ds-size-meta);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);
+  direction: ltr; unicode-bidi: plaintext; white-space: nowrap;
+}
+body.admin .ds-row-u1 .ds-when-t { color: var(--ds-risk); }
+
+/* ---- פעילות אחרונה, בתוך כרטיס ---- */
+body.admin .ds-card .ds-activity { columns: auto; }
+body.admin .ds-card .ds-act-row {
+  grid-template-columns: 44px 1fr;
+  padding: var(--ds-space-8) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+  color: var(--ds-ink-soft);
+}
+body.admin .ds-card .ds-act-day {
+  color: var(--ds-accent-ink); padding: var(--ds-space-12) 0 var(--ds-space-4);
+}
+body.admin .ds-card .ds-act-time { color: var(--ds-ink-soft); }
+body.admin .ds-card .ds-act-what { color: var(--ds-ink); }
+body.admin .ds-card .ds-act-who { display: none; }
+
+/* ---- מצבי ריק בתוך כרטיס ---- */
+body.admin .ds-card .ds-empty {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  border-bottom: 0; padding-block: var(--ds-space-16);
+}
+
+
+/* ==========================================================
+   14. Hero, סלוגן וברכה בשפת ה-reference
+   ========================================================== */
+
+/* ה-Hero חוזר להיות גדול. הוא מופיע רק בדשבורד; שאר מסכי
+   העבודה נשארים נקיים כדי לא לגזול שטח עבודה. */
+body.admin .ds-hero-dash {
+  min-height: clamp(240px, 24vw, 320px);
+  margin-bottom: var(--ds-space-32);
+  align-items: center;
+}
+body.admin .ds-hero-dash .ds-hero-in {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--ds-space-32);
+  padding-block: var(--ds-space-32);
+}
+body.admin .ds-hero-brand { margin: 0; align-self: flex-start; }
+
+/* הסלוגן. שלוש מילים, שלוש שורות, סריף - זה כל המשקל שהוא
+   צריך. הקו מתחתיו הוא המחווה שמחברת אותו למותג. */
+body.admin .ds-slogan {
+  font-family: var(--ds-serif);
+  font-size: clamp(26px, 2.6vw, 40px);
+  font-weight: var(--ds-weight-bold);
+  line-height: 1.12;
+  letter-spacing: var(--ds-ls-display);
+  color: var(--ds-on-dark);                  /* 10.17:1 על החום */
+  text-align: end;
+  margin: 0;
+  padding-bottom: var(--ds-space-16);
+  border-bottom: 2px solid var(--ds-accent-on-dark);
+}
+
+/* ---- הברכה, על הקנבס ---- */
+body.admin .ds-greet-block { margin: 0 0 var(--ds-space-24); }
+body.admin .ds-greet-date {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  margin: 0 0 var(--ds-space-8);
+}
+body.admin .ds-greet-h {
+  font-family: var(--ds-serif);
+  font-size: clamp(30px, 3.2vw, 46px);
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-tight);
+  letter-spacing: var(--ds-ls-display);
+  color: var(--ds-ink);                      /* 13.46:1 */
+  margin: 0 0 var(--ds-space-8);
+}
+body.admin .ds-greet-h:focus-visible { outline: var(--ds-focus); outline-offset: 6px; }
+body.admin .ds-dash-context {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);                 /* 6.23:1 */
+  max-width: 62ch;
+  margin: 0;
+}
+
+/* ---- פריסה ---- */
+body.admin .ds-cols { gap: var(--ds-space-20) clamp(var(--ds-space-20), 2vw, 28px); }
+body.admin .ds-col-side > * + * { margin-top: var(--ds-space-20); }
+body.admin.ds-on .page { padding-block: 0 var(--ds-space-48); }
+body.admin .ds-hero-dash { margin-top: 0; }
+
+/* הרצועה הכהה שסוגרת את העמוד */
+body.admin .ds-band-slim { border-radius: var(--ds-radius-card); margin-top: var(--ds-space-20); }
+
+@media (max-width: 860px) {
+  body.admin .ds-hero-dash .ds-hero-in { flex-direction: column; align-items: flex-start; }
+  body.admin .ds-slogan { text-align: start; font-size: clamp(22px, 6vw, 30px); }
+  body.admin .ds-kpi { grid-template-columns: repeat(2, 1fr); gap: var(--ds-space-16) 0; }
+  body.admin .ds-kpi .ds-stat:nth-child(3) { border-inline-start: 0; padding-inline-start: 0; }
+}
+@media (max-width: 560px) {
+  body.admin .ds-card .ds-row { grid-template-columns: auto minmax(0, 1fr); }
+  body.admin .ds-card .ds-c-side {
+    grid-column: 2; align-items: flex-start; text-align: start;
+    flex-direction: row; gap: var(--ds-space-12); margin-top: var(--ds-space-8);
+  }
+}
+
+
+/* ==========================================================
+   15. Final fidelity pass
+   ----------------------------------------------------------
+   מה שנצפה על המסך: הכותרת העליונה וה-Hero נקראו כשתי
+   מערכות שנפגשות, וה-Hero עצמו נראה כמלבן ריק שממתין לקובץ.
+   ========================================================== */
+
+/* ---- קומפוזיציה אחת ----
+   הסרגל, שורת החיפוש וה-Hero הם אותו גוש כהה. מסירים כל
+   קו הפרדה ביניהם, וה-Hero מוצג רק בדשבורד. */
+body.admin .ds-hero-dash { display: none; }
+body.admin.ds-on .ds-hero-dash { display: flex; }
+
+body.admin.ds-on .topbar { border-bottom: 0; }
+body.admin.ds-on .ds-cmd { border-top-color: rgba(237, 232, 224, 0.10); }
+
+body.admin .ds-hero-dash {
+  margin: 0;                    /* הוא כבר ברוחב מלא, מחוץ ל-.page */
+  border: 0;
+  min-height: clamp(230px, 22vw, 300px);
+  align-items: stretch;
+}
+body.admin .ds-hero-dash .ds-hero-in {
+  max-width: var(--ds-page-max);
+  margin-inline: auto;
+  width: 100%;
+  padding: var(--ds-space-32) var(--ds-gutter) var(--ds-space-40);
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--ds-space-32);
+}
+
+/* ---- ה-fallback ----
+   לא משטח ריק. שלוש שכבות שמרמזות על אור נוטה על אבן חמה:
+   אלכסון בהיר, זוהר ברונזה מצד אחד, ועומק כלפי מטה. כשהטוקן
+   יצביע על צילום - הוא פשוט יכסה אותן. */
+body.admin .ds-hero-dash {
+  background-color: #3b332a;
+  background-image:
+    var(--ds-hero-image),
+    linear-gradient(104deg,
+      rgba(237, 232, 224, 0.00) 30%,
+      rgba(237, 232, 224, 0.09) 38%,
+      rgba(237, 232, 224, 0.03) 46%,
+      rgba(237, 232, 224, 0.00) 54%),
+    radial-gradient(130% 95% at 88% 8%,
+      rgba(212, 181, 120, 0.22), rgba(212, 181, 120, 0) 62%),
+    linear-gradient(to bottom, #4a4136 0%, #2f2822 100%);
+  background-size: cover, cover, cover, cover;
+  background-position: var(--ds-hero-position), center, center, center;
+}
+/* הכיסוי קיים כדי שהטקסט יעמוד בניגודיות מעל צילום כלשהו.
+   בלי צילום הוא מעמיק את החום בלבד. */
+body.admin .ds-hero-dash::after {
+  background: linear-gradient(to top,
+    rgba(26, 23, 20, 0.66), rgba(26, 23, 20, 0.18) 72%);
+}
+/* סימון ה-placeholder ירד לגמרי. הוא גרם ל-Hero להיקרא
+   כ-div טכני, וזה בדיוק מה שהוא לא אמור להיות. */
+body.admin .ds-hero-mark { display: none; }
+
+/* ---- טיפוגרפיה ב-Hero ----
+   הסלוגן הוא הקול של ה-Hero, והמותג שקט לצדו. */
+body.admin .ds-hero-brand { align-self: flex-end; margin: 0; }
+body.admin .ds-slogan {
+  font-size: clamp(30px, 3.1vw, 48px);
+  line-height: 1.08;
+  padding-bottom: var(--ds-space-12);
+  border-bottom-width: 3px;
+}
+
+/* ---- קצב: Hero -> ברכה -> הקשר -> KPI ---- */
+body.admin.ds-on .page { padding-block: var(--ds-space-32) var(--ds-space-48); }
+body.admin .ds-greet-block { margin: 0 0 var(--ds-space-20); }
+body.admin .ds-greet-h {
+  font-size: clamp(28px, 2.7vw, 38px);
+  font-weight: var(--ds-weight-medium);
+  letter-spacing: var(--ds-ls-section);
+  margin-bottom: var(--ds-space-4);
+}
+body.admin .ds-greet-date { margin-bottom: var(--ds-space-4); }
+
+/* הבאנר והאזהרה יושבים בין ה-Hero לברכה. הם נשארים במלואם,
+   אבל אינם פותחים את המסך. */
+body.admin.ds-on .deadline-banner { margin-bottom: var(--ds-space-12); }
+body.admin.ds-on .demo-warning { margin-bottom: var(--ds-space-20); }
+
+/* ---- שורות תשומת הלב: נמוכות יותר, סריקות מהר ---- */
+body.admin .ds-card .ds-row { padding-block: var(--ds-space-12); }
+body.admin .ds-card .ds-row-title {
+  font-size: var(--ds-size-body);
+  margin-bottom: 2px;
+}
+body.admin .ds-attn.ds-card .ds-row-title { font-size: var(--ds-size-eyebrow); }
+body.admin .ds-card .ds-pill { padding-block: 2px; }
+body.admin .ds-card .ds-c-what > .ds-pill { margin-bottom: var(--ds-space-8); }
+
+@media (max-width: 860px) {
+  body.admin .ds-hero-dash { min-height: 180px; }
+  body.admin .ds-hero-dash .ds-hero-in {
+    flex-direction: column; align-items: flex-start;
+    padding-block: var(--ds-space-24);
+  }
+}
+
+
+/* ==========================================================
+   16. פעילות אחרונה
+   ----------------------------------------------------------
+   ההיררכיה: פעולה בתיק קודמת לפעילות מסמך/משימה, ושתיהן
+   קודמות לאירועי גישה. הכניסות לא נמחקו מהאודיט - הן ירדו
+   לרצועה התחתונה ומאוגדות לתצוגה אחת לכל משתמש ליום.
+   ========================================================== */
+
+body.admin .ds-card .ds-activity { list-style: none; margin: 0; padding: 0; }
+body.admin .ds-ev + .ds-ev { border-top: var(--ds-hairline-w) solid var(--ds-card-border); }
+
+body.admin .ds-ev-in {
+  display: block; width: 100%; text-align: start;
+  background: none; border: 0;
+  padding: var(--ds-space-12) 0;
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+}
+body.admin button.ds-ev-in {
+  cursor: pointer;
+  transition: background-color var(--ds-motion-fast) var(--ds-ease);
+}
+body.admin button.ds-ev-in:hover { background: var(--ds-accent-wash); }
+body.admin .ds-ev-in:focus-visible { outline: var(--ds-focus); outline-offset: -2px; }
+
+/* 1. הפעולה */
+body.admin .ds-ev-what {
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-medium);
+  line-height: var(--ds-lh-snug);
+  color: var(--ds-ink);                      /* 16.42:1 על לבן */
+  margin: 0 0 2px;
+}
+/* 2. לקוח, מספר תיק וסוג תביעה */
+body.admin .ds-ev-where {
+  display: flex; flex-wrap: wrap;
+  gap: 0 var(--ds-space-8);
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                 /* 7.59:1 על לבן */
+  margin: 0 0 2px;
+}
+body.admin .ds-ev-where > span + span::before {
+  content: "\00b7"; margin-inline-end: var(--ds-space-8); color: var(--ds-card-border);
+}
+/* 3. מי ביצע ומתי */
+body.admin .ds-ev-who {
+  display: flex; flex-wrap: wrap;
+  gap: 0 var(--ds-space-8);
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);
+  margin: 0;
+}
+body.admin .ds-ev-who > span + span::before {
+  content: "\00b7"; margin-inline-end: var(--ds-space-8); color: var(--ds-card-border);
+}
+body.admin .ds-ev-when { white-space: nowrap; }
+
+/* חץ עדין שמסמן ששורה קשורה לתיק ולכן היא לחיצה */
+body.admin button.ds-ev-in .ds-ev-what::after {
+  content: " \2190";
+  color: var(--ds-accent-ink);
+  opacity: 0;
+  transition: opacity var(--ds-motion-normal) var(--ds-ease);
+}
+body.admin button.ds-ev-in:hover .ds-ev-what::after,
+body.admin button.ds-ev-in:focus-visible .ds-ev-what::after { opacity: 1; }
+
+/* ---- רצועת הגישה, מאוגדת ---- */
+body.admin .ds-band-slim .ds-sys-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--ds-space-12);
+  padding: var(--ds-space-8) 0;
+  font-size: var(--ds-size-meta);
+}
+body.admin .ds-band-slim .ds-sys-what { color: var(--ds-on-dark); }      /* 10.17:1 */
+body.admin .ds-band-slim .ds-sys-time {
+  color: var(--ds-on-dark-dim);              /* 7.70:1 */
+  white-space: nowrap;
+  font-size: var(--ds-size-label);
+}
+
+
+/* ==========================================================
+   17. גישה למערכת - שורה, לא בלוק
+   ----------------------------------------------------------
+   הבלוק הכהה בתחתית העמוד ירד. 83% משורות האודיט הן כניסות,
+   והן אינן "מה קרה בתיק" - ולכן הן מקבלות שורה אחת שקטה
+   בתחתית כרטיס הפעילות.
+
+   האודיט עצמו אינו משתנה. זהו סיכום לתצוגה בלבד.
+   ========================================================== */
+
+body.admin .ds-access {
+  margin-top: var(--ds-space-12);
+  padding-top: var(--ds-space-12);
+  border-top: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .ds-access-line {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  line-height: var(--ds-lh-snug);
+  color: var(--ds-ink-soft);                 /* 7.59:1 על לבן */
+  margin: 0;
+}
+body.admin .ds-access-line + .ds-access-line { margin-top: var(--ds-space-4); }
+
+/* ניסיון כניסה שנכשל הוא אמירה ביטחונית ולא רעש, ולכן הוא
+   נבדל - אבל גם הוא שורה ולא בלוק. הנקודה היא חיזוק; המילים
+   נושאות את המשמעות. */
+body.admin .ds-access-warn {
+  color: var(--ds-risk);                     /* 9.82:1 על לבן */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .ds-access-warn::before {
+  content: "\25CF "; font-size: 9px; vertical-align: 2px;
+}
+body.admin .ds-access-empty {
+  margin: var(--ds-space-12) 0 0;
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);
+}
+
+/* הבלוק הכהה הוסר מה-markup. הכללים שלו נשארים מנוטרלים
+   כאן במקום להימחק, כדי שאם מסך אחר ישתמש ב-ds-band בעתיד
+   הוא לא יירש רצועה שלא התכוונו אליה. */
+body.admin .ds-band-slim { display: none; }

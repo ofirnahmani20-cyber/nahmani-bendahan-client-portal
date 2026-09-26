@@ -84,7 +84,7 @@ window.DsDashboard = (function () {
     return Promise.all([
       d.Api.officeTasks().catch(function () { return null; }),
       d.Api.officeCases().catch(function () { return null; }),
-      d.Api.auditLog(null).catch(function () { return null; })
+      d.Api.auditLog(null, 200).catch(function () { return null; })
     ]).then(function (res) {
       var tasks = res[0], cases = res[1], log = res[2];
 
@@ -279,55 +279,49 @@ window.DsDashboard = (function () {
       .map(function (x) { return x.v; });
   }
 
-  /** שורה בפיד.
+  /** שורה בפיד, בשפת הכרטיסים.
 
-      המבנה הוא מונה תלוי בעמודה משלו ולידו קו אנכי דק, ואז
-      כותרת, נימוק ושורת מטא. אין כאן תיבה, מסגרת או מילוי -
-      ההיררכיה כולה טיפוגרפית.
+      סדר הסריקה: פס דחיפות -> גלולת סטטוס -> הפעולה ->
+      לקוח ותיק -> מועד. שלוש עמודות בשורה אחת, צפוף מספיק
+      כדי לסרוק חמש שורות בשניות.
 
-      כפתור, כי השורה מבצעת פעולה. */
+      המונה 01/02/03 ירד: הוא תפס עמודה שלמה ולא נשא מידע. */
   function row(it, n) {
     var li = d.el('li');
     var btn = d.el('button', 'ds-row ds-row-' + it.tone);
     btn.type = 'button';
 
-    /* המונה דקורטיבי: הוא מיקום ברשימה, לא מידע. המשמעות
-       יושבת בתג שלצד שורת המטא.
+    /* פס הדחיפות. דקורטיבי - הגלולה נושאת את המשמעות. */
+    btn.appendChild(d.el('span', 'ds-bar', null, true));
 
-       השורות הדחופות מקבלות גם נקודה קטנה מעל המונה, כדי
-       שאפשר יהיה לסרוק אותן בעין אחת. היא בתוך ה-aria-hidden
-       ולכן היא חיזוק בלבד - הצבע לעולם אינו הערוץ היחיד. */
-    var enu = d.el('span', 'ds-enum', null, true);
-    if (it.tone !== 'u4') enu.appendChild(d.el('span', 'ds-enum-mark'));
-    enu.appendChild(d.el('span', 'ds-enum-n', n < 10 ? '0' + n : String(n)));
-    enu.appendChild(d.el('span', 'ds-enum-rule'));
-    btn.appendChild(enu);
-
-    btn.appendChild(d.el('p', 'ds-row-title', it.title));
-    btn.appendChild(d.el('p', 'ds-row-why', it.why));
-
-    var foot = d.el('div', 'ds-row-foot');
-    foot.appendChild(badge(it.tone, it.mark, it.badge));
+    var what = d.el('div', 'ds-c-what');
+    what.appendChild(pill(it.tone, it.mark, it.badge));
+    what.appendChild(d.el('p', 'ds-row-title', it.title));
 
     var meta = d.el('p', 'ds-meta');
     if (it.who) meta.appendChild(d.el('span', null, it.who));
     if (it.num) meta.appendChild(d.el('span', 'ds-num', it.num));
-    foot.appendChild(meta);
+    if (it.why) meta.appendChild(d.el('span', null, it.why));
+    what.appendChild(meta);
+    btn.appendChild(what);
 
-    foot.appendChild(d.el('p', 'ds-row-go', it.go + ' ←'));
-    btn.appendChild(foot);
+    var side = d.el('div', 'ds-c-side');
+    if (it.stamp) side.appendChild(d.el('span', 'ds-when-t', it.stamp));
+    side.appendChild(d.el('span', 'ds-row-go', it.go + ' ←'));
+    btn.appendChild(side);
 
     btn.addEventListener('click', function () { d.openCase(it.caseId, it.tab); });
     li.appendChild(btn);
     return li;
   }
 
-  /** הסמל דקורטיבי; המילים נושאות את המשמעות. */
-  function badge(tone, mark, text) {
-    var b = d.el('span', 'ds-badge ds-badge-' + tone);
-    b.appendChild(d.el('span', null, mark, true));
-    b.appendChild(d.el('span', null, text));
-    return b;
+  /** גלולת סטטוס. הסמל דקורטיבי; המילים נושאות את המשמעות,
+      ולכן הצבע לעולם אינו הערוץ היחיד. */
+  function pill(tone, mark, text) {
+    var p = d.el('span', 'ds-pill ds-pill-' + tone);
+    p.appendChild(d.el('span', null, mark, true));
+    p.appendChild(d.el('span', null, text));
+    return p;
   }
 
 
@@ -386,14 +380,65 @@ window.DsDashboard = (function () {
      ומאבדים לו את המשמעות. לכן הם יורדים לחלון צר משלהם.
 
      צפייה בתיק נרשמת בכל פתיחה, ולכן היא מוצאת מהשניים. */
+  /* אירועי גישה. אמיתיים וחשובים, אבל הם אינם "מה קרה בתיק".
+     כשהם מעורבים בפיד הראשי הם מציפים אותו - בצילום נראו
+     ארבע כניסות זהות שתפסו כמעט את כולו. */
   var ACCESS = {
     'staff.login_success': true, 'staff.login_failed': true,
+    'staff.logout': true, 'client.logout': true,
     'client.login_success': true, 'client.login_failed': true,
     'client.otp_requested': true
   };
+  /* צפייה בתיק נרשמת בכל פתיחה. זו רשומת אבטחה, לא פעילות. */
   var NOISE = {
     'office.case_viewed': true, 'client.case_viewed': true
   };
+
+  /* לאיזו לשונית קופצים מכל סוג פעולה. רק נתיבים שכבר
+     קיימים - אין כאן route חדש. */
+  var ACTION_TAB = {
+    'document':     'docs',
+    'task':         'tasks',
+    'requirement':  'comms',
+    'conversation': 'comms',
+    'reminder':     'comms',
+    'decision':     'committees',
+    'stage':        'committees'
+  };
+
+  function tabFor(e) {
+    var a = String(e.action || '');
+    var keys = Object.keys(ACTION_TAB);
+    for (var i = 0; i < keys.length; i++) {
+      if (a.indexOf(keys[i]) !== -1) return ACTION_TAB[keys[i]];
+    }
+    return 'state';
+  }
+
+  /** "לפני 12 דקות". נופל בחזרה לתאריך כשזה כבר לא רלוונטי. */
+  function ago(iso) {
+    var t = new Date(iso);
+    if (isNaN(t.getTime())) return '';
+    var sec = Math.round((Date.now() - t.getTime()) / 1000);
+    if (sec < 60)    return 'הרגע';
+    var min = Math.round(sec / 60);
+    if (min < 60)    return 'לפני ' + min + (min === 1 ? ' דקה' : ' דקות');
+    var hr = Math.round(min / 60);
+    if (hr < 24)     return 'לפני ' + hr + (hr === 1 ? ' שעה' : ' שעות');
+    return d.dayLabel(iso) + ' ' + d.clockOf(iso);
+  }
+
+  /** מספר התיק וסוג התביעה מגיעים מרשימת התיקים שכבר נטענה.
+      תשובת האודיט נושאת caseId ושם לקוח, אך לא מספר תיק -
+      ולכן זהו חיבור בצד הלקוח על נתונים שכבר בידינו, ולא
+      קריאה נוספת ולא ניחוש. */
+  function caseOf(id) {
+    if (!id) return null;
+    for (var i = 0; i < caseIndex.length; i++) {
+      if (caseIndex[i].id === id) return caseIndex[i];
+    }
+    return null;
+  }
 
   function paintActivity(log) {
     var list = $('dashActList');
@@ -408,64 +453,123 @@ window.DsDashboard = (function () {
 
     var all = log.entries || [];
 
+    /* הפעולות המשמעותיות קודמות, והן נשלפות מתוך חלון גדול
+       כדי שכניסות תכופות לא ידחקו אותן החוצה. הסדר בתוך
+       הקבוצה נשאר כרונולוגי, כפי שהשרת החזיר. */
     var rows = all.filter(function (e) {
       return !NOISE[e.action] && !ACCESS[e.action];
-    }).slice(0, 14);
+    }).slice(0, 8);
 
     if (!rows.length) {
       setState(state, 'ds-empty', 'עוד לא בוצעה פעולה בתיקים.');
     } else {
       state.hidden = true;
-      var day = null;
-      rows.forEach(function (e) {
-        var label = d.dayLabel(e.at);
-        if (label !== day) {
-          day = label;
-          list.appendChild(d.el('li', 'ds-act-day', label));
-        }
-        var li = d.el('li', 'ds-act-row');
-        li.appendChild(d.el('span', 'ds-act-time', d.clockOf(e.at)));
-        li.appendChild(d.el('span', 'ds-act-what', d.describe(e)));
-        /* שם הלקוח הוא ההקשר החשוב: "הלקוח העלה מסמך" בלי
-           לומר איזה לקוח אינו אומר דבר. actor הוא איש הצוות,
-           והוא ריק בפעולת לקוח. */
-        li.appendChild(d.el('span', 'ds-act-who', e.client || e.actor || ''));
-        list.appendChild(li);
-      });
+      rows.forEach(function (e) { list.appendChild(activityRow(e)); });
     }
 
     paintAccess(all);
   }
 
-  /** החלון הצר: כניסות וקודי אימות בלבד. */
-  function paintAccess(all) {
-    var list = $('dashSysList');
-    var state = $('dashSysState');
-    if (!list) return;
-    list.textContent = '';
+  /** שורת פעילות בתיק, בשלוש רמות:
+        הפעולה
+        לקוח · מספר תיק · סוג תביעה
+        מי ביצע · מתי
+      לחיצה פותחת את התיק בלשונית המתאימה, כשיש caseId. */
+  function activityRow(e) {
+    var c = caseOf(e.caseId);
+    var li = d.el('li', 'ds-ev');
 
-    if (!all) {
-      state.hidden = false;
-      state.textContent = 'לא נטען.';
-      return;
+    var box = e.caseId ? d.el('button', 'ds-ev-in ds-ev-go') : d.el('div', 'ds-ev-in');
+    if (e.caseId) {
+      box.type = 'button';
+      box.addEventListener('click', function () { d.openCase(e.caseId, tabFor(e)); });
     }
 
-    var rows = all.filter(function (e) { return ACCESS[e.action]; }).slice(0, 8);
+    box.appendChild(d.el('p', 'ds-ev-what', d.describe(e)));
 
-    if (!rows.length) {
+    var where = d.el('p', 'ds-ev-where');
+    if (e.client) where.appendChild(d.el('span', null, e.client));
+    if (c && c.caseNumber) where.appendChild(d.el('span', 'ds-num', c.caseNumber));
+    if (c && c.claimType) where.appendChild(d.el('span', null, c.claimType));
+    if (where.childNodes.length) box.appendChild(where);
+
+    var who = d.el('p', 'ds-ev-who');
+    if (e.actor) who.appendChild(d.el('span', null, e.actor));
+    who.appendChild(d.el('span', 'ds-ev-when', ago(e.at)));
+    box.appendChild(who);
+
+    li.appendChild(box);
+    return li;
+  }
+
+  /** שם פרטי בלבד, לסיכום קצר. */
+  function firstName(full) {
+    return String(full || '').replace(/^עו"ד\s+/, '').split(' ')[0] || full || '';
+  }
+
+  /** סיכום הגישה למערכת.
+
+      עד כה זה היה בלוק כהה בתחתית העמוד, והוא תפס משקל
+      ויזואלי שאינו מגיע לו: 83% משורות האודיט הן כניסות,
+      והן אינן "מה קרה בתיק".
+
+      עכשיו זו שורה שקטה אחת בתחתית כרטיס הפעילות. האודיט
+      עצמו אינו משתנה - אף אירוע לא נמחק וסמנטיקת הרישום
+      זהה. זהו סיכום לתצוגה בלבד.
+
+      ניסיון כניסה שנכשל מקבל שורה נפרדת, כי זו אמירה
+      ביטחונית ולא רעש - אבל גם הוא שורה, לא בלוק. */
+  function paintAccess(all) {
+    var box = $('dashSysList');
+    var state = $('dashSysState');
+    if (!box) return;
+    box.textContent = '';
+
+    if (!all) { state.hidden = false; state.textContent = 'אירועי הגישה לא נטענו.'; return; }
+
+    var today = d.dayLabel(new Date().toISOString());
+    var ok = [], failed = [];
+    all.forEach(function (e) {
+      if (!ACCESS[e.action]) return;
+      (/_failed$/.test(e.action) ? failed : ok).push(e);
+    });
+
+    if (!ok.length && !failed.length) {
       state.hidden = false;
       state.textContent = 'אין אירועי גישה.';
       return;
     }
     state.hidden = true;
 
-    rows.forEach(function (e) {
-      var li = d.el('li', 'ds-sys-row');
-      li.appendChild(d.el('span', 'ds-sys-time',
-        d.dayLabel(e.at) + ' · ' + d.clockOf(e.at)));
-      li.appendChild(d.el('span', 'ds-sys-what', d.describe(e)));
-      list.appendChild(li);
+    /* מי נכנס הכי הרבה היום, וכמה נשארו מעבר לו. */
+    var byWho = {}, order = [];
+    ok.forEach(function (e) {
+      if (d.dayLabel(e.at) !== today) return;
+      var who = firstName(e.actor || e.client) || 'לא מזוהה';
+      if (!byWho[who]) { byWho[who] = 0; order.push(who); }
+      byWho[who] += 1;
     });
+    order.sort(function (a, b) { return byWho[b] - byWho[a]; });
+
+    var bits = ['גישה למערכת'];
+    if (order.length) {
+      var top = order[0];
+      bits.push(top + ' · ' + byWho[top] +
+                (byWho[top] === 1 ? ' כניסה היום' : ' כניסות היום'));
+      var rest = 0;
+      for (var i = 1; i < order.length; i++) rest += byWho[order[i]];
+      if (rest) bits.push(rest + (rest === 1 ? ' כניסה נוספת' : ' כניסות נוספות'));
+    } else {
+      bits.push('אין כניסות היום');
+    }
+    box.appendChild(d.el('p', 'ds-access-line', bits.join(' · ')));
+
+    if (failed.length) {
+      var who = firstName(failed[0].actor) || 'לא מזוהה';
+      box.appendChild(d.el('p', 'ds-access-line ds-access-warn',
+        (failed.length === 1 ? 'ניסיון כניסה שנכשל' : failed.length + ' ניסיונות כניסה שנכשלו')
+        + ' · ' + who));
+    }
   }
 
 

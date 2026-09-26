@@ -8,11 +8,11 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260926170000">
-<link rel="stylesheet" href="assets/css/style.css?v=20260926170000">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260926170000">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260926170000">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260926170000">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260926220000">
+<link rel="stylesheet" href="assets/css/style.css?v=20260926220000">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260926220000">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260926220000">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260926220000">
 </head>
 <body class="admin">
 
@@ -154,6 +154,28 @@
     </div>
   </div>
 
+
+  <!-- ===== Hero =====
+       יושב כאן ולא בתוך התצוגה, כדי שהסרגל, שורת החיפוש
+       וה-Hero ייקראו כקומפוזיציה כהה אחת רציפה - כמו
+       ב-reference - ולא כשני מלבנים שנפגשים.
+
+       מוצג רק כשהדשבורד פעיל (body.ds-on). שאר מסכי העבודה
+       נשארים נקיים ואינם מאבדים גובה.
+
+       התמונה מגיעה מ---ds-hero-image. עד שתסופק, ה-fallback
+       הוא קומפוזיציה מכוונת של אור וצל על אבן - לא משטח ריק
+       שממתין לקובץ. -->
+  <header class="ds-hero ds-hero-dash" id="dashHero">
+    <div class="ds-hero-in">
+      <div class="ds-brand ds-hero-brand">
+        <span class="ds-brand-mark" aria-hidden="true">NB</span>
+        <span class="ds-brand-name">NAHMANI — BEN-DAHAN</span>
+      </div>
+      <p class="ds-slogan">אנשים.<br>זכויות.<br>תוצאות.</p>
+    </div>
+  </header>
+
   <!-- ===== התפריט הנשלף ===== -->
   <div class="drawer-overlay" id="drawerOverlay" hidden></div>
 
@@ -227,49 +249,24 @@
            ברמת המשרד, ומה שאין לו מקור נאמר ב-#dashGaps. -->
       <div class="view ds-dash" id="view-dashboard" hidden>
 
-        <!-- א. פתיחה -----------------------------------------
-             ה-Hero יושב כאן ולא במעטפת, כי הוא חל על הדשבורד
-             בלבד. שאר שבעת האזורים וסביבת התיק הם סביבת עבודה
-             נקייה בלי תמונה - זו החלטה מפורשת.
-
-             הברכה עצמה יושבת בתוך ה-Hero ולא מתחתיו, אחרת
-             המסך היה נפתח פעמיים. #dashGreeting ו-#dashDate
-             שומרים על המזהים שלהם כי ds-dashboard.js כותב
-             אליהם, ו-h1 שומר על .view-title ועל tabindex
-             כי viewnav ממקד אותו במעבר בין אזורים.
-
-             התמונה מגיעה מ---ds-hero-image. כל עוד הוא none
-             מוצג משטח אבן עם תג placeholder מכוון-להיראות,
-             ו-ds-dashboard.js מסיר את התג לבד ברגע שתוגדר
-             תמונה אמיתית. -->
-        <header class="ds-hero ds-hero-dash" id="dashHero">
-          <span class="ds-hero-mark" id="dashHeroMark" title="משטח זמני עד שתסופק תמונה" aria-hidden="true"></span>
-          <div class="ds-hero-in">
-            <div class="ds-brand ds-hero-brand">
-              <span class="ds-brand-mark" aria-hidden="true">NB</span>
-              <span class="ds-brand-name">NAHMANI — BEN-DAHAN</span>
-            </div>
-            <p class="ds-hero-sub" id="dashDate"></p>
-            <h1 class="ds-hero-line view-title" id="dashGreeting" tabindex="-1">שלום</h1>
-          </div>
+        <!-- הברכה יורדת מה-Hero אל הקנבס. ה-Hero נושא זהות,
+             והעבודה מתחילה כאן. #dashGreeting ו-#dashDate
+             שומרים על המזהים, וה-h1 על .view-title ועל
+             tabindex כי viewnav ממקד אותו. -->
+        <header class="ds-greet-block">
+          <p class="ds-greet-date" id="dashDate"></p>
+          <h1 class="ds-greet-h view-title" id="dashGreeting" tabindex="-1">שלום</h1>
+          <p class="ds-dash-context" id="dashContext">טוען את תמונת היום…</p>
         </header>
 
-        <!-- שורת ההקשר והמדדים ------------------------------
-             משפט ההקשר בקצה אחד והמדדים השקטים בקצה השני, על
-             אותו פס. זה מה שמחבר את ה-Hero אל העבודה ומנצל את
-             הרוחב, במקום משפט בודד שצף מעל חלל.
-
-             המדדים הם שורה טיפוגרפית דקה ולא ארבעה כרטיסים. -->
-        <div class="ds-dash-strip">
-          <p class="ds-lede ds-dash-context" id="dashContext">טוען את תמונת היום…</p>
-          <dl class="ds-stats" id="dashStats"></dl>
-        </div>
+        <!-- KPI: תא לכל מדד בתוך כרטיס אחד, מופרדים בקו שיער. -->
+        <dl class="ds-card ds-kpi" id="dashStats"></dl>
 
         <div class="ds-cols">
 
           <!-- ב. לב המסך -->
           <main class="ds-col-main">
-            <section class="ds-section ds-attn" aria-labelledby="dashAttnH">
+            <section class="ds-card ds-attn" aria-labelledby="dashAttnH">
               <div class="ds-section-head">
                 <h2 class="ds-section-title" id="dashAttnH">דורש את תשומת לבי</h2>
                 <p class="ds-section-meta" id="dashAttnCount"></p>
@@ -282,7 +279,7 @@
 
           <!-- ג. הטור המשני -->
           <aside class="ds-col-side">
-            <section class="ds-section" aria-labelledby="dashTodayH">
+            <section class="ds-card" aria-labelledby="dashTodayH">
               <div class="ds-section-head">
                 <h2 class="ds-section-title" id="dashTodayH">סדר היום שלי</h2>
                 <p class="ds-section-meta" id="dashTodayCount"></p>
@@ -294,26 +291,25 @@
             <!-- ד. פעילות אחרונה. משנית לאזור תשומת הלב, אבל
                  לא זניחה - ולכן היא יושבת בטור ולא נדחקת לפס
                  נפרד בתחתית העמוד. -->
-            <section class="ds-section" aria-labelledby="dashActH">
+            <section class="ds-card" aria-labelledby="dashActH">
               <div class="ds-section-head">
                 <h2 class="ds-section-title" id="dashActH">פעילות אחרונה</h2>
               </div>
               <ol class="ds-activity" id="dashActList"></ol>
               <p class="ds-loading" id="dashActState">טוען…</p>
+
+              <!-- גישה למערכת. אירועי אמת, אבל הם אינם "מה קרה
+                   בתיק" - ולכן שורה שקטה אחת בתחתית הכרטיס ולא
+                   בלוק משלהם. האודיט עצמו אינו משתנה; זהו סיכום
+                   לתצוגה בלבד. -->
+              <div class="ds-access" id="dashSysList"></div>
+              <p class="ds-access-empty" id="dashSysState" hidden></p>
+
               <p class="ds-note" id="dashGaps"></p>
             </section>
           </aside>
 
         </div>
-
-        <!-- אירועי גישה. הם אמיתיים אבל הם אינם "מה קרה בתיק",
-             ולכן הם סוגרים את העמוד ברצועה שקטה ואינם מעורבים
-             בפיד הפעילות - שם הם היו מציפים אותו. -->
-        <section class="ds-band ds-band-slim" aria-labelledby="dashSysH">
-          <h2 class="ds-label ds-sys-h" id="dashSysH">גישה למערכת</h2>
-          <ol class="ds-sys-list" id="dashSysList"></ol>
-          <p class="ds-sys-empty" id="dashSysState" hidden></p>
-        </section>
 
       </div>
 
@@ -844,9 +840,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260926170000"></script>
-<script src="assets/js/viewnav.js?v=20260926170000"></script>
-<script src="assets/js/ds-dashboard.js?v=20260926170000"></script>
-<script src="assets/js/admin.js?v=20260926170000"></script>
+<script src="assets/js/api.js?v=20260926220000"></script>
+<script src="assets/js/viewnav.js?v=20260926220000"></script>
+<script src="assets/js/ds-dashboard.js?v=20260926220000"></script>
+<script src="assets/js/admin.js?v=20260926220000"></script>
 </body>
 </html>
