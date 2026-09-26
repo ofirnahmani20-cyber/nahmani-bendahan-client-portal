@@ -171,6 +171,23 @@
                      (caseId ? '?case_id=' + encodeURIComponent(caseId) : ''));
     },
 
+    // ---- חיפוש רוחבי ----
+    /* kinds הוא רשימה מופרדת בפסיקים לצמצום המקורות. הוא קיים
+       כבר עכשיו כדי ששכבת החיפוש בשפה טבעית, כשתגיע, תשתמש
+       באותה נקודת קצה ולא תצטרך נתיב משלה. */
+    search: function (q, kinds) {
+      var parts = ['q=' + encodeURIComponent(q)];
+      if (kinds) parts.push('kinds=' + encodeURIComponent(kinds));
+      return Api.get('/api/office/search?' + parts.join('&'));
+    },
+    /* allowUnauthorized חיוני: הקטלוג נטען בזמן אתחול המודול,
+       כלומר גם כשמסך הכניסה של הצוות מוצג. בלעדיו ה-401
+       מפעיל את onUnauthorized, והדף מועף ל-index.html -
+       כלומר אי אפשר להגיע כלל למסך הכניסה של הצוות. */
+    searchKinds: function () {
+      return Api.get('/api/office/search/kinds', { allowUnauthorized: true });
+    },
+
     // ---- משימות ----
     /* המיון והמדרגות מגיעים מהשרת. הדפדפן אינו מחשב דחיפות
        ואינו ממיין מחדש - אחרת שני מסכים היו יכולים לסטות. */
