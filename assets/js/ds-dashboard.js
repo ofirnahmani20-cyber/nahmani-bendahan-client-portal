@@ -35,7 +35,41 @@ window.DsDashboard = (function () {
 
   function $(id) { return document.getElementById(id); }
 
-  function init(deps) { d = deps; wireCommandBar(); }
+  /** מציג הודעת מצב.
+
+      state.className = '...' היה מוחק את המחלקה שנכתבה
+      ב-HTML, ולכן שורת הטעינה איבדה את העיצוב שלה בציור
+      הראשון. כאן המחלקה הבסיסית נשמרת תמיד. */
+  function setState(el, kind, text) {
+    if (!el) return;
+    el.hidden = false;
+    el.className = kind;
+    el.textContent = text;
+  }
+
+  function init(deps) {
+    d = deps;
+    wireCommandBar();
+    heroMark();
+    /* הקטלוג נטען בשימוש הראשון ולא באתחול. באתחול מסך
+       הכניסה עדיין מוצג, ובקשה לשרת שם היא גם מיותרת וגם
+       הייתה מעיפה את הדף. */
+  }
+
+  /** תג ה-placeholder של ה-Hero.
+
+      הוא נועד להיראות כל עוד אין תמונה, כדי שלא יישכח
+      בייצור. ברגע ש---ds-hero-image מצביע על קובץ הוא מסיר
+      את עצמו - בלי שמישהו יצטרך לזכור למחוק אותו מה-HTML. */
+  function heroMark() {
+    var hero = $('dashHero');
+    var mark = $('dashHeroMark');
+    if (!hero || !mark) return;
+    var img = getComputedStyle(hero).backgroundImage || '';
+    /* המשטח עצמו בנוי מ-gradients, ולכן "יש תמונה" פירושו
+       שמופיע בו url() ולא רק שהוא אינו none. */
+    if (img.indexOf('url(') !== -1) mark.remove();
+  }
 
 
   /* ==========================================================
@@ -126,9 +160,7 @@ window.DsDashboard = (function () {
     more.textContent = '';
 
     if (!tasks && !cases) {
-      state.hidden = false;
-      state.className = 'ds-error';
-      state.textContent = 'לא הצלחנו לטעון את הנתונים.';
+      setState(state, 'ds-error', 'לא הצלחנו לטעון את הנתונים.');
       return;
     }
 
@@ -139,10 +171,7 @@ window.DsDashboard = (function () {
       : '';
 
     if (!items.length) {
-      state.hidden = false;
-      state.className = 'ds-empty';
-      state.textContent =
-        'אין כרגע דבר שדורש את תשומת לבך. כל המועדים והמסמכים מטופלים.';
+      setState(state, 'ds-empty', 'אין כרגע דבר שדורש את תשומת לבך. כל המועדים והמסמכים מטופלים.');
       return;
     }
     state.hidden = true;
@@ -312,9 +341,7 @@ window.DsDashboard = (function () {
     list.textContent = '';
 
     if (!tasks) {
-      state.hidden = false;
-      state.className = 'ds-error';
-      state.textContent = 'לא הצלחנו לטעון את המשימות.';
+      setState(state, 'ds-error', 'לא הצלחנו לטעון את המשימות.');
       return;
     }
 
@@ -327,9 +354,7 @@ window.DsDashboard = (function () {
       ? (today.length === 1 ? 'פריט אחד' : today.length + ' פריטים') : '';
 
     if (!today.length) {
-      state.hidden = false;
-      state.className = 'ds-empty';
-      state.textContent = 'אין דבר שמועדו היום.';
+      setState(state, 'ds-empty', 'אין דבר שמועדו היום.');
       return;
     }
     state.hidden = true;
@@ -376,9 +401,7 @@ window.DsDashboard = (function () {
     list.textContent = '';
 
     if (!log) {
-      state.hidden = false;
-      state.className = 'ds-error';
-      state.textContent = 'לא הצלחנו לטעון את הפעילות.';
+      setState(state, 'ds-error', 'לא הצלחנו לטעון את הפעילות.');
       paintAccess(null);
       return;
     }
@@ -390,9 +413,7 @@ window.DsDashboard = (function () {
     }).slice(0, 14);
 
     if (!rows.length) {
-      state.hidden = false;
-      state.className = 'ds-empty';
-      state.textContent = 'עוד לא בוצעה פעולה בתיקים.';
+      setState(state, 'ds-empty', 'עוד לא בוצעה פעולה בתיקים.');
     } else {
       state.hidden = true;
       var day = null;
@@ -548,44 +569,91 @@ window.DsDashboard = (function () {
     });
   }
 
+  /* החיפוש רץ מול השרת ולא על הרשימה שבזיכרון, ולכן הוא מוצא
+     גם מסמך, משימה ודרישה - לא רק תיק שכבר נטען.
+
+     ההשהיה קיימת כי הקלדה מהירה הייתה יורה בקשה לכל תו.
+     seq מונע מתשובה איטית לדרוס תשובה חדשה ממנה, וזו תקלה
+     שקל מאוד לפספס: בלעדיו הקלדת "EMG" יכולה להציג את
+     תוצאות "EM" אם הן חזרו אחרונות. */
+  var timer = null;
+  var seq = 0;
+
   function search(q) {
-    q = String(q || '').trim().toLowerCase();
-    hits = [];
-    cursor = -1;
+    q = String(q || '').trim();
+    clearTimeout(timer);
 
-    if (q) {
-      caseIndex.forEach(function (c) {
-        var hay = [c.clientName, c.caseNumber, c.claimType]
-                  .join(' ').toLowerCase();
-        if (hay.indexOf(q) !== -1) {
-          hits.push({
-            kind: 'case', label: c.clientName,
-            sub: c.caseNumber + ' · ' + (c.claimType || ''),
-            caseId: c.id
-          });
-        }
-      });
-    }
-
-    AREAS.forEach(function (a) {
-      if (!q || a[1].toLowerCase().indexOf(q) !== -1) {
-        hits.push({ kind: 'area', label: a[1], sub: 'מעבר לאזור', view: a[0] });
-      }
+    /* האזורים הם ניווט מקומי ומיידי, בלי רשת. */
+    var local = AREAS.filter(function (a) {
+      return !q || a[1].toLowerCase().indexOf(q.toLowerCase()) !== -1;
+    }).map(function (a) {
+      return { kind: 'area', label: a[1], sub: 'מעבר לאזור', view: a[0] };
     });
 
-    hits = hits.slice(0, 12);
-    paintPanel(q);
+    if (q.length < 2) {
+      hits = local.slice(0, 12);
+      cursor = -1;
+      paintPanel(q);
+      return;
+    }
+
+    /* הצגה מיידית של האזורים, והתוצאות מהשרת מצטרפות אליהן */
+    hits = local;
+    cursor = -1;
+    paintPanel(q, true);
+
+    loadKinds();
+    var mine = ++seq;
+    timer = setTimeout(function () {
+      d.Api.search(q).then(function (data) {
+        if (mine !== seq) return;        /* תשובה שאיחרה */
+        var remote = (data.results || []).map(function (r) {
+          var bits = [];
+          if (r.clientName) bits.push(r.clientName);
+          if (r.caseNumber && r.kind !== 'case') bits.push(r.caseNumber);
+          if (r.subtitle) bits.push(r.subtitle);
+          return {
+            kind: r.kind,
+            label: r.title,
+            sub: bits.join(' · '),
+            caseId: r.caseId,
+            tab: r.tab
+          };
+        });
+        hits = remote.concat(local).slice(0, 20);
+        cursor = -1;
+        paintPanel(q);
+      }).catch(function () {
+        if (mine !== seq) return;
+        hits = local;
+        paintPanel(q);
+      });
+    }, 220);
   }
 
-  function paintPanel(q) {
+  /* התוויות מגיעות מהשרת, כדי שהוספת מקור חיפוש בעתיד -
+     תוכן מסמך, למשל - תופיע כאן בלי שינוי בצד הלקוח. */
+  var KIND_LABEL = { area: 'אזורים במערכת' };
+
+  var kindsLoaded = false;
+
+  function loadKinds() {
+    if (kindsLoaded || !d || !d.Api.searchKinds) return;
+    kindsLoaded = true;
+    d.Api.searchKinds().then(function (data) {
+      (data.kinds || []).forEach(function (k) { KIND_LABEL[k.kind] = k.label; });
+    }).catch(function () { /* התוויות נשארות כברירת מחדל */ });
+  }
+
+  function paintPanel(q, loading) {
     var panel = $('cmdPanel');
     var input = $('cmdInput');
     panel.textContent = '';
 
     if (!hits.length) {
-      var none = d.el('p', 'ds-cmd-empty',
-        'לא נמצא תיק או אזור שמתאים ל"' + q + '".');
-      panel.appendChild(none);
+      panel.appendChild(d.el('p', 'ds-cmd-empty', loading
+        ? 'מחפש…'
+        : 'לא נמצא דבר שמתאים ל"' + q + '".'));
       open();
       return;
     }
@@ -593,7 +661,7 @@ window.DsDashboard = (function () {
     var group = null;
     var list = null;
     hits.forEach(function (h, i) {
-      var name = h.kind === 'case' ? 'תיקים' : 'אזורים במערכת';
+      var name = KIND_LABEL[h.kind] || h.kind;
       if (name !== group) {
         group = name;
         panel.appendChild(d.el('p', 'ds-cmd-group', name));
@@ -612,6 +680,8 @@ window.DsDashboard = (function () {
       li.appendChild(btn);
       list.appendChild(li);
     });
+
+    if (loading) panel.appendChild(d.el('p', 'ds-cmd-empty', 'מחפש…'));
 
     open();
     input.setAttribute('aria-activedescendant', '');
@@ -638,8 +708,10 @@ window.DsDashboard = (function () {
     if (!hit) return;
     close();
     $('cmdInput').value = '';
-    if (hit.kind === 'case') d.openCase(hit.caseId, 'state');
-    else d.topNav.show(hit.view, true);
+    /* כל תוצאה מהשרת נושאת caseId ו-tab, ולכן היא קופצת
+       ישירות ללשונית שבה הפריט באמת יושב. */
+    if (hit.kind === 'area') d.topNav.show(hit.view, true);
+    else if (hit.caseId)     d.openCase(hit.caseId, hit.tab || 'state');
   }
 
   function open() {
@@ -654,7 +726,8 @@ window.DsDashboard = (function () {
     cursor = -1;
   }
 
-  /** admin.js מעדכן את המפתח אחרי שרשימת התיקים נטענת ממילא. */
+  /** נשמר כדי ש-admin.js לא ישבר. החיפוש עצמו עבר לשרת ואינו
+      נשען עוד על הרשימה שבזיכרון. */
   function setCases(list) { caseIndex = list || []; }
 
   return { init: init, load: load, setCases: setCases };

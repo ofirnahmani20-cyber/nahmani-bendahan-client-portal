@@ -9,6 +9,12 @@
    כל שם מחלקה נושא תחילית .ds-, כדי שלא ייווצר עימות עם מאה
    שמות המחלקות הגנריים שכבר קיימים.
 
+   יוצא דופן אחד: סעיף 8 בסוף הקובץ מגדיר פרימיטיבים של
+   השלד (Hero, Brand, Roadmap, Timeline, Notice) בלי scope
+   למשטח, כי הם משותפים לאדמין ולפרונט. לכן שלושת דפי
+   הפרונט טוענים גם הם את הקובץ - כל שאר הכללים בו פותחים
+   ב-body.admin ולכן אינרטיים שם.
+
    שתי רמות scope:
    1. המעטפת מעוצבת תמיד. היא כהה גם היום וגם בשפה החדשה.
    2. הקנבס הבהיר חל רק כש-body נושא .ds-on, וזה קורה רק
@@ -216,17 +222,12 @@ body.admin .ds-cmd-empty {
    3. הקנבס - רק כשהדשבורד פעיל
    ========================================================== */
 
-body.admin.ds-on { background: var(--ds-ground); color: var(--ds-ink); }
+/* הקנבס עצמו עבר ל-ds-admin.css ומוחל על כל האדמין. המחלקה
+   ds-on נשארת כסמן של הדשבורד בלבד - היא מבדילה את הריווח
+   הרחב שלו משאר האזורים, ולא את הצבע. */
 
-/* ביטול כללי הטקסט הבהיר שנכתבו לקנבס הכהה. בלי אלה
-   הכותרות היו בהירות על בהיר ונעלמות לגמרי. */
-body.admin.ds-on .page > h1,
-body.admin.ds-on .page > .lead,
-body.admin.ds-on .page > section > h1,
-body.admin.ds-on .page > section > .lead,
-body.admin.ds-on .page .view > h1,
-body.admin.ds-on .page .view > .lead,
-body.admin.ds-on .small-print { color: var(--ds-ink); }
+/* צבעי הטקסט עברו ל-ds-admin.css ומוחלים על כל האדמין.
+   כאן נשאר רק מה שייחודי לדשבורד. */
 
 /* ---- פירוק התיבות ----
    הממשק הישן עטף כמעט כל דבר במלבן ממוסגר: אזהרת ההדגמה,
@@ -457,8 +458,10 @@ body.admin .ds-badge-u1 { color: var(--ds-risk); }        /* 8.05:1 */
 body.admin .ds-badge-u2 { color: var(--ds-accent-ink); }  /* 5.57:1 */
 body.admin .ds-badge-u3 { color: var(--ds-accent-ink); }
 body.admin .ds-badge-u4 { color: var(--ds-ink-soft); }    /* 6.23:1 */
-/* התג של הרמה העליונה נושא גם קו עבה יותר, ולא רק צבע */
-body.admin .ds-badge-u1 { border-top-width: 3px; }
+/* התג של הרמה העליונה נושא גם קו עבה יותר, ולא רק צבע.
+   הכלל הזה הפסיד קודם ל-.ds-badge הבסיסי - אותה ספציפיות,
+   מוצהר אחריו - ולכן הערוץ הרביעי פשוט לא רונדר. */
+body.admin .ds-badge.ds-badge-u1 { border-top-width: 3px; }
 
 body.admin .ds-row-title {
   grid-column: 2;
@@ -826,4 +829,523 @@ body.admin .ds-note {
   body.admin .ds-enum-rule { width: var(--ds-space-32); min-height: 0; height: 1px; flex: 0 0 auto; }
   body.admin .ds-row-title, body.admin .ds-row-why, body.admin .ds-row-foot { grid-column: 1; }
   body.admin .ds-col-side .ds-row { grid-template-columns: 1fr; }
+}
+
+
+/* ==========================================================
+   8. פרימיטיבים של השלד
+   ----------------------------------------------------------
+   אלה משותפים לאדמין ולפרונט, ולכן הם מוגדרים כאן על
+   .ds-* בלי scope למשטח. ds-front.css טוען אותם בנפרד
+   דרך אותו קובץ tokens.
+   ========================================================== */
+
+/* ---- HeroHeader ----
+   רצועת זהות, לא באנר שיווקי. היא נותנת מותג ואז מפנה
+   מקום לעבודה.
+
+   התמונה מגיעה מ---ds-hero-image ולכן היא ניתנת להחלפה
+   בשורה אחת. כל עוד הטוקן הוא none מוצג משטח אבן מסומן
+   כ-placeholder - לא תמונה מומצאת ולא stock. */
+.ds-hero {
+  position: relative;
+  min-height: var(--ds-hero-h);
+  display: flex; align-items: flex-end;
+  background-color: var(--ds-espresso);
+  background-image: var(--ds-hero-image);
+  background-size: cover;
+  background-position: var(--ds-hero-position);
+  overflow: hidden;
+}
+.ds-hero-compact { min-height: var(--ds-hero-h-compact); }
+
+/* הכיסוי קיים כדי שהטקסט יעמוד בניגודיות מעל תמונה כלשהי.
+   כשאין תמונה הוא פשוט מעמיק את האספרסו. */
+.ds-hero::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(to top,
+    rgba(26, 23, 20, var(--ds-hero-overlay)),
+    rgba(26, 23, 20, calc(var(--ds-hero-overlay) * 0.55)));
+  pointer-events: none;
+}
+.ds-hero > * { position: relative; z-index: 1; }
+
+/* סימון ה-placeholder. הוא מכוון להיראות - כדי שלא יישכח
+   בייצור - ונעלם לבדו ברגע שהטוקן מצביע על קובץ. */
+.ds-hero-mark {
+  position: absolute; z-index: 2;
+  inset-block-start: var(--ds-space-12);
+  inset-inline-end: var(--ds-space-12);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);
+  border: 1px dashed var(--ds-on-dark-dim);
+  padding: var(--ds-space-4) var(--ds-space-8);
+}
+
+.ds-hero-in {
+  width: 100%;
+  max-width: var(--ds-page-max);
+  margin-inline: auto;
+  padding: var(--ds-space-32) var(--ds-gutter);
+}
+.ds-hero-line {
+  font-family: var(--ds-serif);
+  font-size: clamp(24px, 3vw, 40px);
+  font-weight: var(--ds-weight-bold);
+  line-height: var(--ds-lh-tight);
+  letter-spacing: var(--ds-ls-display);
+  color: var(--ds-on-dark);                  /* 14.6:1 על האספרסו */
+  margin: 0;
+}
+.ds-hero-sub {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-on-dark-dim);              /* 7.70:1 */
+  margin: var(--ds-space-8) 0 0;
+}
+
+/* ---- Brand ----
+   NB · NAHMANI — BEN-DAHAN · עורכי דין. */
+.ds-brand { display: flex; align-items: center; gap: var(--ds-space-12); }
+.ds-brand-mark {
+  font-family: var(--ds-serif);
+  font-weight: var(--ds-weight-bold);
+  font-size: 22px; line-height: 1;
+  letter-spacing: -0.04em;
+  direction: ltr;
+}
+.ds-brand-name {
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-meta);
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  direction: ltr;
+}
+.ds-brand-role {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  opacity: .8;
+}
+
+/* ---- Roadmap ----
+   מסלול ההליך. המצב הנוכחי מסומן בארבעה ערוצים: מילה,
+   סמל, משקל וקו - ולא בצבע בלבד. */
+.ds-roadmap { list-style: none; margin: 0; padding: 0; }
+.ds-roadmap-step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-24);
+  position: relative;
+}
+/* הקו המחבר בין השלבים. דקורטיבי, ולכן aria מתעלם ממנו. */
+.ds-roadmap-step:not(:last-child)::before {
+  content: ""; position: absolute;
+  inset-inline-start: 13px; top: 26px; bottom: 0;
+  width: 1px; background: var(--ds-hairline);
+}
+.ds-roadmap-mark {
+  grid-column: 1; grid-row: 1 / span 2;
+  width: 27px; height: 27px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--ds-hairline);
+  border-radius: 50%;
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);
+  background: var(--ds-ground);
+}
+.ds-roadmap-name {
+  grid-column: 2;
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  color: var(--ds-ink-soft);
+  margin: 0;
+}
+.ds-roadmap-when {
+  grid-column: 2;
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+  margin: var(--ds-space-4) 0 0;
+}
+.ds-roadmap-done .ds-roadmap-mark {
+  border-color: var(--ds-done); color: var(--ds-done);       /* 6.15:1 */
+}
+.ds-roadmap-now .ds-roadmap-mark {
+  border-color: var(--ds-accent); border-width: 2px;
+  background: var(--ds-accent); color: var(--ds-ground);     /* 6.4:1 */
+}
+.ds-roadmap-now .ds-roadmap-name {
+  color: var(--ds-ink);                                      /* 13.46:1 */
+  font-weight: var(--ds-weight-medium);
+}
+
+/* ---- Timeline ---- */
+.ds-timeline { list-style: none; margin: 0; padding: 0; }
+.ds-timeline-item {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 0 var(--ds-space-16);
+  padding: var(--ds-space-12) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+.ds-timeline-item:last-child { border-bottom: 0; }
+.ds-timeline-when {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);
+  direction: ltr; unicode-bidi: plaintext;
+}
+.ds-timeline-what { font-size: var(--ds-size-body); color: var(--ds-ink); }
+
+/* ---- Notice ----
+   פס צד אחד. לא תיבה ולא רקע צבעוני. */
+.ds-notice {
+  border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-ink-soft);
+  padding: var(--ds-space-4) 0;
+  padding-inline-start: var(--ds-space-16);
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  color: var(--ds-ink);
+  margin: 0 0 var(--ds-space-24);
+}
+.ds-notice-risk      { border-inline-start-color: var(--ds-risk); }
+.ds-notice-attention { border-inline-start-color: var(--ds-accent); }
+.ds-notice-done      { border-inline-start-color: var(--ds-done); }
+
+@media (max-width: 560px) {
+  .ds-hero-in { padding: var(--ds-space-24) var(--ds-gutter); }
+  .ds-timeline-item { grid-template-columns: 1fr; gap: var(--ds-space-4); }
+}
+
+
+/* ==========================================================
+   9. ה-Hero של הדשבורד
+   ----------------------------------------------------------
+   רק כאן. שבעת האזורים האחרים וסביבת התיק הם סביבת עבודה
+   נקייה בלי תמונה ובלי רצועה - זו החלטה מפורשת, לא השמטה.
+   ========================================================== */
+
+body.admin .ds-hero-dash {
+  min-height: var(--ds-hero-h-dash);
+  /* יוצא מהמרזב של .page ונצמד לראש התוכן, כדי שייקרא
+     כרצועה ולא ככרטיס שמרחף בתוך העמוד. */
+  margin-inline: calc(var(--ds-gutter) * -1);
+  margin-top: calc(var(--ds-space-48) * -1);
+  margin-bottom: var(--ds-space-64);
+}
+body.admin.ds-on .page { padding-block: var(--ds-space-48) var(--ds-space-128); }
+
+body.admin .ds-hero-dash .ds-hero-in {
+  padding-block: var(--ds-space-48) var(--ds-space-32);
+}
+body.admin .ds-hero-brand {
+  color: var(--ds-on-dark-dim);              /* 7.70:1 על האספרסו */
+  margin: 0 0 var(--ds-space-24);
+}
+body.admin .ds-hero-brand .ds-brand-mark { color: var(--ds-accent-on-dark); }
+body.admin .ds-hero-dash .ds-hero-sub {
+  margin: 0 0 var(--ds-space-8);
+}
+/* הברכה. גדולה, אבל לא במידות של דף שער - זו סביבת עבודה.
+
+   ה-h1 נושא גם .view-title, כי viewnav ממקד אותו במעבר בין
+   אזורים ואסור להסיר את המחלקה. אבל ds-admin.css קובע
+   view-title בצבע הדיו, וזה 0-2-0 מול 0-1-0 - ולכן הברכה
+   יצאה כהה על כהה, נמדד 1.32:1.
+
+   הכלל נכתב על ההקשר: כל טקסט בתוך Hero הוא על רקע כהה,
+   ולכן גם כותרת שתיווסף בעתיד תקבל את הצבע הנכון. */
+body.admin .ds-hero .ds-hero-line,
+body.admin .ds-hero .view-title,
+body.admin .ds-hero h1,
+body.admin .ds-hero h2 { color: var(--ds-on-dark); }         /* 10.17:1 */
+
+body.admin .ds-hero-dash .ds-hero-line {
+  font-size: clamp(34px, 4.2vw, 56px);
+}
+
+/* משפט ההקשר יורד אל הקנבס הבהיר, מתחת לרצועה */
+body.admin .ds-dash-context {
+  max-width: var(--ds-measure);
+  margin: 0 0 var(--ds-space-96);
+}
+
+/* ---- משטח ה-placeholder ----
+   אבן ירושלמית מרומזת בשכבות שקופות בלבד. זו אינה תמונה
+   מומצאת ואינה מתיימרת להיות אחת: היא משטח שממתין לנכס,
+   ומסומן ככזה. כשהטוקן יצביע על קובץ - התמונה פשוט תכסה
+   אותה, ו-ds-dashboard.js יסיר את התג. */
+body.admin .ds-hero-dash {
+  background-image:
+    var(--ds-hero-image),
+    linear-gradient(118deg, transparent 38%, rgba(237, 232, 224, 0.05) 38.4%,
+                    rgba(237, 232, 224, 0.05) 52%, transparent 52.4%),
+    linear-gradient(to left, rgba(138, 95, 43, 0.20), transparent 62%),
+    linear-gradient(to bottom, #4a4136, #332c24);
+  background-size: cover, cover, cover, cover;
+}
+
+@media (max-width: 560px) {
+  body.admin .ds-hero-dash {
+    margin-top: calc(var(--ds-space-32) * -1);
+    margin-bottom: var(--ds-space-48);
+    min-height: 150px;
+  }
+  body.admin .ds-hero-dash .ds-hero-in {
+    padding-block: var(--ds-space-32) var(--ds-space-24);
+  }
+  body.admin .ds-hero-brand { margin-bottom: var(--ds-space-12); }
+  body.admin .ds-dash-context { margin-bottom: var(--ds-space-64); }
+}
+
+
+/* ==========================================================
+   10. ליטוש הדשבורד
+   ----------------------------------------------------------
+   המסך היה נכון במבנה אבל ריק מדי בפועל: הרוחב לא נוצל,
+   והפריטים הבודדים שיש נראו אבודים בתוך חלל.
+
+   העיקרון: whitespace מכוון פירושו מרווח שמשרת היררכיה, לא
+   קנבס ריק. כאן הוא נדחס לאנכי ונפתח לאופקי.
+   ========================================================== */
+
+/* ---- שורת ההקשר והמדדים ----
+   משפט ההקשר בקצה אחד, המדדים בקצה השני, שניהם על פס אחד
+   בין שני קווי שיער. זה מחבר את ה-Hero אל העבודה ומנצל את
+   הרוחב במקום להשאיר משפט שצף. */
+body.admin .ds-dash-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ds-space-24) clamp(var(--ds-space-32), 5vw, 96px);
+  padding-block: var(--ds-space-24);
+  border-top: var(--ds-hairline-w) solid var(--ds-hairline);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  margin: 0 0 var(--ds-space-64);
+}
+body.admin .ds-dash-strip .ds-dash-context {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--ds-size-eyebrow);
+  color: var(--ds-ink);
+}
+
+/* ---- מדדים שקטים ----
+   שורה טיפוגרפית, לא ארבעה כרטיסים. המספר גדול ובסריף,
+   התווית קטנה מתחתיו, והמפריד הוא קו שיער אנכי. */
+body.admin .ds-dash-strip .ds-stats {
+  display: flex; flex-wrap: wrap;
+  gap: var(--ds-space-16) clamp(var(--ds-space-24), 3vw, 48px);
+  margin: 0;
+}
+body.admin .ds-dash-strip .ds-stat {
+  display: block; margin: 0; padding: 0;
+  border: 0; border-inline-start: var(--ds-hairline-w) solid var(--ds-hairline);
+  padding-inline-start: clamp(var(--ds-space-16), 2vw, 32px);
+}
+body.admin .ds-dash-strip .ds-stat:first-child {
+  border-inline-start: 0; padding-inline-start: 0;
+}
+body.admin .ds-dash-strip .ds-stat dd {
+  font-family: var(--ds-serif);
+  font-size: clamp(26px, 2.4vw, 34px);
+  font-weight: var(--ds-weight-bold);
+  line-height: 1; color: var(--ds-ink);
+  margin: 0 0 var(--ds-space-4);
+  direction: ltr; unicode-bidi: plaintext;
+}
+body.admin .ds-dash-strip .ds-stat dt {
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);
+  margin: 0; white-space: nowrap;
+}
+
+/* ---- הפריסה ----
+   הטור המשני מתרחב, כי "סדר היום" נשאר בו לבדו אחרי
+   שהמדדים עלו למעלה. */
+body.admin .ds-cols {
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 420px);
+  gap: var(--ds-space-64) clamp(var(--ds-space-48), 5vw, 96px);
+  margin-bottom: var(--ds-space-96);
+}
+
+/* ---- נוכחות הפיד ----
+   שורה עם מסה אמיתית: מונה גדול, כותרת גדולה, ומרווח פנימי
+   במקום מרווח בין השורות. כך גם פריט אחד קורא כשורת עבודה
+   ולא כהערה שנשכחה. */
+body.admin .ds-attn .ds-feed > li + li { margin-top: 0; }
+body.admin .ds-attn .ds-row {
+  grid-template-columns: clamp(64px, 6vw, 92px) 1fr;
+  padding-block: var(--ds-space-32);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+body.admin .ds-attn .ds-feed > li:last-child .ds-row { border-bottom: 0; }
+body.admin .ds-attn .ds-enum-n { font-size: clamp(24px, 2.4vw, 32px); }
+body.admin .ds-attn .ds-row-title { font-size: clamp(21px, 2vw, 27px); }
+body.admin .ds-attn .ds-row-why   { font-size: var(--ds-size-eyebrow); }
+
+/* ---- מצבי ריק שהם אמירה ולא הערה ----
+   כשאין פריטים, המסך צריך לומר זאת בבירור במקום להשאיר
+   שורת טקסט אפורה בתוך חלל. */
+body.admin .ds-empty {
+  font-family: var(--ds-serif);
+  font-size: clamp(19px, 1.8vw, 24px);
+  line-height: var(--ds-lh-snug);
+  color: var(--ds-ink-soft);
+  padding-block: var(--ds-space-32);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  max-width: 34ch;
+}
+body.admin .ds-col-side .ds-empty {
+  font-size: var(--ds-size-eyebrow);
+  padding-block: var(--ds-space-24);
+}
+
+/* ---- קצב אנכי ----
+   הריווח הענק בתחתית הותיר קנבס ריק שאינו משרת דבר. */
+body.admin.ds-on .page { padding-block: var(--ds-space-48) var(--ds-space-64); }
+body.admin .ds-band { margin-bottom: 0; }
+
+@media (max-width: 1180px) {
+  body.admin .ds-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  body.admin .ds-dash-strip { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  body.admin .ds-dash-strip { margin-bottom: var(--ds-space-48); }
+  body.admin .ds-dash-strip .ds-stats { gap: var(--ds-space-16) var(--ds-space-24); }
+  body.admin .ds-attn .ds-row { padding-block: var(--ds-space-24); }
+}
+
+
+/* ==========================================================
+   11. ליטוש שני
+   ----------------------------------------------------------
+   שלוש בעיות שנצפו על המסך החי:
+
+   א. "דורש את תשומת לבי" התחרה ב-"שלום, אופיר" במקום להיות
+      כותרת מקטע. ה-Display היחיד במסך הוא הברכה.
+   ב. הטור המשני נראה כהערת שוליים ליד הטור הראשי.
+   ג. ארבע שכבות מעל ה-Hero דחפו את העבודה מתחת לקו הקיפול.
+   ========================================================== */
+
+/* ---- א. הכותרת חוזרת להיות כותרת מקטע ----
+   הברכה היא clamp(34px, 4.2vw, 56px); המקטע חייב לשבת
+   מתחתיה בבירור ולא לצדה. */
+body.admin .ds-attn .ds-section-title { font-size: clamp(28px, 2.7vw, 40px); }
+
+/* ופריטי הפיד מקבלים יותר נוכחות מהכותרת שמעליהם */
+body.admin .ds-attn .ds-row-title { font-size: clamp(20px, 1.75vw, 25px); }
+body.admin .ds-attn .ds-enum-n    { font-size: clamp(22px, 2vw, 29px); }
+body.admin .ds-attn .ds-row       { padding-block: var(--ds-space-24); }
+
+/* ---- ב. יחס הטורים 67/33 ----
+   הטור המשני מקבל נוכחות אמיתית במקום להיצמד לרוחב מינימלי. */
+body.admin .ds-cols {
+  grid-template-columns: minmax(0, 67fr) minmax(300px, 33fr);
+  gap: var(--ds-space-48) clamp(var(--ds-space-32), 4vw, 72px);
+  margin-bottom: var(--ds-space-64);
+}
+/* הכותרות בטור המשני משניות, אך לא זניחות */
+body.admin .ds-col-side .ds-section-title {
+  font-family: var(--ds-serif);
+  font-size: clamp(21px, 1.7vw, 26px);
+  font-weight: var(--ds-weight-bold);
+  letter-spacing: var(--ds-ls-section);
+}
+body.admin .ds-col-side .ds-section { margin-bottom: var(--ds-space-48); }
+body.admin .ds-col-side .ds-row-title { font-size: var(--ds-size-body); }
+body.admin .ds-col-side .ds-row-why   { font-size: var(--ds-size-meta); }
+
+/* פעילות אחרונה עברה לקנבס הבהיר */
+body.admin .ds-col-side .ds-activity { columns: auto; }
+body.admin .ds-col-side .ds-act-day {
+  color: var(--ds-accent-ink);               /* 5.57:1 על העצם */
+  padding: var(--ds-space-16) 0 var(--ds-space-4);
+}
+body.admin .ds-col-side .ds-act-row {
+  grid-template-columns: 46px 1fr;
+  color: var(--ds-ink-soft);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+}
+body.admin .ds-col-side .ds-act-time { color: var(--ds-ink-soft); }
+body.admin .ds-col-side .ds-act-what { color: var(--ds-ink); }
+body.admin .ds-col-side .ds-act-who  { display: none; }
+
+/* ---- ג. צפיפות אנכית ----
+   המטרה: Hero + מדדים + תחילת הפיד + חלק מסדר היום, הכול
+   בצפייה הראשונה. המרווח הגדול נשאר בין אזורים, לא בתוכם. */
+body.admin .ds-hero-dash { margin-bottom: var(--ds-space-32); }
+body.admin .ds-hero-dash .ds-hero-in { padding-block: var(--ds-space-32) var(--ds-space-24); }
+body.admin .ds-hero-brand { margin-bottom: var(--ds-space-16); }
+body.admin .ds-dash-strip {
+  padding-block: var(--ds-space-16);
+  margin-bottom: var(--ds-space-40, 40px);
+}
+body.admin .ds-section-head {
+  margin-bottom: var(--ds-space-24);
+  padding-bottom: var(--ds-space-12);
+}
+body.admin .ds-section { margin-bottom: var(--ds-space-64); }
+
+/* ---- ד. השכבות שמעל ה-Hero ----
+   הן נשארות במלואן - הפונקציונליות והמידע לא נגרעים - אבל
+   הן מפסיקות לתפוס גובה של תוכן. */
+body.admin .ds-cmd-in { padding-block: var(--ds-space-8); }
+body.admin .ds-cmd-input { min-height: 44px; font-size: var(--ds-size-body); }
+
+/* אזהרת ההדגמה: מידע נחוץ, נוכחות מינימלית */
+body.admin .demo-warning {
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);
+  opacity: .75;
+  margin: 0 0 var(--ds-space-12);
+  padding: 0;
+}
+body.admin .demo-warning strong { font-weight: var(--ds-weight-regular); }
+
+body.admin .deadline-banner {
+  padding-block: 0;
+  margin: 0 0 var(--ds-space-16);
+}
+
+/* ---- ה. סימון ה-placeholder ----
+   לא כיתוב על המסך. ריבוע זעיר בפינה, שקיים רק כדי שלא
+   יישכח בפיתוח, ומסיר את עצמו ברגע שיש תמונה. */
+body.admin .ds-hero-mark {
+  width: 8px; height: 8px; padding: 0;
+  border: 1px dashed var(--ds-on-dark-dim);
+  opacity: .5;
+}
+
+/* ---- ו. רצועת אירועי הגישה ----
+   סוגרת את העמוד, ואינה מתחרה בדבר. */
+body.admin .ds-band-slim {
+  padding-block: var(--ds-space-32);
+  margin-bottom: 0;
+}
+body.admin .ds-band-slim .ds-sys-h {
+  color: var(--ds-on-dark-dim);
+  margin: 0 0 var(--ds-space-12);
+}
+body.admin .ds-band-slim .ds-sys-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0 var(--ds-space-32);
+}
+body.admin .ds-band-slim .ds-sys-row {
+  flex-direction: row; align-items: baseline;
+  gap: var(--ds-space-12);
+  border-bottom: var(--ds-hairline-w) solid #574d40;
+}
+
+@media (max-width: 1180px) {
+  body.admin .ds-cols { grid-template-columns: minmax(0, 1fr); }
 }

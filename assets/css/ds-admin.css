@@ -126,7 +126,6 @@ body.admin table.cases td { padding-inline: var(--ds-space-8); }
 body.admin table.cases td { padding-block: var(--ds-space-16); }
 body.admin table.cases td:first-child { padding-inline-start: 0; }
 body.admin table.cases td:last-child  { padding-inline-end: 0; }
-body.admin .wide { overflow-x: auto; }
 
 /* ---- מונים ----
    מספר בסריף, לא צ'יפ ממולא. */
@@ -245,23 +244,6 @@ body.admin .page .btn-stop:hover {
   background: var(--ds-risk-wash); border-color: var(--ds-risk);
 }
 
-/* ---- אזור בדיקת המסמכים ----
-   פחות מלבנים וצפיפות: כל מסמך מקבל אוויר, והפרדה בקו שיער
-   במקום בתיבה. הכפתורים יורדים לשורה משלהם עם מרווח, כדי
-   שהם לא ייראו כמו זוג משבצות דבוקות לטקסט. */
-body.admin .page .doc,
-body.admin .page .gap-row,
-body.admin .page .review-row {
-  background: none; border: 0;
-  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
-  border-radius: var(--ds-radius);
-  padding-block: var(--ds-space-24);
-}
-body.admin .page .doc:last-child,
-body.admin .page .gap-row:last-child,
-body.admin .page .review-row:last-child { border-bottom: 0; }
-body.admin .page .doc .btn + .btn,
-body.admin .page .review-row .btn + .btn { margin-inline-start: var(--ds-space-12); }
 
 /* ---- סביבת התיק ---- */
 body.admin .case-head {
@@ -383,5 +365,136 @@ body.admin .attn-item,
 body.admin .task-row,
 body.admin .req-row,
 body.admin .legal-panel,
-body.admin .assist-msg,
 body.admin .log-row { border-radius: var(--ds-radius); }
+
+/* ---- אזור בדיקת המסמכים ----
+   השמות האמיתיים שה-JS פולט הם .review-actions ו-.reject-form.
+   הכלל הקודם כאן כיוון ל-.doc/.gap-row/.review-row - שלושה
+   שמות שאינם קיימים בשום markup ובשום JS. */
+body.admin .review-actions { gap: var(--ds-space-12); }
+body.admin .reject-form {
+  background: none; border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-risk);
+  padding-inline-start: var(--ds-space-16);
+  margin-top: var(--ds-space-16);
+}
+body.admin .assist-q,
+body.admin .assist-a,
+body.admin .assist-note {
+  background: none;
+  border-radius: var(--ds-radius);
+}
+body.admin .assist-q {
+  border-inline-start: var(--ds-rule-w) solid var(--ds-ink-soft);
+  padding-inline-start: var(--ds-space-16);
+  color: var(--ds-ink);
+}
+body.admin .assist-a { color: var(--ds-ink); }
+body.admin .assist-note,
+body.admin .assist-empty { color: var(--ds-ink-soft); font-size: var(--ds-size-meta); }
+
+
+/* ==========================================================
+   8. תיקון תקלות שההגירה החלקית השאירה
+   ----------------------------------------------------------
+   הקנבס התהפך מגרפיט לעצם, אבל כללים שנכתבו לקנבס הכהה
+   נשארו. התוצאה היא טקסט בהיר על בהיר. כל הערכים כאן נמדדו
+   על הרינדור החי.
+   ========================================================== */
+
+/* ---- כותרת התיק הייתה בלתי נראית ----
+   .case-fact dt נמדד 1.67:1 ו-dd נמדד 1.03:1 על העצם. זה
+   אומר ששם הלקוח, מספר התיק, השלב והאחראי פשוט לא נראו.
+   admin.css:265-266 הוא 0-1-1, ולכן נדרש כאן 0-2-1. */
+body.admin .case-fact dt { color: var(--ds-ink-soft); }      /* 6.23:1 */
+body.admin .case-fact dd { color: var(--ds-ink); }           /* 13.46:1 */
+body.admin .case-fact + .case-fact::before { color: var(--ds-hairline); }
+
+/* ---- כללי ID שמחלקה אינה יכולה לנצח ----
+   שלושתם צובעים בברונזה #8a5f2b, שהיא 4.59:1 על העצם -
+   הטוקנים אוסרים אותה במפורש כטקסט. accent-ink הוא 5.57:1. */
+body.admin #attnCount,
+body.admin #reqCount,
+body.admin #chatUnread { color: var(--ds-accent-ink); }      /* 5.57:1 */
+body.admin .state-num,
+body.admin .next-label,
+body.admin .log-day { color: var(--ds-accent-ink); }
+
+/* #logList > li הוא 1-0-1 ונושא גם גבול מ-style.css:209 */
+body.admin #logList > li,
+body.admin #firmLogList > li {
+  border-top: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
+  padding: var(--ds-space-12) 0;
+}
+
+/* ---- פס "דורש תשומת לב" שנמחק בטעות ----
+   הכלל .block { border: 0 } שלי מחק את פס הברונזה של
+   .attention-block ואת מסגרת פאנל הניתוח, בלי תחליף.
+   הם חוזרים כפס צד, שהוא הדפוס של השפה החדשה. */
+body.admin .attention-block,
+body.admin .assist-block {
+  border: 0;
+  border-inline-start: var(--ds-rule-w) solid var(--ds-accent);
+  padding-inline-start: var(--ds-space-24);
+}
+
+/* ---- שבב הסינון: המונה נשאר מלא בתוך שבב שטוח ---- */
+body.admin .chip-n,
+body.admin .chip[aria-pressed="true"] .chip-n {
+  background: none; color: inherit; padding: 0;
+}
+
+/* ---- עוגן שנגלל אליו נחת מתחת לכרום ----
+   admin.css:213 כויל לסרגל 52px. היום הסרגל 92px ומתחתיו
+   שורת פקודה דביקה. */
+body.admin [id] { scroll-margin-top: 180px; }
+@media (max-width: 860px) { body.admin [id] { scroll-margin-top: 96px; } }
+
+/* ---- טקסט חופשי ופלט מודל יכולים לגלוש ----
+   אותה תקלה שכבר תוקנה ב-.chat-body: קישור ארוך בלי רווחים
+   מותח את הבלוק מעבר לרוחב המסך. */
+body.admin .task-desc,
+body.admin .assist-a,
+body.admin .reject-note { overflow-wrap: anywhere; }
+
+/* ---- מזהים בעברית ----
+   הדפוס הוחל עד כה לפי הקשר בארבעה מקומות, ולכן כל .num
+   חדש נפל בין הכיסאות. */
+body.admin .num { direction: ltr; unicode-bidi: plaintext; white-space: nowrap; }
+
+/* ---- רכיבים שלא הוגרו כלל ---- */
+body.admin .chat-msg {
+  border-color: var(--ds-hairline); border-radius: var(--ds-radius);
+}
+body.admin .chat-inbound  { background: var(--ds-surface); border-inline-start-color: var(--ds-ink-soft); }
+body.admin .chat-outbound { background: var(--ds-accent-wash); border-inline-end-color: var(--ds-accent); }
+body.admin .chat-head { color: var(--ds-ink-soft); }
+body.admin .chat-who  { color: var(--ds-ink); }
+
+body.admin .alert {
+  background: none; border: 0; border-radius: var(--ds-radius);
+  border-inline-start: var(--ds-rule-w) solid var(--ds-ink-soft);
+  color: var(--ds-ink);
+}
+body.admin .alert-error {
+  border-inline-start-color: var(--ds-risk);
+  color: var(--ds-risk);                                     /* 8.05:1 */
+}
+body.admin .alert-note { border-inline-start-color: var(--ds-accent); }
+
+body.admin .toast {
+  background: var(--ds-ink); color: var(--ds-ground);        /* 13.46:1 */
+  border-radius: var(--ds-radius); border: 0;
+  font-family: var(--ds-sans); font-size: var(--ds-size-body);
+}
+body.admin .skip-link {
+  background: var(--ds-ink); color: var(--ds-ground);
+  border-radius: var(--ds-radius);
+  font-family: var(--ds-sans);
+}
+body.admin .hamburger {
+  color: var(--ds-on-dark); border-radius: var(--ds-radius);
+}
+body.admin .empty { color: var(--ds-ink-soft); font-size: var(--ds-size-meta); }
+body.admin .check { color: var(--ds-ink); }
