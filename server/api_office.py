@@ -50,9 +50,22 @@ def _owned_document(cur, document_id, identity):
 
 @router.get("/api/office/cases")
 def list_cases(request: Request, identity=Depends(require_staff)):
+    """
+    התיקים שבטיפול המשרד.
+
+    27.09: נוסף סינון סטטוס. עד כה השאילתה החזירה כל תיק
+    במשרד, כולל סגורים - וכשהיו שני תיקים פעילים בלבד זה
+    היה בלתי נראה. ברגע שנוצרו תיקים סגורים, המסך אמר
+    "16 תיקים פעילים" כשארבעה מהם אינם.
+
+    תיק מוקפא כן נשאר: הוא עדיין באחריות עורך הדין ואינו
+    אמור להיעלם בשקט. הוא מסומן, ולא מוסתר.
+
+    תיק סגור יצא מכאן והוא באזור "תיקים שהושלמו".
+    """
     with cursor() as cur:
         cur.execute(
-            """select c.id, c.case_number, cl.full_name as client_name,
+            """select c.id, c.case_number, c.status, cl.full_name as client_name,
                       ct.name as claim_type, st.stage_position, st.stage_title,
                       (select count(*) from case_documents d
                         where d.case_id = c.id and d.status = 'pending_review')
@@ -65,13 +78,15 @@ def list_cases(request: Request, identity=Depends(require_staff)):
                  join claim_types ct on ct.id = c.claim_type_id
                  left join case_current_stage st on st.case_id = c.id
                 where c.firm_id = %s
-                order by c.opened_at desc""",
+                  and c.status in ('active', 'frozen')
+                order by c.status, c.opened_at desc""",
             (identity.firm_id,),
         )
         rows = cur.fetchall()
     return {"cases": [{
         "id": str(r["id"]), "caseNumber": r["case_number"],
         "clientName": r["client_name"], "claimType": r["claim_type"],
+        "status": r["status"],
         "currentStage": r["stage_position"], "stageTitle": r["stage_title"],
         "awaitingReview": r["awaiting_review"],
         "openForClient": r["open_for_client"],

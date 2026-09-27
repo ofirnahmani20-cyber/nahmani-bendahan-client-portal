@@ -340,11 +340,25 @@
     block.hidden = false;
     body.textContent = '';
 
-    // מה נקבע - בשורה אחת גדולה וברורה
-    var head = el('p', 'decision-headline',
-      d.percent != null
-        ? 'הוועדה קבעה ' + d.percent + '% נכות' + (d.permanent ? ' צמיתה' : ' זמנית')
-        : 'התקבלה החלטה בעניינך');
+    /* מה נקבע - בשורה אחת גדולה וברורה.
+
+       התוצאה קודמת לאחוזים, ולא להפך. הניסוח הקודם הסתמך
+       על percent בלבד, ולכן תביעה שנדחתה עם 0% הוצגה
+       ללקוח כ"הוועדה קבעה 0% נכות זמנית" - משפט שנשמע
+       כאילו נקבעה לו נכות. במסך שאדם קורא כדי להבין מה
+       קרה לו, זה הפרש גדול. */
+    var headline;
+    if (d.outcome === 'rejected') {
+      headline = 'התביעה נדחתה';
+    } else if (d.outcome === 'below-threshold' && d.percent != null) {
+      headline = 'נקבעו ' + d.percent + '% - מתחת לסף הזכאות';
+    } else if (d.percent != null) {
+      headline = 'הוועדה קבעה ' + d.percent + '% נכות' +
+                 (d.permanent ? ' צמיתה' : ' זמנית');
+    } else {
+      headline = 'התקבלה החלטה בעניינך';
+    }
+    var head = el('p', 'decision-headline', headline);
     body.appendChild(head);
     body.appendChild(el('p', 'decision-when', 'ההחלטה התקבלה ב-' + formatDate(d.date)));
 

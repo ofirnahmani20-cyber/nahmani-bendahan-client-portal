@@ -618,11 +618,18 @@
       DsDashboard.setCases(cases);
       var waiting = cases.reduce(function (n, c) { return n + c.awaitingReview; }, 0);
 
-      $('listSummary').textContent = waiting === 0
-        ? cases.length + ' תיקים פעילים. אין מסמכים שממתינים לבדיקה.'
-        : cases.length + ' תיקים פעילים · ' +
-          (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') +
-          ' לבדיקת המשרד.';
+      /* "פעילים" ו"מוקפאים" אינם אותו דבר, ומשפט אחד שסופר
+         את שניהם יחד אומר מספר שאינו נכון לאף אחד מהם. */
+      var frozen = cases.filter(function (c) { return c.status === 'frozen'; }).length;
+      var live   = cases.length - frozen;
+
+      var parts = [live === 1 ? 'תיק פעיל אחד' : live + ' תיקים פעילים'];
+      if (frozen) parts.push(frozen === 1 ? 'אחד מוקפא' : frozen + ' מוקפאים');
+      parts.push(waiting === 0
+        ? 'אין מסמכים שממתינים לבדיקה'
+        : (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') +
+          ' לבדיקת המשרד');
+      $('listSummary').textContent = parts.join(' · ') + '.';
 
       var rows = $('caseRows');
       rows.textContent = '';
@@ -632,7 +639,11 @@
 
         var who = document.createElement('td');
         who.appendChild(el('div', 'client', c.clientName));
-        who.appendChild(el('div', 'sub num', c.caseNumber));
+        var sub = el('div', 'sub num', c.caseNumber);
+        who.appendChild(sub);
+        if (c.status === 'frozen') {
+          who.appendChild(el('div', 'sub case-frozen-tag', 'מוקפא'));
+        }
         tr.appendChild(who);
 
         tr.appendChild(cell(c.caseNumber, 'num'));
@@ -642,6 +653,10 @@
         stage.appendChild(el('div', null, (c.currentStage || '-') + ''));
         stage.appendChild(el('div', 'sub', c.stageTitle || ''));
         tr.appendChild(stage);
+
+        /* תיק מוקפא נשאר ברשימה - הוא באחריות עורך הדין -
+           אבל הוא אינו מתנהל, וזה חייב להיאמר בשורה עצמה. */
+        if (c.status === 'frozen') tr.className = 'case-frozen';
 
         tr.appendChild(countCell(c.awaitingReview, 'hot'));
         tr.appendChild(countCell(c.openForClient, 'calm'));

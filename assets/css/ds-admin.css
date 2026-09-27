@@ -944,3 +944,14 @@ body.admin .closed-how {
   color: var(--ds-ink);
   font-weight: var(--ds-weight-medium);
 }
+
+/* תיק מוקפא ברשימת התיקים. הוא נשאר - הוא באחריות עורך
+   הדין - אבל אינו מתנהל, והשורה אומרת זאת בשני ערוצים:
+   תווית במילים, וטקסט שקט יותר. לא בצבע בלבד. */
+body.admin table.cases tr.case-frozen .client,
+body.admin table.cases tr.case-frozen td { color: var(--ds-ink-soft); }
+body.admin .case-frozen-tag {
+  color: var(--ds-accent-ink);                /* 6.79:1 על לבן */
+  letter-spacing: var(--ds-ls-label);
+  font-weight: var(--ds-weight-medium);
+}

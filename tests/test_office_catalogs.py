@@ -275,3 +275,77 @@ def test_the_new_areas_are_read_only(api, path):
         assert r.status_code == 405, (
             "%s %s החזיר %d - נוספה כתיבה בלי שנקבעה מדיניות"
             % (method.upper(), path, r.status_code))
+
+# ================================================================
+#  5. תיק אינו נופל בין שני האזורים
+# ================================================================
+
+def test_a_case_appears_in_exactly_one_list(api, temp_case):
+    """
+    27.09: רשימת "התיקים בטיפולי" לא סיננה סטטוס כלל, והחזירה
+    גם תיקים סגורים. כשהיו שני תיקי זרע פעילים בלבד זה היה
+    בלתי נראה - המסך אמר "16 תיקים פעילים" רק אחרי שנוצרו
+    תיקים סגורים.
+
+    התיקון הוא סינון, ולכן הוא מביא סיכון הפוך: תיק שנופל
+    בין שתי הרשימות ונעלם. הבדיקה נועלת את שניהם יחד - אין
+    חפיפה, ואין תיק חסר.
+    """
+    staff_login(api)
+
+    def ids():
+        live = {c["id"] for c in api.get("/api/office/cases").json()["cases"]}
+        done = {c["id"] for c in api.get("/api/office/closed-cases").json()["cases"]}
+        return live, done
+
+    with cursor() as cur:
+        cur.execute("""select count(*) as n from cases
+                        where firm_id = (select firm_id from users
+                                          where lower(email) = lower(%s))""",
+                    (STAFF_EMAIL,))
+        total = cur.fetchone()["n"]
+
+    live, done = ids()
+    assert not (live & done), "תיק מופיע בשתי הרשימות"
+    assert len(live) + len(done) == total, (
+        "תיק נעלם: %d ברשימה + %d סגורים, אך במסד %d"
+        % (len(live), len(done), total))
+
+    # התיק הזמני פעיל, ולכן הוא ברשימה החיה
+    assert str(temp_case["case_id"]) in live
+
+    # וכשהוא נסגר הוא עובר צד, ולא נעלם
+    with cursor(commit=True) as cur:
+        cur.execute("update cases set status = 'closed_accepted' where id = %s",
+                    (temp_case["case_id"],))
+    try:
+        live, done = ids()
+        assert str(temp_case["case_id"]) not in live
+        assert str(temp_case["case_id"]) in done
+        assert len(live) + len(done) == total, "תיק נעלם אחרי סגירה"
+    finally:
+        with cursor(commit=True) as cur:
+            cur.execute("update cases set status = 'active' where id = %s",
+                        (temp_case["case_id"],))
+
+
+def test_a_frozen_case_stays_in_the_working_list(api, temp_case):
+    """
+    תיק מוקפא אינו סגור. הוא עדיין באחריות עורך הדין, ואם
+    הוא ייעלם מהרשימה איש לא יזכור לחדש אותו.
+    """
+    staff_login(api)
+
+    with cursor(commit=True) as cur:
+        cur.execute("update cases set status = 'frozen' where id = %s",
+                    (temp_case["case_id"],))
+    try:
+        cases = api.get("/api/office/cases").json()["cases"]
+        mine = [c for c in cases if c["id"] == str(temp_case["case_id"])]
+        assert mine, "תיק מוקפא נעלם מרשימת התיקים"
+        assert mine[0]["status"] == "frozen", (
+            "הסטטוס אינו מוחזר - התצוגה לא תוכל לסמן אותו")
+    finally:
+        with cursor(commit=True) as cur:
+            cur.execute("update cases set status = 'active' where id = %s",
+                        (temp_case["case_id"],))
