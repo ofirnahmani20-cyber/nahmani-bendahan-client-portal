@@ -929,24 +929,10 @@ html[dir="rtl"] .drawer-open .drawer { transform: translateX(0); }
 }
 .stat-note { font-size: calc(15px * var(--scale)); color: var(--text-soft); margin: 4px 0 0; }
 
-.compare { margin: 24px 0 0; padding: 20px 0 0; border-top: 1px solid var(--border); }
-.compare h3 { margin: 0 0 12px; }
-.compare-bar {
-  height: 10px; background: #e5e0d7; border-radius: 0; overflow: hidden;
-  display: flex; flex-direction: row-reverse;
-}
-.compare-bar > i { display: block; height: 100%; background: var(--accent); }
-.compare-note { margin: 12px 0 0; font-size: calc(17px * var(--scale)); color: var(--text-soft); }
+/* בלוק ההשוואה לממוצע הוסר ב-27.09. המקור לנתון
+   (durationEstimate ב-data.js) נמחק כשהמערכת עברה לשרת,
+   והבלוק לא רונדר מאז. ראה dashboard.js renderDuration. */
 
-/* הסייג על ההערכה - מוצג ללקוח, לא רק בקוד */
-.estimate-warning {
-  margin: 16px 0 0; padding: 14px 16px;
-  background: var(--warn-soft);
-  border: 1px solid var(--warn);
-  border-inline-start: 4px solid var(--warn);
-  border-radius: 0;
-  font-size: calc(17px * var(--scale)); line-height: 1.6;
-}
 
 /* ---- אנימציית הכניסה למפה ---- */
 .steps-in > li {

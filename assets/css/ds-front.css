@@ -892,8 +892,8 @@ body.front .stat-note {
   font-size: calc(15px * var(--scale));
   color: var(--ds-ink-soft);
 }
-body.front .compare { border-top-color: var(--ds-hairline); }
-body.front .compare-bar { background: var(--ds-hairline); border-radius: 0; }
+/* .compare הוסר יחד עם בלוק ההשוואה לממוצע (27.09) -
+   ראה ההערה ב-dashboard.js renderDuration. */
 
 
 @media (prefers-contrast: more) {

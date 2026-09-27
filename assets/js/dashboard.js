@@ -1101,46 +1101,25 @@
     }
     host.appendChild(grid);
 
-    /* ---- השוואה לממוצע ---- */
+    /* ---- השוואה לממוצע: הוסרה ב-27.09 ----
+       הבלוק חישב "אתה ב-70% ממשך טיפול אופייני" מתוך
+       durationEstimate(), פונקציה שחיה ב-assets/js/data.js.
+       הקובץ הזה נמחק כשהמערכת עברה לשרת, ומאז הביטוי
+       typeof durationEstimate === 'function' החזיר false
+       והבלוק כולו לא רונדר. כלומר הוא היה מת מאז ההגירה.
 
-    var est = typeof durationEstimate === 'function'
-            ? durationEstimate(caseFile.claimType) : null;
-    if (!est || openedDays == null) return;
+       זו גם התוצאה הבטוחה: המספרים שהיו שם הם הערכה
+       שנכתבה לפי סדרי גודל כלליים, לא לפי נתוני המוסד
+       לביטוח לאומי ולא לפי תיקי המשרד. "ממוצע 9 חודשים"
+       בהקשר של תביעה משפטית עלול להיתפס כהתחייבות.
 
-    var estDays = Math.round(est.typicalMonths * 30.44);
-    var pct     = Math.min(100, Math.round((openedDays / estDays) * 100));
+       מסמך הצעדים הבאים מונה שלוש דרכים לסגור את החסם,
+       והשלישית היא בדיוק זו: למחוק את הבלוק. מסך משך
+       ההליך ממשיך לעבוד בלעדיו - הוא מציג תאריכים
+       אמיתיים מהתיק ולא הערכה.
 
-    var cmp = el('div', 'compare');
-    cmp.appendChild(el('h3', null,
-      'מול משך טיפול אופייני בתביעת ' + caseFile.claimType));
-
-    var bar = el('div', 'compare-bar');
-    bar.setAttribute('role', 'img');
-    bar.setAttribute('aria-label',
-      'התיק שלך נמצא בכ-' + pct + ' אחוז ממשך הטיפול האופייני');
-    var fill = el('i');
-    fill.style.width = pct + '%';
-    bar.appendChild(fill);
-    cmp.appendChild(bar);
-
-    cmp.appendChild(el('p', 'compare-note',
-      'טיפול אופייני בתביעה מסוג זה נמשך בערך ' + est.typicalMonths +
-      ' חודשים, ובדרך כלל בין ' + est.rangeMonths[0] + ' ל-' +
-      est.rangeMonths[1] + ' חודשים. ' + est.note));
-
-    /* הסייג מוצג ללקוח כל עוד המספרים לא אושרו על ידי המשרד.
-       זה מכוון: עדיף שהלקוח יידע שזו הערכה מאשר שיבנה עליה. */
-    if (!est.verified) {
-      var warn = el('p', 'estimate-warning');
-      warn.appendChild(el('strong', null, 'שימו לב: זו הערכה כללית בלבד. '));
-      warn.appendChild(document.createTextNode(
-        'המספרים כאן אינם נתונים רשמיים ואינם הבטחה לגבי התיק שלכם. ' +
-        'כל תיק מתנהל בקצב משלו. לשאלה על לוח הזמנים שלכם - דברו עם המשרד.'
-      ));
-      cmp.appendChild(warn);
-    }
-
-    host.appendChild(cmp);
+       להחזרת התכונה נדרש מקור נתונים אמיתי, ואז גם
+       הסייג חוזר יחד אתו. */
   }
 
   /* ---- אנימציית מפת הדרכים ----
