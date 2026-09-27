@@ -726,19 +726,23 @@ window.DsDashboard = (function () {
     timer = setTimeout(function () {
       d.Api.search(q).then(function (data) {
         if (mine !== seq) return;        /* תשובה שאיחרה */
-        var remote = (data.results || []).map(function (r) {
-          var bits = [];
-          if (r.clientName) bits.push(r.clientName);
-          if (r.caseNumber && r.kind !== 'case') bits.push(r.caseNumber);
-          if (r.subtitle) bits.push(r.subtitle);
-          return {
-            kind: r.kind,
-            label: r.title,
-            sub: bits.join(' · '),
-            caseId: r.caseId,
-            tab: r.tab
-          };
-        });
+
+        /* התשובה מגיעה מקובצת ומדורגת מהשרת. הקיבוץ נשמר
+           כמו שהוא: הוא נקבע לפי ORDER בשרת, ולסדר מחדש
+           כאן היה אומר ששני מקומות מחליטים על אותו דבר.
+
+           data.results נשמר כנפילה-לאחור לגרסת שרת ישנה
+           שעדיין בזיכרון המטמון של הדפדפן. */
+        var flat = [];
+        if (data.groups && data.groups.length) {
+          data.groups.forEach(function (g) {
+            (g.results || []).forEach(function (r) { flat.push(r); });
+          });
+        } else {
+          flat = data.results || [];
+        }
+
+        var remote = flat.map(function (r) { return toHit(r); });
         hits = remote.concat(local).slice(0, 20);
         cursor = -1;
         paintPanel(q);
@@ -748,6 +752,27 @@ window.DsDashboard = (function () {
         paintPanel(q);
       });
     }, 220);
+  }
+
+  /** שורת תוצאה אחת, מהחוזה של השרת אל מה שהפאנל מצייר.
+
+      שם הלקוח אינו חוזר בכותרת המשנה כשהוא כבר הכותרת -
+      "ישראל ישראלי · ישראל ישראלי · לקוח" הוא מה שהיה מוצג
+      עד 27.09. */
+  function toHit(r) {
+    var bits = [];
+    if (r.clientName && r.clientName !== r.title) bits.push(r.clientName);
+    if (r.caseNumber && r.kind !== 'case' && r.caseNumber !== r.title) {
+      bits.push(r.caseNumber);
+    }
+    if (r.subtitle) bits.push(r.subtitle);
+    return {
+      kind: r.kind,
+      label: r.title,
+      sub: bits.join(' · '),
+      caseId: r.caseId,
+      tab: r.tab
+    };
   }
 
   /* התוויות מגיעות מהשרת, כדי שהוספת מקור חיפוש בעתיד -

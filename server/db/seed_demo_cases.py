@@ -84,6 +84,11 @@ CASES = [
             ("צילום תעודת זהות + ספח", "approved", None),
             ("ייפוי כוח חתום", "approved", None),
             ("חוות דעת רפואית עדכנית", "approved", None),
+            # שמות עם לטינית: בלעדיהם אין במסד ולו תו לטיני
+            # אחד בשם מסמך, וחיפוש "EMG" מחזיר אפס גם כשהוא
+            # עובד נכון לחלוטין.
+            ("בדיקת EMG יד ימין", "approved", None),
+            ("MRI עמוד שדרה מותני", "approved", None),
             ("תוצאות בדיקות הדמיה", "pending_review", None),
         ],
         "tasks": [
@@ -109,6 +114,8 @@ CASES = [
             ("צילום תעודת זהות + ספח", "approved", None),
             ("ייפוי כוח חתום", "approved", None),
             ("פרוטוקול ועדה מדרג ראשון", "approved", None),
+            ("EMG + NCS גפיים תחתונות", "approved", None),
+            ("CT כתף שמאל", "pending_review", None),
             ("חוות דעת מומחה מטעמנו", "missing", None),
         ],
         "tasks": [
@@ -195,6 +202,7 @@ CASES = [
         "docs": [
             ("צילום תעודת זהות + ספח", "approved", None),
             ("ייפוי כוח חתום", "approved", None),
+            ("בדיקת EMG - חוזרת", "pending_review", None),
             ("אישורי מחלה (טופס 100)", "pending_review", None),
         ],
         "conversation": [
