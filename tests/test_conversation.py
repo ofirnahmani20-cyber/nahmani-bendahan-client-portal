@@ -16,6 +16,10 @@ from starlette.testclient import TestClient
 from server.app import app
 from server.db.pool import cursor
 
+# ה-fixture חי ב-test_firm_isolation ולא ב-conftest. הייבוא
+# הוא מה שהופך אותו לזמין כאן, ולכן הוא אינו מיותר.
+from .test_firm_isolation import second_firm  # noqa: F401
+
 LOCAL = ("127.0.0.1", 45123)
 
 STAFF_EMAIL = "nahmani@nahmani-bendahan.co.il"
@@ -381,3 +385,53 @@ def _last_login_row():
                         where a.action = 'staff.login_success'
                         order by a.created_at desc limit 1""")
         return cur.fetchone()
+
+# ================================================================
+#  8. יומן האודיט נושא את הקשר התיק מהשרת
+# ================================================================
+
+def test_the_audit_log_carries_the_case_number(api, temp_case):
+    """
+    27.09: עד היום התשובה נשאה caseId בלבד, והדשבורד חיבר את
+    מספר התיק בצד הלקוח מול רשימת התיקים שכבר נטענה. זה עבד
+    רק לתיקים שברשימה - שורת אודיט של תיק סגור, או של תיק
+    מעבר לחלון הטעינה, הוצגה בלי מספר ובלי סוג תביעה.
+
+    הבדיקה נועלת את שני השדות ואת הבידוד: הם נשלפים
+    בהצטרפות שנושאת firm_id, בדיוק כמו שאר השאילתה.
+    """
+    staff_login(api)
+    case_id = str(temp_case["case_id"])
+
+    r = api.get("/api/office/audit-log?limit=200")
+    assert r.status_code == 200, r.text
+    entries = r.json()["entries"]
+
+    with_case = [e for e in entries if e.get("caseId")]
+    assert with_case, "אין שורת אודיט משויכת לתיק - אין מה לבדוק"
+
+    for e in with_case:
+        assert "caseNumber" in e, "השדה caseNumber נעלם מהתשובה"
+        assert "claimType" in e, "השדה claimType נעלם מהתשובה"
+
+    numbered = [e for e in with_case if e["caseNumber"]]
+    assert numbered, "אף שורה משויכת לתיק לא קיבלה מספר תיק"
+
+
+def test_the_audit_log_case_number_never_crosses_firms(api, second_firm):
+    """
+    השדה החדש נשלף בהצטרפות. די בהצטרפות אחת ששוכחת firm_id
+    כדי שמשרד אחד יראה מספרי תיק של אחר.
+    """
+    staff_login(api)
+
+    with cursor() as cur:
+        cur.execute("select case_number from cases where firm_id = %s",
+                    (second_firm["firm_id"],))
+        theirs = {r["case_number"] for r in cur.fetchall()}
+
+    entries = api.get("/api/office/audit-log?limit=200").json()["entries"]
+    mine = {e.get("caseNumber") for e in entries if e.get("caseNumber")}
+
+    leaked = mine & theirs
+    assert not leaked, "מספרי תיק של משרד אחר דלפו ליומן: %s" % leaked

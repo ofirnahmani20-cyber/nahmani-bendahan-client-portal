@@ -428,16 +428,31 @@ window.DsDashboard = (function () {
     return d.dayLabel(iso) + ' ' + d.clockOf(iso);
   }
 
-  /** מספר התיק וסוג התביעה מגיעים מרשימת התיקים שכבר נטענה.
-      תשובת האודיט נושאת caseId ושם לקוח, אך לא מספר תיק -
-      ולכן זהו חיבור בצד הלקוח על נתונים שכבר בידינו, ולא
-      קריאה נוספת ולא ניחוש. */
+  /** מספר התיק וסוג התביעה.
+
+      מ-27.09 הם מגיעים מהשרת בתשובת האודיט עצמה. קודם הם
+      חוברו כאן מול רשימת התיקים שכבר נטענה, וזה עבד רק
+      לתיקים שברשימה: שורת אודיט של תיק סגור, או של תיק
+      מעבר לחלון הטעינה, הוצגה בלי מספר ובלי סוג תביעה.
+
+      החיבור המקומי נשאר כנפילה-לאחור בלבד, למקרה שהשדות
+      חסרים - למשל דפדפן שהחזיק גרסה ישנה של הקובץ בזיכרון
+      המטמון. */
   function caseOf(id) {
     if (!id) return null;
     for (var i = 0; i < caseIndex.length; i++) {
       if (caseIndex[i].id === id) return caseIndex[i];
     }
     return null;
+  }
+
+  /** מאחד את שני המקורות: השרת קודם, הרשימה המקומית אחריו. */
+  function caseInfo(e) {
+    var local = caseOf(e.caseId);
+    return {
+      caseNumber: e.caseNumber || (local && local.caseNumber) || '',
+      claimType:  e.claimType  || (local && local.claimType)  || ''
+    };
   }
 
   function paintActivity(log) {
@@ -476,7 +491,7 @@ window.DsDashboard = (function () {
         מי ביצע · מתי
       לחיצה פותחת את התיק בלשונית המתאימה, כשיש caseId. */
   function activityRow(e) {
-    var c = caseOf(e.caseId);
+    var c = caseInfo(e);
     var li = d.el('li', 'ds-ev');
 
     var box = e.caseId ? d.el('button', 'ds-ev-in ds-ev-go') : d.el('div', 'ds-ev-in');
@@ -489,8 +504,8 @@ window.DsDashboard = (function () {
 
     var where = d.el('p', 'ds-ev-where');
     if (e.client) where.appendChild(d.el('span', null, e.client));
-    if (c && c.caseNumber) where.appendChild(d.el('span', 'ds-num', c.caseNumber));
-    if (c && c.claimType) where.appendChild(d.el('span', null, c.claimType));
+    if (c.caseNumber) where.appendChild(d.el('span', 'ds-num', c.caseNumber));
+    if (c.claimType) where.appendChild(d.el('span', null, c.claimType));
     if (where.childNodes.length) box.appendChild(where);
 
     var who = d.el('p', 'ds-ev-who');

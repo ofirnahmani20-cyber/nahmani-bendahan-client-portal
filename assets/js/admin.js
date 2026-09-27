@@ -507,6 +507,10 @@
            הוא ההקשר; שם איש הצוות אחריו, כשיש. */
         var who = [];
         if (entry.client) who.push(entry.client);
+        /* מספר התיק מגיע מהשרת מ-27.09. בלעדיו שורה כמו
+           "נשלחה הודעה ללקוח" הצריכה לזכור בעל פה באיזה תיק
+           מדובר, כשללקוח יש יותר מאחד. */
+        if (entry.caseNumber) who.push(entry.caseNumber);
         if (entry.actor)  who.push(entry.actor);
         body.appendChild(el('p', 'item-note', who.join(' · ') || 'המערכת'));
         li.appendChild(body);

@@ -439,6 +439,8 @@ def audit_log(request: Request, case_id: str | None = None,
             cur.execute(
                 """select a.action, a.entity_type, a.created_at, a.metadata,
                           a.case_id,
+                          coalesce(c.case_number, '') as case_number,
+                          coalesce(ct.name, '') as claim_type,
                           coalesce(cl.full_name, '') as client_name,
                           coalesce(u.full_name, '') as actor_name
                      from audit_log a
@@ -448,6 +450,7 @@ def audit_log(request: Request, case_id: str | None = None,
                                      and c.firm_id = a.firm_id
                      left join clients cl on cl.id = c.client_id
                                         and cl.firm_id = a.firm_id
+                     left join claim_types ct on ct.id = c.claim_type_id
                     where a.firm_id = %s and a.case_id = %s
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, case_id, limit),
@@ -456,6 +459,8 @@ def audit_log(request: Request, case_id: str | None = None,
             cur.execute(
                 """select a.action, a.entity_type, a.created_at, a.metadata,
                           a.case_id,
+                          coalesce(c.case_number, '') as case_number,
+                          coalesce(ct.name, '') as claim_type,
                           coalesce(cl.full_name, '') as client_name,
                           coalesce(u.full_name, '') as actor_name
                      from audit_log a
@@ -465,6 +470,7 @@ def audit_log(request: Request, case_id: str | None = None,
                                      and c.firm_id = a.firm_id
                      left join clients cl on cl.id = c.client_id
                                         and cl.firm_id = a.firm_id
+                     left join claim_types ct on ct.id = c.claim_type_id
                     where a.firm_id = %s
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, limit),
@@ -473,13 +479,21 @@ def audit_log(request: Request, case_id: str | None = None,
     # caseId ו-client נוספו כדי שיומן כלל-המשרד יוכל לומר על מי
     # מדובר. עד כה שורה כמו "הלקוח העלה מסמך" לא אמרה איזה לקוח,
     # ולכן היומן היה כמעט חסר ערך מחוץ להקשר של תיק בודד.
+    #
+    # caseNumber ו-claimType נוספו ב-27.09. עד אז הדשבורד חיבר את
+    # מספר התיק בצד הלקוח, מול רשימת התיקים שכבר נטענה - ולכן שורת
+    # אודיט של תיק שאינו ברשימה (סגור, או מעבר לחלון הטעינה) הוצגה
+    # בלי מספר. החיבור עבר לשרת, שם הוא תמיד נכון.
+    #
     # תוספת קריאה בלבד: אין שדה חדש במסד, הסינון לפי firm_id לא
-    # השתנה, ושתי ההצטרפויות נושאות את אותו firm_id.
+    # השתנה, ושלוש ההצטרפויות נושאות את אותו firm_id.
     return {"entries": [{
         "action": r["action"],
         "actor": r["actor_name"],
         "client": r["client_name"],
         "caseId": str(r["case_id"]) if r["case_id"] else None,
+        "caseNumber": r["case_number"],
+        "claimType": r["claim_type"],
         "entity": r["entity_type"],
         "at": r["created_at"].isoformat(),
         "metadata": r["metadata"],

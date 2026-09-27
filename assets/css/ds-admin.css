@@ -684,3 +684,41 @@ body.admin .ds-col-side .block > h2 {
 /* שני הטורים בדוחות מתחלקים כמו בדשבורד, אבל בלי המרווח
    האנכי העצום של הפיד - כאן זה מקטע אחד בכל צד. */
 body.admin #view-reports .ds-col-side > * + * { margin-top: var(--ds-space-20); }
+
+/* ==========================================================
+   10. הפוטר של מסך הכניסה לצוות
+   ----------------------------------------------------------
+   🔴 תקלה חיה, והמופע החמישי של אותה מלכודת.
+
+   הפוטר מוצג רק לפני התחברות - admin.js:73 מסתיר אותו
+   ברגע שהזהות מאומתת - ולכן הוא המשטח הראשון שאיש צוות
+   רואה, ולא משטח שולי.
+
+   הוא יושב על #2a2620. הכלל הגנרי שכתבתי בשלב 1,
+   body.admin h2 { color: var(--ds-ink) }, נחת עליו וצבע
+   את כותרות הטורים בדיו כהה: נמדד 1.09:1. "ניווט" ו"יצירת
+   קשר" היו בלתי נראים לגמרי.
+
+   admin.html אינו טוען את ds-front.css, ולכן התיקון שנעשה
+   שם לפוטר של הפרונט מעולם לא הגיע לכאן. זה בדיוק מצב
+   הביניים שההגירה הייתה אמורה לסגור.
+
+   הכלל נכתב על ההקשר (.sitefoot) ולא על האלמנט - אותו
+   לקח שנכשלתי בו כבר ארבע פעמים.
+   ========================================================== */
+
+body.admin .sitefoot .foot-col h2 {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-accent-on-dark);             /* 7.65:1 על #2a2620 */
+}
+body.admin .sitefoot .foot-col a,
+body.admin .sitefoot .foot-col p,
+body.admin .sitefoot-legal {
+  color: var(--ds-on-dark-dim);                /* 9.33:1 */
+}
+body.admin .sitefoot .foot-col a:hover { color: var(--ds-on-dark); }   /* 12.33:1 */
+body.admin .sitefoot .logo-wm b { color: var(--ds-on-dark); }
+body.admin .sitefoot .logo-wm i { color: var(--ds-accent-on-dark); }
+body.admin .sitefoot-legal { border-top-color: #574d40; }
