@@ -549,22 +549,16 @@ body.admin .view > .view-title + .lead {
   border-bottom: var(--ds-hairline-w) solid var(--ds-hairline);
 }
 
-/* ---- מצב ריק מנוסח ----
-   אזור שטרם נבנה אינו אמור להיראות כמו אזור שנשבר. הקו
-   המקווקו אומר "כאן עוד אין תוכן", ולא "משהו השתבש".
+/* מצב הריק המנוסח הוסר ב-27.09.
 
-   הכלל מכוון ל-.item-note שהוא הילד היחיד של .block - זו
-   החתימה של ארבעת מצבי הריק, ואינה קיימת באזורים מלאים. */
-body.admin .view > .block > .item-note:only-child {
-  margin: 0;
-  border: 1px dashed var(--ds-hairline);
-  border-radius: var(--ds-radius-card);
-  padding: var(--ds-space-24);
-  font-size: var(--ds-size-body);
-  line-height: var(--ds-lh-body);
-  color: var(--ds-ink-soft);                   /* 7.59:1 על לבן */
-  max-width: var(--ds-measure);
-}
+   הוא כוון ל-.item-note שהוא הילד היחיד של .block - החתימה
+   של ארבעת האזורים שהציגו "ייבנה בשלב ו'". שלושתם נבנו
+   בשלב ו' והרביעי בשלב ד', ולכן אין יותר אף התאמה. נבדק
+   על הרינדור החי: אפס.
+
+   מצבי הריק של האזורים החדשים מנוסחים בתוך הרשימות עצמן
+   (li.item-note) ולא כפסקה בודדת, וההסבר "מה אין ולמה"
+   קיבל מחלקה משלו - .catalog-gap. */
 
 /* ---- ניהול משימות: "דורש טיפול" ----
    הכרטיס והפס כבר מוגדרים למעלה. כאן הקצב שבתוכו. */
