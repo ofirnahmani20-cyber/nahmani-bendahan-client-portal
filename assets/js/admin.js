@@ -180,6 +180,7 @@
     if (name === 'dashboard') return DsDashboard.load();
     if (name === 'cases')   return showList();
     if (name === 'tasks')   return loadAttention();
+    if (name === 'documents') return loadBinder();
     if (name === 'reports') return renderLog(null, 'firmLogList');
     return Promise.resolve();
   }
@@ -327,6 +328,7 @@
     'office.decision_recorded':  'נרשמה החלטה',
     'office.message_sent':       'נשלח עדכון',
     'office.case_viewed':        'צפייה בתיק',
+    'office.file_downloaded':    'הצוות פתח קובץ',
     'office.ai_invoked':         'הופעל ניתוח',
     'client.file_uploaded':      'הלקוח העלה מסמך',
     'client.document_replied':   'הלקוח הגיב',
@@ -1431,6 +1433,169 @@
            { tag: 'tag-wait', mark: '?', text: value || 'לא ידוע' };
   }
 
+  /* ================= קלסר המסמכים =================
+     מבט רוחבי על כל מסמכי המשרד, חוצה תיקים.
+
+     עד כה מסמך היה נגיש דרך התיק בלבד, ולכן השאלה "מה
+     ממתין לבדיקה השבוע" חייבה לפתוח תיקים אחד אחד - ובפועל
+     איש לא שאל אותה.
+
+     המונים מגיעים מהשרת ולא מספירה של הדף שהוחזר. אחרת
+     השבב היה אומר "8 ממתינים" כשיש 40 והרשימה נחתכה. */
+
+  var BINDER_LABEL = {
+    'pending_review': 'ממתינים לבדיקה',
+    'missing':        'הלקוח טרם העלה',
+    'rejected':       'נדחו',
+    'approved':       'אושרו',
+    'cancelled':      'דרישות שנסגרו'
+  };
+  var BINDER_ORDER = ['pending_review', 'missing', 'rejected',
+                      'approved', 'cancelled'];
+
+  /* ברירת המחדל היא העבודה הפתוחה, ולא הכול. מסמך שאושר
+     אינו משימה, והוא מסתיר את מה שכן. */
+  var binderFilter = 'pending_review';
+
+  function loadBinder() {
+    var list  = $('binderList');
+    var intro = $('binderIntro');
+    if (!list) return Promise.resolve();
+
+    list.textContent = '';
+    list.appendChild(el('li', 'item-note', 'טוען...'));
+
+    return Api.officeDocuments(binderFilter, 300).then(function (data) {
+      renderBinderChips(data.counts, data.total);
+      renderBinderList(data, list, intro);
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את הקלסר.'));
+    });
+  }
+
+  function renderBinderChips(counts, total) {
+    var wrap = $('binderChips');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    /* "הכול" ראשון, ואז מצב אחד לכל שבב. אפס נשאר לחיץ
+       אבל שקט - הוא אומר "אין כאן כלום", לא "אין כזה דבר". */
+    addBinderChip(wrap, '', 'הכול', total);
+    BINDER_ORDER.forEach(function (st) {
+      addBinderChip(wrap, st, BINDER_LABEL[st], counts[st] || 0);
+    });
+  }
+
+  function addBinderChip(wrap, value, label, n) {
+    var on  = binderFilter === value;
+    var b   = el('button', 'chip' + (n ? '' : ' chip-zero'));
+    b.type  = 'button';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.appendChild(el('span', null, label));
+    b.appendChild(el('span', 'chip-n', String(n)));
+    b.addEventListener('click', function () {
+      if (binderFilter === value) return;
+      binderFilter = value;
+      loadBinder();
+    });
+    wrap.appendChild(b);
+  }
+
+  function renderBinderList(data, list, intro) {
+    var docs = data.documents;
+
+    if (intro) {
+      intro.textContent = !docs.length
+        ? 'אין מסמכים במצב הזה.'
+        : (docs.length === 1 ? 'מסמך אחד' : docs.length + ' מסמכים') +
+          (data.truncated ? ' (מוצגים הראשונים)' : '') + '.';
+    }
+
+    list.textContent = '';
+    if (!docs.length) {
+      list.appendChild(el('li', 'item-note',
+        'אין מסמכים במצב הזה. אפשר לעבור לשבב אחר.'));
+      return;
+    }
+
+    docs.forEach(function (doc) { list.appendChild(binderRow(doc)); });
+  }
+
+  /** שורת מסמך בקלסר.
+      שלוש רמות: מה המסמך · של מי ובאיזה תיק · מה אפשר לעשות. */
+  function binderRow(doc) {
+    var s  = reviewStatus(doc.status);
+    var li = el('li', 'binder-row');
+
+    var tag = el('span', 'tag ' + s.tag);
+    tag.appendChild(el('span', null, s.mark, true));
+    tag.appendChild(document.createTextNode(s.text));
+    li.appendChild(tag);
+
+    li.appendChild(el('h3', 'binder-name',
+      doc.name + (doc.required ? '' : ' (לא חובה)')));
+
+    var who = el('p', 'binder-who');
+    who.appendChild(el('span', null, doc.clientName));
+    who.appendChild(el('span', 'num', doc.caseNumber));
+    if (doc.claimType) who.appendChild(el('span', null, doc.claimType));
+    li.appendChild(who);
+
+    if (doc.status === 'rejected' && doc.rejectReason) {
+      li.appendChild(el('p', 'reject-note',
+        'סיבת הדחייה שנמסרה ללקוח: ' + doc.rejectReason));
+    }
+
+    var acts = el('div', 'binder-acts');
+    if (doc.file) acts.appendChild(fileLink(doc.id, doc.file));
+
+    /* פתיחת התיק בלשונית המסמכים. שם יושבים כפתורי האישור
+       והדחייה - הם לא משוכפלים לכאן, כדי שלא יהיו שני
+       מקומות שמבצעים את אותה פעולה. */
+    var go = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק ←');
+    go.type = 'button';
+    go.setAttribute('aria-label', 'פתיחת התיק ' + doc.caseNumber +
+                                  ' בלשונית המסמכים');
+    go.addEventListener('click', function () { openCase(doc.caseId, 'docs'); });
+    acts.appendChild(go);
+
+    li.appendChild(acts);
+    return li;
+  }
+
+  /** קישור לקובץ, או אמירה מפורשת למה אי אפשר לפתוח אותו.
+
+      סריקה שטרם הסתיימה אינה כישלון ואינה הדבקה, ושלושתם
+      אינם אותו מצב. שורה שאומרת רק "לא זמין" שולחת את הצוות
+      לנחש. */
+  function fileLink(documentId, f) {
+    if (f.ready) {
+      var a = el('a', 'btn btn-outline btn-sm', 'פתיחת הקובץ');
+      a.href = Api.officeFileUrl(documentId, f.id);
+      a.setAttribute('download', f.name || '');
+      a.setAttribute('aria-label', 'הורדת הקובץ ' + (f.name || 'שהלקוח העלה'));
+      return a;
+    }
+    var why = f.scan === 'infected'
+      ? 'הקובץ נמצא נגוע בסריקה ואינו ניתן לפתיחה.'
+      : f.scan === 'failed'
+        ? 'סריקת האבטחה נכשלה. הקובץ אינו ניתן לפתיחה.'
+        : 'הקובץ ממתין לסריקת אבטחה ויהיה זמין בסיומה.';
+    return el('span', 'file-blocked', why);
+  }
+
+
+  /** גודל קובץ בשפה של אדם. */
+  function fileSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' בייט';
+    var kb = bytes / 1024;
+    if (kb < 1024) return Math.round(kb) + ' KB';
+    return (Math.round(kb / 102.4) / 10) + ' MB';
+  }
+
   function renderReview(file) {
     // מה שממתין לבדיקה קודם - זו העבודה הפתוחה של הצוות
     var order = { 'pending_review': 0, 'rejected': 1, 'missing': 2,
@@ -1459,10 +1624,21 @@
       li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
       li.appendChild(el('p', 'item-note', doc.note));
 
-      if (doc.file) {
-        li.appendChild(el('span', 'file-name',
-          'הקובץ שהלקוח העלה: ' + doc.file + ' · ' + formatDate(doc.date)));
-      }
+      /* הקבצים שהלקוח העלה.
+
+         עד 27.09 השורה כאן בדקה doc.file - שדה שהשרת מעולם
+         לא החזיר. כלומר עורך הדין התבקש לאשר או לדחות מסמך
+         בלי לראות את שם הקובץ ובלי שום דרך לפתוח אותו.
+         הביקורת הייתה עיוורת. */
+      (doc.files || []).forEach(function (f) {
+        var row = el('div', 'doc-file');
+        var name = el('span', 'file-name', f.name || 'קובץ ללא שם');
+        row.appendChild(name);
+        if (f.at) row.appendChild(el('span', 'file-when num', formatDate(f.at)));
+        if (f.size) row.appendChild(el('span', 'file-size', fileSize(f.size)));
+        row.appendChild(fileLink(doc.id, f));
+        li.appendChild(row);
+      });
       if (doc.status === 'rejected' && doc.rejectReason) {
         li.appendChild(el('p', 'reject-note', 'סיבת הדחייה שנמסרה ללקוח: ' + doc.rejectReason));
       }

@@ -8,12 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260927073517">
-<link rel="stylesheet" href="assets/css/style.css?v=20260927073517">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260927073517">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260927073517">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927073517">
-<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927073517">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260927081448">
+<link rel="stylesheet" href="assets/css/style.css?v=20260927081448">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260927081448">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260927081448">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927081448">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927081448">
 </head>
 <body class="admin">
 
@@ -381,15 +381,18 @@
         </div>
       </div>
 
-      <!-- ---- מסמכים ---- -->
+      <!-- ---- מסמכים: הקלסר ----
+           מבט רוחבי על כל מסמכי המשרד. עד כה מסמך היה נגיש
+           דרך התיק בלבד, ולכן "מה ממתין לבדיקה השבוע" חייב
+           לפתוח תיקים אחד אחד. -->
       <div class="view" id="view-documents" hidden>
         <h1 class="view-title" tabindex="-1">מסמכים</h1>
-        <p class="lead">מבט רוחבי על מסמכי המשרד.</p>
+        <p class="lead" id="binderIntro">מבט רוחבי על מסמכי המשרד.</p>
+
         <div class="block">
-          <p class="item-note">
-            הקלסר נבנה בשלב ד'. מסמכי תיק בודד זמינים כבר עכשיו
-            בתוך התיק, בלשונית "מסמכי התיק".
-          </p>
+          <div class="chips" id="binderChips" role="group"
+               aria-label="סינון לפי מצב המסמך"></div>
+          <ul class="plain-list doc-binder" id="binderList"></ul>
         </div>
       </div>
 
@@ -871,9 +874,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260927073517"></script>
-<script src="assets/js/viewnav.js?v=20260927073517"></script>
-<script src="assets/js/ds-dashboard.js?v=20260927073517"></script>
-<script src="assets/js/admin.js?v=20260927073517"></script>
+<script src="assets/js/api.js?v=20260927081448"></script>
+<script src="assets/js/viewnav.js?v=20260927081448"></script>
+<script src="assets/js/ds-dashboard.js?v=20260927081448"></script>
+<script src="assets/js/admin.js?v=20260927081448"></script>
 </body>
 </html>

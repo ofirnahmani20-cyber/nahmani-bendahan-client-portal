@@ -169,6 +169,21 @@
     /* limit נדרש כי כניסות למערכת נרשמות בתדירות גבוהה, ובלי
        חלון גדול מספיק הן דוחקות את הפעולות המשמעותיות מחוץ
        ל-N האחרונים. השרת מגביל ל-200 ממילא. */
+    /* קלסר המסמכים: מבט רוחבי, חוצה תיקים. */
+    officeDocuments: function (status, limit) {
+      var q = [];
+      if (status) q.push('status=' + encodeURIComponent(status));
+      if (limit)  q.push('limit=' + encodeURIComponent(limit));
+      return Api.get('/api/office/documents' + (q.length ? '?' + q.join('&') : ''));
+    },
+
+    /* כתובת הורדה, לא קריאה. הדפדפן ניגש אליה ישירות דרך
+       href, ולכן היא מחזירה מחרוזת ולא Promise. */
+    officeFileUrl: function (documentId, fileId) {
+      return '/api/office/documents/' + encodeURIComponent(documentId) +
+             '/files/' + encodeURIComponent(fileId);
+    },
+
     auditLog: function (caseId, limit) {
       var q = [];
       if (caseId) q.push('case_id=' + encodeURIComponent(caseId));

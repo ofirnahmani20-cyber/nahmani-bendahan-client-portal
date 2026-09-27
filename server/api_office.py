@@ -11,10 +11,10 @@ api_office.py - ממשק הניהול.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import audit
+from . import audit, scan, storage
 from .auth import require_csrf, require_staff
 from .db.pool import cursor
 
@@ -109,6 +109,38 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         )
         docs = cur.fetchall()
 
+        # ---- הקבצים שהלקוח העלה ----
+        # עד 27.09 תשובת התיק לא נשאה אותם כלל. admin.js בדק
+        # doc.file, השדה מעולם לא הגיע, ולכן עורך הדין התבקש
+        # לאשר או לדחות מסמך בלי לראות את שם הקובץ ובלי שום
+        # דרך לפתוח אותו. הביקורת הייתה עיוורת.
+        #
+        # is_current בלבד: גרסה שהוחלפה נשמרת במסד ואינה נמחקת,
+        # אבל היא אינה מה שעומד לבדיקה.
+        cur.execute(
+            """select f.id, f.document_id, f.original_filename, f.mime_type,
+                      f.size_bytes, f.scan_status, f.uploaded_at
+                 from document_files f
+                 join case_documents d on d.id = f.document_id
+                                      and d.firm_id = f.firm_id
+                where d.case_id = %s and f.firm_id = %s and f.is_current
+                order by f.uploaded_at desc""",
+            (case_id, identity.firm_id),
+        )
+        files_by_doc = {}
+        for f in cur.fetchall():
+            files_by_doc.setdefault(str(f["document_id"]), []).append({
+                "id": str(f["id"]),
+                "name": f["original_filename"],
+                "mime": f["mime_type"],
+                "size": f["size_bytes"],
+                # הצוות צריך לדעת למה קובץ אינו ניתן לפתיחה.
+                # "ממתין לסריקה" ו"נדבק" אינם אותו דבר.
+                "scan": f["scan_status"],
+                "ready": scan.downloadable(f["scan_status"]),
+                "at": f["uploaded_at"].isoformat() if f["uploaded_at"] else None,
+            })
+
         cur.execute(
             """select s.id, s.position, s.title
                  from stage_templates s where s.claim_type_id = %s
@@ -155,6 +187,7 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
             "id": str(d["id"]), "name": d["name"], "note": d["guidance"],
             "required": d["is_required"], "status": d["status"],
             "rejectReason": d["reject_reason"],
+            "files": files_by_doc.get(str(d["id"]), []),
         } for d in docs],
         "stageOptions": [{
             "id": str(s["id"]), "position": s["position"], "title": s["title"],
@@ -498,6 +531,171 @@ def audit_log(request: Request, case_id: str | None = None,
         "at": r["created_at"].isoformat(),
         "metadata": r["metadata"],
     } for r in rows]}
+
+
+# ================================================================
+#  הורדת קובץ בצד המשרד
+#
+#  הצד הלקוחי החזיק נקודת הורדה מאז שלב ד' של ההעלאות; הצד
+#  המשרדי מעולם לא. כלומר עורך הדין ראה "ממתין לבדיקה" ולחץ
+#  "אישור" או "דחייה" בלי לפתוח את הקובץ - כי לא הייתה דרך.
+#
+#  אותן שתי בדיקות של הצד הלקוחי, ובאותו סדר: בעלות ואז
+#  סטטוס סריקה. ההבדל היחיד הוא מי הבעלים - כאן firm_id של
+#  הסשן, ושם client_id.
+# ================================================================
+
+@router.get("/api/office/documents/{document_id}/files/{file_id}")
+def office_download_file(document_id: str, file_id: str, request: Request,
+                         identity=Depends(require_staff)):
+    with cursor() as cur:
+        cur.execute(
+            """select f.storage_key, f.original_filename, f.mime_type,
+                      f.scan_status, d.case_id
+                 from document_files f
+                 join case_documents d on d.id = f.document_id
+                                      and d.firm_id = f.firm_id
+                where f.id = %s and f.document_id = %s and f.firm_id = %s""",
+            (file_id, document_id, identity.firm_id),
+        )
+        row = cur.fetchone()
+
+    # 404 ולא 403 על קובץ של משרד אחר: תשובה שמבדילה ביניהם
+    # מאשרת שהמזהה קיים.
+    if row is None:
+        raise HTTPException(status_code=404, detail="הקובץ לא נמצא.")
+
+    if not scan.downloadable(row["scan_status"]):
+        # 409 ולא 403: ההרשאה תקינה, הקובץ פשוט עדיין לא נסרק.
+        raise HTTPException(
+            status_code=409,
+            detail="הקובץ טרם עבר סריקת אבטחה ואינו זמין להורדה.",
+        )
+
+    # מי מהצוות פתח איזה קובץ ומתי. זו בדיוק השאלה שיומן
+    # ביקורת אמור לענות עליה.
+    audit.record(identity, "office.file_downloaded", entity_type="document",
+                 entity_id=document_id, case_id=str(row["case_id"]),
+                 request=request)
+
+    return Response(
+        content=storage.read(row["storage_key"]),
+        media_type=row["mime_type"],
+        headers={
+            # attachment + nosniff: הדפדפן לא ינחש סוג ולא יריץ
+            # תוכן שהועלה כאילו הוא חלק מהאתר.
+            "Content-Disposition": 'attachment; filename="%s"'
+                                   % row["original_filename"],
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+# ================================================================
+#  קלסר המסמכים - מבט רוחבי על כל מסמכי המשרד
+#
+#  עד כה מסמך היה נגיש דרך התיק בלבד. השאלה "מה ממתין
+#  לבדיקה השבוע" חייבה לפתוח תיקים אחד אחד, ולכן בפועל
+#  איש לא שאל אותה.
+#
+#  המונים מגיעים מאותה שאילתה ולא מחישוב בדפדפן, כדי
+#  שהשבבים והרשימה לא יוכלו לסתור זה את זה.
+# ================================================================
+
+DOC_STATUSES = ["pending_review", "missing", "rejected", "approved", "cancelled"]
+
+# הסדר שבו מסמך נכנס לרשימה. מה שדורש פעולה מהמשרד קודם.
+_DOC_ORDER = """
+    case d.status when 'pending_review' then 0
+                  when 'rejected'       then 1
+                  when 'missing'        then 2
+                  when 'approved'       then 3
+                  else 4 end
+"""
+
+
+@router.get("/api/office/documents")
+def office_documents(request: Request, status: str | None = None,
+                     limit: int = 100, identity=Depends(require_staff)):
+    """
+    כל מסמכי המשרד, חוצה תיקים.
+
+    status  רשימה מופרדת בפסיקים. ריק = הכול.
+    limit   תקרה, עד 300.
+    """
+    limit = max(1, min(limit, 300))
+
+    wanted = [s for s in DOC_STATUSES]
+    if status:
+        asked = {x.strip() for x in status.split(",") if x.strip()}
+        wanted = [s for s in wanted if s in asked]
+    if not wanted:
+        return {"documents": [], "counts": {}, "total": 0, "truncated": False}
+
+    with cursor() as cur:
+        # המונים על כל המשרד ולא על הדף שהוחזר, אחרת השבב
+        # היה אומר "8 ממתינים" כשיש 40.
+        cur.execute(
+            """select d.status, count(*) as n
+                 from case_documents d
+                where d.firm_id = %s
+                group by d.status""",
+            (identity.firm_id,),
+        )
+        counts = {r["status"]: r["n"] for r in cur.fetchall()}
+
+        cur.execute(
+            """select d.id, d.name, d.status, d.is_required, d.reject_reason,
+                      d.case_id, c.case_number, c.status as case_status,
+                      cl.full_name as client_name,
+                      coalesce(ct.name, '') as claim_type,
+                      f.id as file_id, f.original_filename, f.scan_status,
+                      f.uploaded_at
+                 from case_documents d
+                 join cases c on c.id = d.case_id and c.firm_id = d.firm_id
+                 join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
+                 left join claim_types ct on ct.id = c.claim_type_id
+                 left join document_files f on f.document_id = d.id
+                                           and f.firm_id = d.firm_id
+                                           and f.is_current
+                where d.firm_id = %s and d.status = any(%s)
+                order by """ + _DOC_ORDER + """,
+                         f.uploaded_at desc nulls last,
+                         c.case_number, d.position
+                limit %s""",
+            (identity.firm_id, wanted, limit + 1),
+        )
+        rows = cur.fetchall()
+
+    truncated = len(rows) > limit
+    rows = rows[:limit]
+
+    return {
+        "documents": [{
+            "id": str(r["id"]),
+            "name": r["name"],
+            "status": r["status"],
+            "required": r["is_required"],
+            "rejectReason": r["reject_reason"],
+            "caseId": str(r["case_id"]),
+            "caseNumber": r["case_number"],
+            "caseStatus": r["case_status"],
+            "clientName": r["client_name"],
+            "claimType": r["claim_type"],
+            # קובץ נוכחי, אם הועלה. ready אומר אם מותר לפתוח
+            # אותו - סריקה שטרם הסתיימה אינה כישלון.
+            "file": ({
+                "id": str(r["file_id"]),
+                "name": r["original_filename"],
+                "scan": r["scan_status"],
+                "ready": scan.downloadable(r["scan_status"]),
+                "at": r["uploaded_at"].isoformat() if r["uploaded_at"] else None,
+            } if r["file_id"] else None),
+        } for r in rows],
+        "counts": {s: counts.get(s, 0) for s in DOC_STATUSES},
+        "total": sum(counts.values()),
+        "truncated": truncated,
+    }
 
 
 # ================================================================

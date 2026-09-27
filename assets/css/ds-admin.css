@@ -722,3 +722,80 @@ body.admin .sitefoot .foot-col a:hover { color: var(--ds-on-dark); }   /* 12.33:
 body.admin .sitefoot .logo-wm b { color: var(--ds-on-dark); }
 body.admin .sitefoot .logo-wm i { color: var(--ds-accent-on-dark); }
 body.admin .sitefoot-legal { border-top-color: #574d40; }
+
+/* ==========================================================
+   11. קלסר המסמכים, והקבצים בביקורת
+   ----------------------------------------------------------
+   שורת מסמך בקלסר אומרת שלושה דברים בשלוש רמות: מה המסמך,
+   של מי ובאיזה תיק, ומה אפשר לעשות אתו.
+
+   כפתורי האישור והדחייה אינם כאן במכוון - הם יושבים
+   בלשונית המסמכים של התיק, ושכפול שלהם היה יוצר שני
+   מקומות שמבצעים את אותה פעולה על אותה שורה.
+   ========================================================== */
+
+body.admin .doc-binder > li {
+  padding: var(--ds-space-16) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+  border-top: 0;
+}
+body.admin .doc-binder > li:last-child { border-bottom: 0; padding-bottom: 0; }
+
+body.admin .binder-name {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);                       /* 16.42:1 על לבן */
+  margin: var(--ds-space-4) 0 var(--ds-space-4);
+}
+body.admin .binder-who {
+  display: flex; flex-wrap: wrap;
+  gap: var(--ds-space-4) var(--ds-space-12);
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  margin: 0;
+}
+/* מפריד בין הפרטים, דקורטיבי בלבד */
+body.admin .binder-who > span + span::before {
+  content: "·";
+  margin-inline-end: var(--ds-space-12);
+  color: var(--ds-hairline);
+}
+body.admin .binder-acts {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--ds-space-8);
+  margin: var(--ds-space-12) 0 0;
+}
+
+/* ---- שורת קובץ בלשונית המסמכים של התיק ---- */
+body.admin .doc-file {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--ds-space-8) var(--ds-space-12);
+  margin: var(--ds-space-8) 0 0;
+  padding-inline-start: var(--ds-space-12);
+  border-inline-start: 2px solid var(--ds-hairline);
+}
+body.admin .file-name {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink);                       /* 16.42:1 */
+  overflow-wrap: anywhere;
+}
+body.admin .file-when,
+body.admin .file-size {
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+}
+
+/* קובץ שאי אפשר לפתוח אומר למה. סריקה שטרם הסתיימה, סריקה
+   שנכשלה והדבקה אינם אותו מצב, ושורה שאומרת רק "לא זמין"
+   שולחת את הצוות לנחש. */
+body.admin .file-blocked {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-risk);                      /* 9.82:1 על לבן */
+  border-top: 2px solid var(--ds-risk);
+  padding-top: var(--ds-space-4);
+}
+
+@media (max-width: 620px) {
+  body.admin .binder-acts .btn { flex: 1 1 auto; }
+}
