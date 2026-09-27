@@ -181,6 +181,9 @@
     if (name === 'cases')   return showList();
     if (name === 'tasks')   return loadAttention();
     if (name === 'documents') return loadBinder();
+    if (name === 'clients')   return loadClients();
+    if (name === 'settings')  return loadCatalogs();
+    if (name === 'closed')    return loadClosed();
     if (name === 'reports') return renderLog(null, 'firmLogList');
     return Promise.resolve();
   }
@@ -1432,6 +1435,310 @@
     return REVIEW_STATUS[value] ||
            { tag: 'tag-wait', mark: '?', text: value || 'לא ידוע' };
   }
+
+  /* ================= לקוחות =================
+     קריאה בלבד. תעודת הזהות אינה מוחזרת מהשרת כלל - היא
+     שמורה מוצפנת ומשמשת כמפתח ההתחברות של הלקוח, ואין לה
+     שום שימוש במסך רשימה. */
+
+  var clientQuery = '';
+  var clientTimer = null;
+
+  function loadClients() {
+    var list = $('clientList');
+    if (!list) return Promise.resolve();
+
+    return Api.officeClients(clientQuery).then(function (data) {
+      var rows  = data.clients;
+      var intro = $('clientsIntro');
+      if (intro) {
+        intro.textContent = !rows.length
+          ? (clientQuery ? 'אין לקוח שתואם את החיפוש.' : 'אין עדיין לקוחות במשרד.')
+          : (rows.length === 1 ? 'לקוח אחד' : rows.length + ' לקוחות') + '.';
+      }
+
+      list.textContent = '';
+      if (!rows.length) {
+        list.appendChild(el('li', 'item-note',
+          clientQuery ? 'אפשר לנקות את החיפוש כדי לראות את כולם.'
+                      : 'לקוח נוצר היום דרך פתיחת תיק.'));
+        return;
+      }
+      rows.forEach(function (c) { list.appendChild(clientRow(c)); });
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את רשימת הלקוחות.'));
+    });
+  }
+
+  /* חיפוש עם השהיה: הקלדה מלאה אינה שולחת בקשה לכל תו.
+
+     ההאזנה נרשמת בהגנה - #clientSearch הוא אלמנט חדש, ואם
+     הוא ייעלם מה-HTML בעתיד, הרישום ברמת המודול היה מפיל
+     את כל מה שמתחתיו ב-IIFE. */
+  var clientSearchBox = $('clientSearch');
+  if (clientSearchBox) {
+    clientSearchBox.addEventListener('input', function () {
+      var value = clientSearchBox.value.trim();
+      if (clientTimer) clearTimeout(clientTimer);
+      clientTimer = setTimeout(function () {
+        clientQuery = value.length >= 2 ? value : '';
+        loadClients();
+      }, 250);
+    });
+  }
+
+  function clientRow(c) {
+    var li = el('li', 'client-row');
+
+    li.appendChild(el('h3', 'client-name', c.name));
+
+    var meta = el('p', 'client-meta');
+    if (c.phone) meta.appendChild(el('span', 'num', c.phone));
+    if (c.email) meta.appendChild(el('span', null, c.email));
+    if (c.status !== 'active') meta.appendChild(el('span', 'client-off', 'מושבת'));
+    if (meta.childNodes.length) li.appendChild(meta);
+
+    /* שני מספרים ולא אחד: "שלושה תיקים" ו"אחד מהם פעיל"
+       הם שתי עובדות שונות, ואיחוד שלהן מסתיר את השנייה. */
+    var n = el('p', 'client-cases');
+    n.appendChild(el('span', null,
+      c.totalCases === 1 ? 'תיק אחד' : c.totalCases + ' תיקים'));
+    n.appendChild(el('span', null,
+      c.activeCases === 0 ? 'אין תיק פעיל'
+        : c.activeCases === 1 ? 'אחד פעיל' : c.activeCases + ' פעילים'));
+    li.appendChild(n);
+
+    return li;
+  }
+
+
+  /* ================= הקטלוגים =================
+     סוגי תביעה, מסלולי השלבים, קטלוג המסמכים וסוגי המשימות.
+
+     הם כבר מניעים התנהגות: המסלול קובע מה הלקוח רואה
+     ב"מפת ההליך", והקטלוג קובע מה נדרש ממנו. עד כה לא
+     הייתה שום דרך לראות אותם מהממשק, וכל שינוי חייב גישה
+     ישירה למסד. */
+
+  function loadCatalogs() {
+    var host = $('catalogBody');
+    if (!host) return Promise.resolve();
+
+    host.textContent = '';
+    host.appendChild(el('p', 'item-note', 'טוען...'));
+
+    return Api.officeCatalogs().then(function (data) {
+      host.textContent = '';
+
+      var intro = $('catalogIntro');
+      if (intro) {
+        intro.textContent = data.claimTypes.length +
+          ' סוגי תביעה · ' + data.taskTypes.length + ' סוגי משימה.';
+      }
+
+      data.claimTypes.forEach(function (t) {
+        host.appendChild(claimTypeBlock(t));
+      });
+
+      host.appendChild(taskTypesBlock(data.taskTypes));
+
+      if (!data.editable) host.appendChild(catalogGap());
+    }).catch(function (err) {
+      host.textContent = '';
+      host.appendChild(el('p', 'item-note',
+        err.message || 'לא הצלחנו לטעון את הקטלוגים.'));
+    });
+  }
+
+  function claimTypeBlock(t) {
+    var sec = el('section', 'block');
+
+    var head = el('div', 'catalog-head');
+    var h2 = el('h2', null, t.name);
+    head.appendChild(h2);
+    var meta = el('p', 'item-note');
+    meta.appendChild(el('span', null,
+      t.cases === 1 ? 'תיק אחד' : t.cases + ' תיקים'));
+    if (!t.active) meta.appendChild(el('span', 'client-off', 'לא פעיל'));
+    head.appendChild(meta);
+    sec.appendChild(head);
+
+    sec.appendChild(el('h3', null, 'מסלול השלבים'));
+    if (!t.stages.length) {
+      sec.appendChild(el('p', 'item-note', 'לא הוגדר מסלול לסוג הזה.'));
+    } else {
+      var ol = el('ol', 'catalog-stages');
+      t.stages.forEach(function (st) {
+        var li = el('li');
+        li.appendChild(el('span', 'catalog-n num', pad2(st.position)));
+        var body = el('div');
+        var title = el('p', 'catalog-title', st.title);
+        if (st.isTerminal) title.appendChild(el('span', 'catalog-flag', 'שלב סיום'));
+        body.appendChild(title);
+        if (st.desc) body.appendChild(el('p', 'item-note', st.desc));
+        li.appendChild(body);
+        ol.appendChild(li);
+      });
+      sec.appendChild(ol);
+    }
+
+    sec.appendChild(el('h3', null, 'קטלוג המסמכים'));
+    if (!t.documents.length) {
+      sec.appendChild(el('p', 'item-note',
+        'לא הוגדר קטלוג מסמכים לסוג הזה. תיק חדש ייפתח בלי דרישות.'));
+    } else {
+      var ul = el('ul', 'catalog-docs');
+      t.documents.forEach(function (d) {
+        var li = el('li');
+        li.appendChild(el('span', 'catalog-title',
+          d.name + (d.required ? '' : ' (לא חובה)')));
+        if (d.guidance) li.appendChild(el('span', 'item-note', d.guidance));
+        ul.appendChild(li);
+      });
+      sec.appendChild(ul);
+    }
+
+    return sec;
+  }
+
+  function taskTypesBlock(types) {
+    var sec = el('section', 'block');
+    sec.appendChild(el('h2', null, 'סוגי משימה'));
+    if (!types.length) {
+      sec.appendChild(el('p', 'item-note', 'לא הוגדרו סוגי משימה.'));
+      return sec;
+    }
+    var ul = el('ul', 'catalog-tasks');
+    types.forEach(function (t) {
+      var li = el('li');
+      li.appendChild(el('span', 'catalog-title', t.name));
+      if (!t.active) li.appendChild(el('span', 'client-off', 'לא פעיל'));
+      ul.appendChild(li);
+    });
+    sec.appendChild(ul);
+    return sec;
+  }
+
+  /** מה שאין: עריכה מהממשק. נאמר, ולא מוסתר מאחורי מסך
+      שנראה שלם. */
+  function catalogGap() {
+    var p = el('p', 'catalog-gap');
+    p.textContent = 'הקטלוגים מוצגים לקריאה בלבד. עריכה מהממשק ' +
+      'טרם נבנתה - שינוי משפיע על תיקים חיים, ולכן הוא דורש ' +
+      'החלטה על מה קורה לתיק שכבר רץ במסלול הישן. בינתיים ' +
+      'השינוי נעשה במסד.';
+    return p;
+  }
+
+
+  /* ================= תיקים שהושלמו =================
+     התוצאה מוצגת מההחלטה שכבר רשומה. שכר טרחה אינו קיים
+     במסד - אין טבלה, אין עמודה, ואין דרך לגזור אותו - ולכן
+     הוא נאמר כחסר ואינו מומצא. */
+
+  /* התוויות נגזרות מ-OUTCOMES ולא נכתבות מחדש. אוצר המילים
+     האמיתי הוא below-threshold / grant / pension / rejected -
+     אותו אחד שהסכמה אוכפת ושהטופס משתמש בו. מפה שנייה הייתה
+     יכולה להיפרד ממנו בשקט. */
+  function outcomeLabel(code) {
+    for (var i = 0; i < OUTCOMES.length; i++) {
+      if (OUTCOMES[i][0] === code) return OUTCOMES[i][1];
+    }
+    return 'התקבלה החלטה';
+  }
+
+  /* שני מצבי סגירה, והם נושאים את התוצאה גם בלי החלטה רשומה. */
+  var CLOSED_LABEL = {
+    'closed_accepted': 'הסתיים בקבלה',
+    'closed_rejected': 'הסתיים בדחייה'
+  };
+
+  function loadClosed() {
+    var list = $('closedList');
+    if (!list) return Promise.resolve();
+
+    return Api.officeClosedCases().then(function (data) {
+      var rows  = data.cases;
+      var intro = $('closedIntro');
+      if (intro) {
+        intro.textContent = !rows.length
+          ? 'אין עדיין תיק שהסתיים.'
+          : (rows.length === 1 ? 'תיק אחד הסתיים' : rows.length + ' תיקים הסתיימו') + '.';
+      }
+
+      list.textContent = '';
+      if (!rows.length) {
+        list.appendChild(el('li', 'item-note',
+          'תיק עובר למצב "סגור" כשהמשרד מסמן זאת. כרגע אין ' +
+          'במערכת נתיב לסגירת תיק מהממשק, ולכן הרשימה ריקה ' +
+          'גם אם בפועל הסתיימו תיקים.'));
+      } else {
+        rows.forEach(function (c) { list.appendChild(closedRow(c)); });
+      }
+
+      renderFeesGap(data.feesAvailable);
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את התיקים שהושלמו.'));
+    });
+  }
+
+  function closedRow(c) {
+    var li = el('li', 'closed-row');
+
+    li.appendChild(el('h3', 'closed-name', c.clientName));
+
+    var meta = el('p', 'closed-meta');
+    meta.appendChild(el('span', 'num', c.caseNumber));
+    if (c.claimType) meta.appendChild(el('span', null, c.claimType));
+    /* הסטטוס נאמר גם כשיש החלטה: הוא התשובה לשאלה "איך
+       התיק נסגר", וההחלטה היא התשובה ל"מה נקבע". */
+    if (CLOSED_LABEL[c.status]) {
+      meta.appendChild(el('span', 'closed-how', CLOSED_LABEL[c.status]));
+    }
+    li.appendChild(meta);
+
+    if (c.decision) {
+      var d = el('p', 'closed-outcome');
+      d.appendChild(el('span', null, outcomeLabel(c.decision.outcome)));
+      if (c.decision.percent != null) {
+        d.appendChild(el('span', 'num', c.decision.percent + '%'));
+      }
+      if (c.decision.permanent) d.appendChild(el('span', null, 'נכות קבועה'));
+      d.appendChild(el('span', 'num', formatDate(c.decision.date)));
+      li.appendChild(d);
+    } else {
+      li.appendChild(el('p', 'item-note',
+        'התיק סגור אך לא נרשמה לו החלטה.'));
+    }
+
+    var go = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק ←');
+    go.type = 'button';
+    go.setAttribute('aria-label', 'פתיחת התיק ' + c.caseNumber);
+    go.addEventListener('click', function () { openCase(c.id, 'state'); });
+    li.appendChild(go);
+
+    return li;
+  }
+
+  function renderFeesGap(available) {
+    var host = $('feesGap');
+    if (!host) return;
+    host.textContent = '';
+    if (available) return;
+
+    host.appendChild(el('h2', null, 'שכר טרחה'));
+    host.appendChild(el('p', 'catalog-gap',
+      'אין במערכת מודל שכר טרחה. לא טבלה, לא עמודה, ואין נתון ' +
+      'קיים שאפשר לגזור ממנו סכום. המסך אינו מציג מספר משוער ' +
+      'במכוון - נתון כספי שגוי גרוע מנתון חסר. הוספת המודל ' +
+      'דורשת החלטה על שיטת החישוב, על מע"מ ועל מה קורה בתיק ' +
+      'שנדחה.'));
+  }
+
 
   /* ================= קלסר המסמכים =================
      מבט רוחבי על כל מסמכי המשרד, חוצה תיקים.

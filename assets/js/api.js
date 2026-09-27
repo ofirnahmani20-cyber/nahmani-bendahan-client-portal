@@ -169,6 +169,16 @@
     /* limit נדרש כי כניסות למערכת נרשמות בתדירות גבוהה, ובלי
        חלון גדול מספיק הן דוחקות את הפעולות המשמעותיות מחוץ
        ל-N האחרונים. השרת מגביל ל-200 ממילא. */
+    /* שלב ו': לקוחות, קטלוגים ותיקים שהושלמו. קריאה בלבד. */
+    officeClients: function (q) {
+      return Api.get('/api/office/clients' +
+                     (q ? '?q=' + encodeURIComponent(q) : ''));
+    },
+    officeCatalogs: function () { return Api.get('/api/office/catalogs'); },
+    /* /closed-cases ולא /cases/closed: הנתיב השני נתפס על ידי
+       /api/office/cases/{case_id} שרשום לפניו. */
+    officeClosedCases: function () { return Api.get('/api/office/closed-cases'); },
+
     /* קלסר המסמכים: מבט רוחבי, חוצה תיקים. */
     officeDocuments: function (status, limit) {
       var q = [];

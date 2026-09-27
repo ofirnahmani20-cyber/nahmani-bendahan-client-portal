@@ -799,3 +799,154 @@ body.admin .file-blocked {
 @media (max-width: 620px) {
   body.admin .binder-acts .btn { flex: 1 1 auto; }
 }
+
+
+/* ==========================================================
+   12. שלב ו' - לקוחות, קטלוגים ותיקים שהושלמו
+   ----------------------------------------------------------
+   שלושת האזורים האחרונים שהציגו "ייבנה בשלב ו'". כולם
+   קריאה בלבד, ולכן אין בהם אף פקד שנראה כמו עריכה.
+
+   הכלל שחוזר בשלושתם: מה שאין - נאמר, במסגרת מקווקוות,
+   בניסוח שמסביר גם למה. מסך שנראה שלם ואינו שלם גרוע
+   ממסך שאומר את האמת.
+   ========================================================== */
+
+/* ---- רשימת הלקוחות ---- */
+body.admin .client-list > li,
+body.admin .closed-list > li {
+  padding: var(--ds-space-16) 0;
+  border-top: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .client-list > li:last-child,
+body.admin .closed-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
+
+body.admin .client-name,
+body.admin .closed-name {
+  font-family: var(--ds-serif);
+  font-size: clamp(16px, 1.2vw, 19px);
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-ink);                       /* 16.42:1 על לבן */
+  margin: 0 0 var(--ds-space-4);
+}
+
+body.admin .client-meta,
+body.admin .closed-meta,
+body.admin .client-cases,
+body.admin .closed-outcome {
+  display: flex; flex-wrap: wrap;
+  gap: var(--ds-space-4) var(--ds-space-12);
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  margin: 0;
+}
+body.admin .client-cases { margin-top: var(--ds-space-4); }
+body.admin .closed-outcome {
+  margin-top: var(--ds-space-4);
+  color: var(--ds-ink);                       /* 16.42:1 */
+}
+/* מפריד דקורטיבי בין הפרטים */
+body.admin .client-meta > span + span::before,
+body.admin .closed-meta > span + span::before,
+body.admin .client-cases > span + span::before,
+body.admin .closed-outcome > span + span::before {
+  content: "·";
+  margin-inline-end: var(--ds-space-12);
+  color: var(--ds-hairline);
+}
+body.admin .client-off {
+  color: var(--ds-risk);                      /* 9.82:1 על לבן */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .closed-row .btn { margin-top: var(--ds-space-12); }
+
+/* ---- הקטלוגים ---- */
+body.admin .catalog-head {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-4) var(--ds-space-16);
+  margin: 0 0 var(--ds-space-16);
+  padding-bottom: var(--ds-space-12);
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .catalog-head h2 { margin: 0; }
+body.admin .catalog-head .item-note {
+  display: flex; gap: var(--ds-space-12);
+  margin: 0;
+}
+
+body.admin #view-settings .block > h3 {
+  font-size: var(--ds-size-meta);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  margin: var(--ds-space-20) 0 var(--ds-space-8);
+}
+body.admin #view-settings .block > h3:first-of-type { margin-top: 0; }
+
+body.admin .catalog-stages,
+body.admin .catalog-docs,
+body.admin .catalog-tasks { list-style: none; margin: 0; padding: 0; }
+
+body.admin .catalog-stages > li {
+  display: flex; gap: var(--ds-space-12);
+  padding: var(--ds-space-8) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .catalog-stages > li:last-child { border-bottom: 0; }
+body.admin .catalog-n {
+  flex: 0 0 auto;
+  font-family: var(--ds-serif);
+  font-size: var(--ds-size-body);
+  font-weight: var(--ds-weight-bold);
+  color: var(--ds-accent-ink);                /* 6.79:1 על לבן */
+}
+body.admin .catalog-title {
+  font-size: var(--ds-size-body);
+  color: var(--ds-ink);
+  margin: 0;
+}
+/* שלב שבו תיק יכול להסתיים באופן לגיטימי. בלי הסימון,
+   "הסתיים בשלב 6" נראה כמו תיק תקוע. */
+body.admin .catalog-flag {
+  margin-inline-start: var(--ds-space-8);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-done);                      /* 7.50:1 על לבן */
+  border-top: 2px solid var(--ds-done);
+  padding-top: 2px;
+}
+
+body.admin .catalog-docs > li,
+body.admin .catalog-tasks > li {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--ds-space-4) var(--ds-space-12);
+  padding: var(--ds-space-8) 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .catalog-docs > li:last-child,
+body.admin .catalog-tasks > li:last-child { border-bottom: 0; }
+
+/* ---- מה שאין, ולמה ----
+   אותה חתימה של מצב ריק: מסגרת מקווקוות, לא רחיצה של
+   אזהרה. זה אינו כשל - זה גבול מוצהר. */
+body.admin .catalog-gap {
+  border: 1px dashed var(--ds-hairline);
+  border-radius: var(--ds-radius-card);
+  padding: var(--ds-space-16);
+  margin: var(--ds-space-16) 0 0;
+  font-size: var(--ds-size-meta);
+  line-height: var(--ds-lh-body);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  max-width: var(--ds-measure);
+}
+
+@media (prefers-contrast: more) {
+  body.admin .catalog-gap { border-color: var(--ds-ink-soft); }
+}
+
+/* איך התיק נסגר, לצד מה שנקבע בו. שני דברים שונים. */
+body.admin .closed-how {
+  color: var(--ds-ink);
+  font-weight: var(--ds-weight-medium);
+}

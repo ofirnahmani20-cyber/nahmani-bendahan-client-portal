@@ -8,12 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260927081448">
-<link rel="stylesheet" href="assets/css/style.css?v=20260927081448">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260927081448">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260927081448">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927081448">
-<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927081448">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260927083447">
+<link rel="stylesheet" href="assets/css/style.css?v=20260927083447">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260927083447">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260927083447">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927083447">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927083447">
 </head>
 <body class="admin">
 
@@ -369,16 +369,17 @@
         </div>
       </div>
 
-      <!-- ---- תיקים שהושלמו ושכר טרחה ---- -->
+      <!-- ---- תיקים שהושלמו ----
+           התוצאה מוצגת מההחלטה שכבר רשומה. שכר טרחה אינו
+           קיים במסד - אין טבלה, אין עמודה, ואין דרך לגזור
+           אותו מנתון קיים - ולכן הוא נאמר כחסר ואינו מומצא. -->
       <div class="view" id="view-closed" hidden>
-        <h1 class="view-title" tabindex="-1">תיקים שהושלמו ושכר טרחה</h1>
-        <p class="lead">תוצאת ההליך והמצב הכספי של כל תיק שהסתיים.</p>
+        <h1 class="view-title" tabindex="-1">תיקים שהושלמו</h1>
+        <p class="lead" id="closedIntro">תוצאת ההליך של כל תיק שהסתיים.</p>
         <div class="block">
-          <p class="item-note">
-            האזור הזה דורש מנגנון סגירת תיק ומודל תוצאה ושכר טרחה,
-            והוא ייבנה בשלב ו'. כרגע אין במערכת נתיב לסגירת תיק.
-          </p>
+          <ul class="plain-list closed-list" id="closedList"></ul>
         </div>
+        <div class="block" id="feesGap"></div>
       </div>
 
       <!-- ---- מסמכים: הקלסר ----
@@ -396,15 +397,21 @@
         </div>
       </div>
 
-      <!-- ---- לקוחות ---- -->
+      <!-- ---- לקוחות ----
+           קריאה בלבד. יצירה ועריכה כותבות תעודת זהות - שדה
+           מוצפן שמשמש גם כמפתח ההתחברות של הלקוח - וזו
+           החלטת מוצר ולא רק נקודת קצה. -->
       <div class="view" id="view-clients" hidden>
         <h1 class="view-title" tabindex="-1">לקוחות</h1>
-        <p class="lead">רשימת הלקוחות של המשרד.</p>
+        <p class="lead" id="clientsIntro">רשימת הלקוחות של המשרד.</p>
+
         <div class="block">
-          <p class="item-note">
-            ניהול לקוחות דורש נקודות קצה שטרם נבנו (יצירה, עריכה
-            ושינוי טלפון). נכנס בשלב ו'.
-          </p>
+          <div class="field">
+            <label for="clientSearch">חיפוש לפי שם או טלפון</label>
+            <input type="search" id="clientSearch" autocomplete="off"
+                   placeholder="שתי אותיות ומעלה">
+          </div>
+          <ul class="plain-list client-list" id="clientList"></ul>
         </div>
       </div>
 
@@ -443,16 +450,15 @@
         </div>
       </div>
 
-      <!-- ---- הגדרות ---- -->
+      <!-- ---- הגדרות: הקטלוגים ----
+           הם כבר מניעים את המערכת - מסלול השלבים קובע מה
+           הלקוח רואה ב"מפת ההליך", וקטלוג המסמכים קובע מה
+           נדרש ממנו. עד כה לא הייתה שום דרך לראות אותם
+           מהממשק. קודם רואים, אחר כך עורכים. -->
       <div class="view" id="view-settings" hidden>
         <h1 class="view-title" tabindex="-1">הגדרות</h1>
-        <p class="lead">קטלוגים והגדרות המשרד.</p>
-        <div class="block">
-          <p class="item-note">
-            עריכת סוגי תביעה, מסלולי שלבים, קטלוג המסמכים וסוגי
-            המשימות - כולם יושבים כבר במסד וייחשפו כאן בשלב ו'.
-          </p>
-        </div>
+        <p class="lead" id="catalogIntro">הקטלוגים שמניעים את המערכת.</p>
+        <div id="catalogBody"></div>
       </div>
 
     </div>
@@ -874,9 +880,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260927081448"></script>
-<script src="assets/js/viewnav.js?v=20260927081448"></script>
-<script src="assets/js/ds-dashboard.js?v=20260927081448"></script>
-<script src="assets/js/admin.js?v=20260927081448"></script>
+<script src="assets/js/api.js?v=20260927083447"></script>
+<script src="assets/js/viewnav.js?v=20260927083447"></script>
+<script src="assets/js/ds-dashboard.js?v=20260927083447"></script>
+<script src="assets/js/admin.js?v=20260927083447"></script>
 </body>
 </html>

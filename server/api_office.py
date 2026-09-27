@@ -699,6 +699,227 @@ def office_documents(request: Request, status: str | None = None,
 
 
 # ================================================================
+#  שלב ו' - לקוחות, קטלוגים ותיקים שהושלמו
+#
+#  שלושת האזורים האחרונים שהציגו "ייבנה בשלב ו'". כולם
+#  קריאה בלבד: אין כאן יצירה, עריכה או מחיקה.
+#
+#  למה קריאה בלבד, ובמפורש
+#  ------------------------
+#  יצירת לקוח כותבת תעודת זהות - שדה מוצפן שמשמש גם כמפתח
+#  ההתחברות. עריכת קטלוג משנה את המסלול של תיקים חיים.
+#  שתי הפעולות דורשות החלטת מוצר ולא רק נקודת קצה, ולכן
+#  הן אינן כאן. מה שכן קיים היום נחשף, ומה שאין - נאמר.
+# ================================================================
+
+@router.get("/api/office/clients")
+def office_clients(request: Request, q: str | None = None,
+                   identity=Depends(require_staff)):
+    """
+    לקוחות המשרד, עם ספירת התיקים של כל אחד.
+
+    תעודת הזהות אינה מוחזרת בשום צורה. היא שמורה מוצפנת
+    ומשמשת כמפתח ההתחברות של הלקוח, ואין לה שום שימוש
+    במסך רשימה.
+    """
+    like = None
+    if q and len(q.strip()) >= 2:
+        raw = q.strip()
+        safe = raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = "%" + safe + "%"
+
+    with cursor() as cur:
+        cur.execute(
+            """select cl.id, cl.full_name, cl.phone, cl.email, cl.status,
+                      cl.created_at,
+                      count(c.id) filter (where c.status = 'active') as active_cases,
+                      count(c.id) as total_cases,
+                      max(c.opened_at) as last_opened
+                 from clients cl
+                 left join cases c on c.client_id = cl.id
+                                  and c.firm_id = cl.firm_id
+                where cl.firm_id = %(firm)s
+                  -- ::text מפורש: בלי הטלת הטיפוס postgres
+                  -- אינו יכול להסיק את סוג הפרמטר כשהוא null,
+                  -- והשאילתה נופלת ב-AmbiguousParameter.
+                  and (%(like)s::text is null
+                       or cl.full_name ilike %(like)s::text escape '\\'
+                       or coalesce(cl.phone, '') ilike %(like)s::text escape '\\')
+                group by cl.id, cl.full_name, cl.phone, cl.email,
+                         cl.status, cl.created_at
+                order by cl.full_name""",
+            {"firm": identity.firm_id, "like": like},
+        )
+        rows = cur.fetchall()
+
+    return {"clients": [{
+        "id": str(r["id"]),
+        "name": r["full_name"],
+        "phone": r["phone"],
+        "email": r["email"],
+        "status": r["status"],
+        "activeCases": r["active_cases"],
+        "totalCases": r["total_cases"],
+        "lastOpened": r["last_opened"].isoformat() if r["last_opened"] else None,
+    } for r in rows]}
+
+
+@router.get("/api/office/catalogs")
+def office_catalogs(request: Request, identity=Depends(require_staff)):
+    """
+    הקטלוגים שמניעים את המערכת: סוגי תביעה, מסלולי השלבים,
+    קטלוג המסמכים וסוגי המשימות.
+
+    כולם כבר יושבים במסד ומניעים התנהגות - מסלול השלבים
+    קובע מה הלקוח רואה ב"מפת ההליך", וקטלוג המסמכים קובע
+    מה נדרש ממנו. עד כה לא הייתה שום דרך לראות אותם מהממשק,
+    וכל שינוי חייב גישה ישירה למסד.
+
+    החשיפה כאן היא הצעד הראשון: קודם רואים, אחר כך עורכים.
+    """
+    with cursor() as cur:
+        cur.execute(
+            """select id, name, code, is_active, position
+                 from claim_types where firm_id = %s
+                order by position, name""",
+            (identity.firm_id,),
+        )
+        types = cur.fetchall()
+
+        cur.execute(
+            """select id, claim_type_id, position, title, description,
+                      is_terminal, typical_duration_days
+                 from stage_templates where firm_id = %s
+                order by claim_type_id, position""",
+            (identity.firm_id,),
+        )
+        stages = cur.fetchall()
+
+        cur.execute(
+            """select id, claim_type_id, name, guidance, is_required, position
+                 from required_document_templates where firm_id = %s
+                order by claim_type_id, position""",
+            (identity.firm_id,),
+        )
+        docs = cur.fetchall()
+
+        cur.execute(
+            """select id, name, code, is_active, position
+                 from task_types where firm_id = %s
+                order by position, name""",
+            (identity.firm_id,),
+        )
+        tasks = cur.fetchall()
+
+        # כמה תיקים חיים תלויים בכל סוג. זה מה שהופך את
+        # המסך לשימושי: עריכה של מסלול אינה שאלה תיאורטית
+        # כשיש עליו 40 תיקים פתוחים.
+        cur.execute(
+            """select claim_type_id, count(*) as n
+                 from cases where firm_id = %s group by claim_type_id""",
+            (identity.firm_id,),
+        )
+        case_counts = {str(r["claim_type_id"]): r["n"] for r in cur.fetchall()}
+
+    by_type_stages = {}
+    for s in stages:
+        by_type_stages.setdefault(str(s["claim_type_id"]), []).append({
+            "id": str(s["id"]), "position": s["position"], "title": s["title"],
+            "desc": s["description"], "isTerminal": s["is_terminal"],
+            "days": s["typical_duration_days"],
+        })
+
+    by_type_docs = {}
+    for d in docs:
+        by_type_docs.setdefault(str(d["claim_type_id"]), []).append({
+            "id": str(d["id"]), "name": d["name"], "guidance": d["guidance"],
+            "required": d["is_required"], "position": d["position"],
+        })
+
+    return {
+        "claimTypes": [{
+            "id": str(t["id"]), "name": t["name"], "code": t["code"],
+            "active": t["is_active"], "position": t["position"],
+            "cases": case_counts.get(str(t["id"]), 0),
+            "stages": by_type_stages.get(str(t["id"]), []),
+            "documents": by_type_docs.get(str(t["id"]), []),
+        } for t in types],
+        "taskTypes": [{
+            "id": str(t["id"]), "name": t["name"], "code": t["code"],
+            "active": t["is_active"], "position": t["position"],
+        } for t in tasks],
+        # מה שאין, ונאמר במפורש במקום להשאיר מסך שנראה שלם:
+        # עריכה מהממשק טרם נבנתה.
+        "editable": False,
+    }
+
+
+# הנתיב הוא /closed-cases ולא /cases/closed במכוון:
+# /api/office/cases/{case_id} רשום לפניו, ולכן "closed"
+# היה נתפס כמזהה תיק ונופל על המרת uuid.
+@router.get("/api/office/closed-cases")
+def office_closed_cases(request: Request, identity=Depends(require_staff)):
+    """
+    תיקים שהושלמו.
+
+    מה שקיים: סטטוס התיק, ההחלטה האחרונה (תאריך, תוצאה,
+    אחוזים, קביעות) ומשך ההליך.
+
+    שני מצבי סגירה ולא אחד: closed_accepted ו-closed_rejected.
+    הסכמה מחזיקה את התוצאה בסטטוס עצמו, ולכן תיק שנסגר בלי
+    שנרשמה לו החלטה עדיין אומר משהו.
+
+    מה שאין במסד, ולכן אינו מוצג ואינו מומצא: שכר טרחה,
+    מודל גבייה, חשבוניות ותשלומים. אין טבלה, אין עמודה,
+    ואין דרך לגזור אותם מנתון קיים. התשובה מצהירה על כך
+    ב-feesAvailable כדי שהממשק יאמר זאת ולא ימלא מספר.
+    """
+    with cursor() as cur:
+        cur.execute(
+            """select c.id, c.case_number, c.status, c.opened_at,
+                      cl.full_name as client_name,
+                      coalesce(ct.name, '') as claim_type,
+                      d.decided_at, d.outcome, d.percent, d.is_permanent
+                 from cases c
+                 join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
+                 left join claim_types ct on ct.id = c.claim_type_id
+                 left join lateral (
+                      select decided_at, outcome, percent, is_permanent
+                        from case_decisions
+                       where case_id = c.id and firm_id = c.firm_id
+                       order by decided_at desc, created_at desc
+                       limit 1
+                 ) d on true
+                where c.firm_id = %s
+                  and c.status in ('closed_accepted', 'closed_rejected')
+                order by d.decided_at desc nulls last, c.case_number""",
+            (identity.firm_id,),
+        )
+        rows = cur.fetchall()
+
+    return {
+        "cases": [{
+            "id": str(r["id"]),
+            "caseNumber": r["case_number"],
+            "clientName": r["client_name"],
+            "claimType": r["claim_type"],
+            # הסטטוס עצמו נושא את התוצאה: closed_accepted מול
+            # closed_rejected. זו אינה כפילות של ההחלטה - תיק
+            # יכול להיסגר בלי שנרשמה לו החלטה, ואז זה כל מה שיש.
+            "status": r["status"],
+            "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
+            "decision": ({
+                "date": r["decided_at"].isoformat(),
+                "outcome": r["outcome"],
+                "percent": r["percent"],
+                "permanent": r["is_permanent"],
+            } if r["decided_at"] else None),
+        } for r in rows],
+        "feesAvailable": False,
+    }
+
+
+# ================================================================
 #  משימות ומועדי גג
 #
 #  המיון והמדרגות אינם מחושבים כאן אלא בתצוגה case_task_urgency,
