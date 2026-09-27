@@ -534,6 +534,12 @@ def _one(cur, firm_id, number, spec, users, claims, task_types, stages):
     for kind, title, guidance, status, due, doc_i in spec.get("requirements", []):
         # kind='document' מחייב document_id לפי אילוץ בסכמה.
         doc_id = doc_ids[doc_i] if doc_i is not None else None
+        # שעה אמיתית ולא חצות. הטופס הוא datetime-local, כלומר
+        # המשתמש בוחר שעה בפועל, ותאריך שנשמר כחצות מציג במסך
+        # "בשעה 00:00" - נתון שאיש לא הזין. 17:00 הוא סוף יום
+        # העבודה, וזה מה ש"עד תאריך X" אומר למעשה.
+        due_at = (dt.datetime.combine(due, dt.time(17, 0)).astimezone()
+                  if due else None)
         done = status == "completed"
         cur.execute(
             """insert into case_requirements
@@ -541,7 +547,7 @@ def _one(cur, firm_id, number, spec, users, claims, task_types, stages):
                   document_id, completed_at, completed_by_user_id,
                   created_by_user_id)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning id""",
-            (firm_id, case_id, kind, title, guidance, due, status, doc_id,
+            (firm_id, case_id, kind, title, guidance, due_at, status, doc_id,
              hours(-48) if done else None, author if done else None, author))
         req_ids.append(cur.fetchone()["id"])
 

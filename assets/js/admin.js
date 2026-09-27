@@ -905,12 +905,136 @@
       ? r.deliveryCount + ' משלוחים · אחרון ' + stamp(r.lastDeliveryAt)
       : 'טרם נשלחה הודעה');
     if (r.activeReminders) bits.push('תזכורת פעילה');
+    /* מושהית נאמרת במפורש. "אין תזכורת" ו"יש תזכורת שאינה
+       רצה" נראו עד כה זהים, וההפרש ביניהם הוא אם הלקוח
+       נרדף בכלל. */
+    if (r.pausedReminders) bits.push(r.pausedReminders === 1
+      ? 'תזכורת מושהית' : r.pausedReminders + ' תזכורות מושהות');
     if (r.completedAt) bits.push('הושלמה ' + stamp(r.completedAt) +
                                  ' בידי ' + (r.completedBy || '-'));
     meta.textContent = bits.join(' · ');
     li.appendChild(meta);
 
+    if (r.deliveryCount || r.activeReminders || r.pausedReminders) {
+      li.appendChild(deliveryLog(r));
+    }
+
     if (!closed) li.appendChild(requirementActions(r));
+    return li;
+  }
+
+  /* ---- היסטוריית המשלוח ----
+     הנקודה /deliveries קיימת מאז שכבת המשלוח נבנתה, והיא
+     מחזירה גם ערוץ, גם סטטוס וגם את סיבת הכישלון - אבל שום
+     מסך לא קרא לה. השורה אמרה "5 משלוחים" ותו לא, ולכן
+     הודעה שלא הגיעה ללקוח הייתה בלתי נראית לחלוטין.
+
+     זו בדיוק המידע שעורך דין חייב: לא כמה פעמים שלחנו,
+     אלא אם זה הגיע.
+
+     נטען בפתיחה ולא מראש - חמש דרישות בתיק היו חמש קריאות
+     שאיש לא ביקש. */
+  var DELIVERY_STATUS = {
+    'queued':    { tag: 'tag-wait', mark: '○', text: 'בהמתנה' },
+    'sent':      { tag: 'tag-warn', mark: '→', text: 'נשלח' },
+    'delivered': { tag: 'tag-ok',   mark: '✓', text: 'נמסר' },
+    'failed':    { tag: 'tag-stop', mark: '✗', text: 'נכשל' },
+    'skipped':   { tag: 'tag-wait', mark: '–', text: 'דולג' }
+  };
+
+  function deliveryLog(r) {
+    var box  = el('details', 'delivery-log');
+    var head = el('summary', null, r.deliveryCount
+      ? 'היסטוריית המשלוח והתזכורות (' + r.deliveryCount + ')'
+      : 'התזכורות');
+    box.appendChild(head);
+
+    var body = el('div', 'delivery-body');
+    body.appendChild(el('p', 'item-note', 'טוען...'));
+    box.appendChild(body);
+
+    var loaded = false;
+    box.addEventListener('toggle', function () {
+      if (!box.open || loaded) return;
+      loaded = true;
+      Api.requirementDeliveries(r.id).then(function (data) {
+        body.textContent = '';
+        var rows  = data.deliveries || [];
+        var rules = data.reminders || [];
+
+        if (rules.length) {
+          body.appendChild(el('h4', 'delivery-head', 'תזכורות'));
+          var rl = el('ul', 'plain-list');
+          rules.forEach(function (x) { rl.appendChild(reminderRow(x)); });
+          body.appendChild(rl);
+        }
+
+        if (!rows.length) {
+          body.appendChild(el('p', 'item-note', 'טרם נשלחה הודעה בדרישה הזאת.'));
+          return;
+        }
+        body.appendChild(el('h4', 'delivery-head', 'משלוחים'));
+        var ul = el('ul', 'plain-list');
+        rows.forEach(function (d) { ul.appendChild(deliveryRow(d)); });
+        body.appendChild(ul);
+      }).catch(function (err) {
+        body.textContent = '';
+        body.appendChild(el('p', 'item-note',
+          err.message || 'לא הצלחנו לטעון את היסטוריית המשלוח.'));
+      });
+    });
+    return box;
+  }
+
+  /** שורת תזכורת.
+
+      תזכורת מושהית היא המצב שחייב להיראות: הצוות מניח
+      שהלקוח נרדף, ובפועל לא נשלח אליו דבר. עד כה השורה
+      אמרה "תזכורת פעילה" רק כשהייתה פעילה, ומושהית לא
+      הופיעה כלל - כלומר היא נראתה כאילו אין תזכורת. */
+  function reminderRow(x) {
+    var li = el('li', 'delivery-row' + (x.isPaused ? ' delivery-paused' : ''));
+
+    li.appendChild(statusTag(x.isPaused
+      ? { tag: 'tag-wait', mark: '⏸', text: 'מושהית' }
+      : { tag: 'tag-ok',   mark: '↻', text: 'פעילה' }));
+
+    li.appendChild(el('span', 'delivery-chan',
+      CHANNEL_LABEL[x.channel] || x.channel));
+    li.appendChild(el('span', 'delivery-when',
+      'כל ' + (x.everyDays === 1 ? 'יום' : x.everyDays + ' ימים') +
+      ' · בין ' + x.hoursFrom + ':00 ל-' + x.hoursTo + ':00'));
+
+    if (x.isPaused) {
+      li.appendChild(el('p', 'delivery-error',
+        'התזכורת מושהית. הלקוח אינו מקבל תזכורות בדרישה הזאת.'));
+    }
+    return li;
+  }
+
+  function deliveryRow(d) {
+    var st = DELIVERY_STATUS[d.status] ||
+             { tag: 'tag-wait', mark: '?', text: d.status || 'לא ידוע' };
+    var li = el('li', 'delivery-row' + (d.status === 'failed' ? ' delivery-failed' : ''));
+
+    li.appendChild(statusTag(st));
+    li.appendChild(el('span', 'delivery-chan',
+      CHANNEL_LABEL[d.channel] || d.channel));
+    if (d.to) li.appendChild(el('span', 'delivery-to num', d.to));
+
+    var when = d.sentAt || d.createdAt;
+    if (when) li.appendChild(el('span', 'delivery-when', stamp(when)));
+
+    /* ההסבר בשורה משלה. זה מה שאומר לצוות מה לעשות עכשיו -
+       מספר שגוי הוא פעולה אחרת ממספר שאינו בוואטסאפ.
+
+       אוכמנית רק לכישלון אמיתי. גם "דולג" נושא הסבר, אבל
+       הוא תוצאה תקינה ("הלקוח כבר קרא בפורטל"), וצביעה
+       שלו באדום הייתה קוראת לתשומת לב שאינה נדרשת. */
+    if (d.error) {
+      li.appendChild(el('p', d.status === 'failed'
+        ? 'delivery-error' : 'delivery-why', d.error));
+    }
     return li;
   }
 
@@ -1719,7 +1843,9 @@
     if (c.decision) {
       var d = el('p', 'closed-outcome');
       d.appendChild(el('span', null, outcomeLabel(c.decision.outcome)));
-      if (c.decision.percent != null) {
+      /* אחוזים רק כשיש להם מה לומר. בתביעה שנדחתה "0%" אינו
+         נתון אלא היעדר נתון, והוא קורא כאילו נקבע משהו. */
+      if (c.decision.percent != null && c.decision.outcome !== 'rejected') {
         d.appendChild(el('span', 'num', c.decision.percent + '%'));
       }
       if (c.decision.permanent) d.appendChild(el('span', null, 'נכות קבועה'));

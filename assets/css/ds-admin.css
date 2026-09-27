@@ -955,3 +955,79 @@ body.admin .case-frozen-tag {
   letter-spacing: var(--ds-ls-label);
   font-weight: var(--ds-weight-medium);
 }
+
+/* ==========================================================
+   13. היסטוריית משלוח ותזכורות
+   ----------------------------------------------------------
+   הנקודה /deliveries קיימת מאז שכבת המשלוח נבנתה, ושום מסך
+   לא קרא לה. השורה אמרה "5 משלוחים" ותו לא, ולכן הודעה
+   שלא הגיעה ללקוח - ותזכורת שמושהית - היו בלתי נראות.
+
+   מקופל כברירת מחדל: זו היסטוריה, לא מצב. מי שצריך אותה
+   פותח אותה, ומי שלא - רואה שורת דרישה נקייה.
+   ========================================================== */
+
+body.admin .delivery-log { margin: var(--ds-space-8) 0 0; }
+body.admin .delivery-log > summary {
+  display: inline-flex; align-items: center;
+  min-height: var(--ds-touch-min);
+  cursor: pointer; list-style: none;
+  font-size: var(--ds-size-meta);
+  color: var(--ds-accent-ink);                /* 6.79:1 על לבן */
+  text-decoration: underline; text-underline-offset: 4px;
+}
+body.admin .delivery-log > summary::-webkit-details-marker { display: none; }
+body.admin .delivery-log > summary:focus-visible {
+  outline: var(--ds-focus); outline-offset: var(--ds-focus-gap);
+}
+body.admin .delivery-body {
+  margin: var(--ds-space-8) 0 0;
+  padding-inline-start: var(--ds-space-16);
+  border-inline-start: 2px solid var(--ds-hairline);
+}
+body.admin .delivery-head {
+  font-family: var(--ds-sans);
+  font-size: var(--ds-size-label);
+  letter-spacing: var(--ds-ls-label);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  margin: var(--ds-space-12) 0 var(--ds-space-4);
+}
+body.admin .delivery-head:first-child { margin-top: 0; }
+
+body.admin .delivery-row {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--ds-space-4) var(--ds-space-12);
+  padding: var(--ds-space-8) 0;
+  border-top: 0;
+  border-bottom: var(--ds-hairline-w) solid var(--ds-card-border);
+}
+body.admin .delivery-row:last-child { border-bottom: 0; }
+body.admin .delivery-chan {
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink);                       /* 16.42:1 */
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .delivery-to,
+body.admin .delivery-when {
+  font-size: var(--ds-size-label);
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+}
+
+/* סיבת הכישלון, ושורת ההשהיה. שתיהן אומרות לצוות מה לעשות
+   עכשיו, ולכן הן שורה מלאה ולא פרט בשוליים. */
+body.admin .delivery-error {
+  flex: 1 1 100%;
+  margin: var(--ds-space-4) 0 0;
+  font-size: var(--ds-size-meta);
+  color: var(--ds-risk);                      /* 9.82:1 על לבן */
+}
+body.admin .delivery-paused .delivery-error { color: var(--ds-accent-ink); }
+
+/* הסבר שאינו כישלון - "דולג", למשל. הוא נושא מידע ולא
+   אזהרה, ולכן הוא שקט. */
+body.admin .delivery-why {
+  flex: 1 1 100%;
+  margin: var(--ds-space-4) 0 0;
+  font-size: var(--ds-size-meta);
+  color: var(--ds-ink-soft);                  /* 7.59:1 על לבן */
+}
