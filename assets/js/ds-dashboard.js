@@ -641,7 +641,7 @@ window.DsDashboard = (function () {
 
   var AREAS = [
     ['dashboard', 'דשבורד'], ['tasks', 'ניהול משימות'],
-    ['cases', 'התיקים בטיפולי'], ['closed', 'תיקים שהושלמו ושכר טרחה'],
+    ['cases', 'תיקי המשרד'], ['closed', 'תיקים שהושלמו ושכר טרחה'],
     ['documents', 'מסמכים'], ['clients', 'לקוחות'],
     ['reports', 'דוחות'], ['settings', 'הגדרות']
   ];

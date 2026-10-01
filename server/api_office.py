@@ -62,11 +62,22 @@ def list_cases(request: Request, identity=Depends(require_staff)):
     אמור להיעלם בשקט. הוא מסומן, ולא מוסתר.
 
     תיק סגור יצא מכאן והוא באזור "תיקים שהושלמו".
+
+    29.09: נוסף mine. עד כה המסך נקרא "התיקים בטיפולי"
+    והציג את כל תיקי המשרד בלי לומר מי אחראי על מה - כלומר
+    הכותרת הבטיחה דבר אחד והרשימה הראתה אחר.
     """
     with cursor() as cur:
         cur.execute(
             """select c.id, c.case_number, c.status, cl.full_name as client_name,
                       ct.name as claim_type, st.stage_position, st.stage_title,
+                      u.full_name as assignee,
+                      -- ההחלטה "שלי או של אחר" נעשית בשרת, שיודע מי
+                      -- שואל. החלופה הייתה להחזיר assigned_user_id
+                      -- ולהשוות בדפדפן - כלומר לחשוף מזהי משתמשים
+                      -- לכל קריאה, בשביל השוואה אחת.
+                      (c.assigned_user_id = %(me)s) as mine,
+                      (c.assigned_user_id is null) as unassigned,
                       (select count(*) from case_documents d
                         where d.case_id = c.id and d.status = 'pending_review')
                         as awaiting_review,
@@ -77,16 +88,28 @@ def list_cases(request: Request, identity=Depends(require_staff)):
                  join clients cl on cl.id = c.client_id
                  join claim_types ct on ct.id = c.claim_type_id
                  left join case_current_stage st on st.case_id = c.id
-                where c.firm_id = %s
+                 left join users u on u.id = c.assigned_user_id
+                                  and u.firm_id = c.firm_id
+                where c.firm_id = %(firm)s
                   and c.status in ('active', 'frozen')
-                order by c.status, c.opened_at desc""",
-            (identity.firm_id,),
+                -- התיקים שלי קודם. זה המסך שאיש הצוות פותח
+                -- בבוקר, והשאלה הראשונה שלו היא מה מוטל עליו.
+                -- nulls last חיוני: בפוסטגרס NULL = value הוא
+                -- NULL ולא false, ו-DESC מציב NULL ראשון. בלעדיו
+                -- דווקא התיקים שאינם משויכים לאיש קפצו לראש
+                -- הרשימה במקום התיקים שלי.
+                order by (c.assigned_user_id = %(me)s) desc nulls last,
+                         c.status, c.opened_at desc""",
+            {"firm": identity.firm_id, "me": identity.subject_id},
         )
         rows = cur.fetchall()
     return {"cases": [{
         "id": str(r["id"]), "caseNumber": r["case_number"],
         "clientName": r["client_name"], "claimType": r["claim_type"],
         "status": r["status"],
+        "assignee": r["assignee"],
+        "mine": bool(r["mine"]),
+        "unassigned": bool(r["unassigned"]),
         "currentStage": r["stage_position"], "stageTitle": r["stage_title"],
         "awaitingReview": r["awaiting_review"],
         "openForClient": r["open_for_client"],

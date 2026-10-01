@@ -68,6 +68,9 @@ def il_id(base8):
 # ------------------------------------------------------------------
 #  purpose = מה התיק הזה נועד להדגים. הוא נכתב גם כהערה בתיק
 #  עצמו (case_next_steps), כדי שמי שפותח אותו במסך יבין מיד.
+#
+#  lawyer = אינדקס ברשימה הממוינת לפי אימייל:
+#    0 = bendahan@   1 = nahmani@   None = בלי אחראי
 # ==================================================================
 
 CASES = [
@@ -425,7 +428,11 @@ CASES = [
 
 def _lookup(cur, firm_id):
     """מזהי העזר שכל התיקים נשענים עליהם."""
-    cur.execute("select id, email from users where firm_id = %s order by created_at",
+    # order by email ולא created_at: שני אנשי הצוות נוצרים
+    # באותה טרנזקציה ולכן created_at שלהם זהה עד לרמת
+    # המיקרו-שנייה. המיון היה שרירותי, ושיוך עורכי הדין
+    # בתיקי ההדגמה יכול היה להתהפך בין הרצה להרצה.
+    cur.execute("select id, email from users where firm_id = %s order by email",
                 (firm_id,))
     users = [(r["id"], r["email"]) for r in cur.fetchall()]
 

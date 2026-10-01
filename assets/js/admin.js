@@ -85,7 +85,7 @@
   var TOP_VIEWS = {
     dashboard: { el: 'view-dashboard', title: 'דשבורד' },
     tasks:     { el: 'view-tasks',     title: 'ניהול משימות' },
-    cases:     { el: 'view-cases',     title: 'התיקים בטיפולי' },
+    cases:     { el: 'view-cases',     title: 'תיקי המשרד' },
     closed:    { el: 'view-closed',    title: 'תיקים שהושלמו ושכר טרחה' },
     documents: { el: 'view-documents', title: 'מסמכים' },
     clients:   { el: 'view-clients',   title: 'לקוחות' },
@@ -610,6 +610,54 @@
 
   /* ================= רשימת התיקים ================= */
 
+  /* ---- סינון לפי אחראי ----
+     המסך נקרא עד 29.09 "התיקים בטיפולי" והציג את כל תיקי
+     המשרד. הכותרת תוקנה ל"תיקי המשרד", ו"שלי" הוא סינון
+     בתוכו - כי שתי השאלות אמיתיות: "מה מוטל עליי" ו"מה
+     קורה במשרד".
+
+     הסינון בצד הלקוח על רשימה שכבר נטענה, ולא קריאה
+     נוספת: שלושה עשר תיקים אינם מצדיקים סיבוב לשרת. */
+  var caseFilter = 'mine';
+
+  function caseInFilter(c) {
+    if (caseFilter === 'all')   return true;
+    if (caseFilter === 'mine')  return c.mine;
+    if (caseFilter === 'other') return !c.mine && !c.unassigned;
+    if (caseFilter === 'none')  return c.unassigned;
+    return true;
+  }
+
+  function renderCaseChips(cases) {
+    var wrap = $('caseChips');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    var n = {
+      all:   cases.length,
+      mine:  cases.filter(function (c) { return c.mine; }).length,
+      other: cases.filter(function (c) { return !c.mine && !c.unassigned; }).length,
+      none:  cases.filter(function (c) { return c.unassigned; }).length
+    };
+
+    [['mine', 'שלי'], ['other', 'של עורך דין אחר'],
+     ['none', 'לא שויכו'], ['all', 'כל תיקי המשרד']].forEach(function (pair) {
+      var key = pair[0];
+      var on  = caseFilter === key;
+      var b   = el('button', 'chip' + (n[key] ? '' : ' chip-zero'));
+      b.type  = 'button';
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.appendChild(el('span', null, pair[1]));
+      b.appendChild(el('span', 'chip-n', String(n[key])));
+      b.addEventListener('click', function () {
+        if (caseFilter === key) return;
+        caseFilter = key;
+        showList();
+      });
+      wrap.appendChild(b);
+    });
+  }
+
   function showList() {
     return Api.officeCases().then(function (data) {
       var cases   = data.cases;
@@ -629,12 +677,18 @@
         ? 'אין מסמכים שממתינים לבדיקה'
         : (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') +
           ' לבדיקת המשרד');
+      var shown = cases.filter(caseInFilter).length;
+      if (caseFilter !== 'all') {
+        parts.unshift(shown === 1 ? 'תיק אחד מוצג' : shown + ' תיקים מוצגים');
+      }
       $('listSummary').textContent = parts.join(' · ') + '.';
+
+      renderCaseChips(cases);
 
       var rows = $('caseRows');
       rows.textContent = '';
 
-      cases.forEach(function (c) {
+      cases.filter(caseInFilter).forEach(function (c) {
         var tr = document.createElement('tr');
 
         var who = document.createElement('td');
@@ -647,6 +701,21 @@
         tr.appendChild(who);
 
         tr.appendChild(cell(c.caseNumber, 'num'));
+
+        /* מי אחראי. "אני" ולא השם שלי - השם מופיע בסרגל
+           העליון, וחזרה עליו בכל שורה אינה מוסיפה דבר.
+           תיק בלי אחראי הוא המצב שדורש פעולה, ולכן הוא
+           נאמר במילים ולא מושאר ריק. */
+        var own = document.createElement('td');
+        if (c.mine) {
+          own.appendChild(el('span', 'own-mine', 'אני'));
+        } else if (c.unassigned) {
+          own.appendChild(el('span', 'own-none', 'לא שויך'));
+        } else {
+          own.appendChild(el('span', 'own-other', c.assignee || '-'));
+        }
+        tr.appendChild(own);
+
         tr.appendChild(cell(c.claimType));
 
         var stage = document.createElement('td');

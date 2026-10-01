@@ -349,3 +349,82 @@ def test_a_frozen_case_stays_in_the_working_list(api, temp_case):
         with cursor(commit=True) as cur:
             cur.execute("update cases set status = 'active' where id = %s",
                         (temp_case["case_id"],))
+
+# ================================================================
+#  6. "שלי" מול "של עורך דין אחר"
+# ================================================================
+
+def test_the_case_list_says_whose_case_it_is(api, temp_case):
+    """
+    29.09: המסך נקרא "התיקים בטיפולי" והציג את כל תיקי המשרד
+    בלי לומר מי אחראי על מה. הכותרת הבטיחה דבר אחד והטבלה
+    הראתה אחר.
+
+    ההחלטה "שלי או של אחר" נעשית בשרת, שיודע מי שואל.
+    החלופה הייתה להחזיר assigned_user_id ולהשוות בדפדפן -
+    כלומר לחשוף מזהי משתמשים בכל קריאה בשביל השוואה אחת.
+    """
+    staff_login(api)
+
+    with cursor() as cur:
+        cur.execute("""select id from users where lower(email) = lower(%s)""",
+                    (STAFF_EMAIL,))
+        me = cur.fetchone()["id"]
+        cur.execute("""select id, full_name from users
+                        where lower(email) <> lower(%s) limit 1""", (STAFF_EMAIL,))
+        other = cur.fetchone()
+
+    def row():
+        cases = api.get("/api/office/cases").json()["cases"]
+        return [c for c in cases if c["id"] == str(temp_case["case_id"])][0]
+
+    # שלי
+    with cursor(commit=True) as cur:
+        cur.execute("update cases set assigned_user_id = %s where id = %s",
+                    (me, temp_case["case_id"]))
+    r = row()
+    assert r["mine"] is True and r["unassigned"] is False
+
+    # של אחר
+    with cursor(commit=True) as cur:
+        cur.execute("update cases set assigned_user_id = %s where id = %s",
+                    (other["id"], temp_case["case_id"]))
+    r = row()
+    assert r["mine"] is False and r["unassigned"] is False
+    assert r["assignee"] == other["full_name"], (
+        "שם עורך הדין האחר אינו מוחזר - הטבלה לא תוכל לומר של מי התיק")
+
+    # לא שויך
+    with cursor(commit=True) as cur:
+        cur.execute("update cases set assigned_user_id = null where id = %s",
+                    (temp_case["case_id"],))
+    r = row()
+    assert r["mine"] is False and r["unassigned"] is True
+    assert r["assignee"] is None
+
+
+def test_my_cases_come_first(api, temp_case):
+    """
+    זה המסך שאיש הצוות פותח בבוקר, והשאלה הראשונה שלו היא
+    מה מוטל עליו.
+
+    הבדיקה נועלת גם את nulls last: בפוסטגרס NULL = value הוא
+    NULL ולא false, ו-DESC מציב NULL ראשון - כלומר בלי
+    ההוראה המפורשת דווקא התיקים שאינם משויכים לאיש היו
+    קופצים לראש.
+    """
+    staff_login(api)
+    cases = api.get("/api/office/cases").json()["cases"]
+    flags = [c["mine"] for c in cases]
+    assert flags == sorted(flags, reverse=True), (
+        "התיקים שלי אינם ראשונים ברשימה")
+
+
+def test_the_user_id_is_never_returned(api):
+    """
+    ההחלטה מגיעה כדגל בוליאני. מזהה המשתמש אינו נדרש
+    בדפדפן, ולכן הוא אינו יוצא.
+    """
+    staff_login(api)
+    body = api.get("/api/office/cases").text
+    assert "assignedUserId" not in body and "assigned_user_id" not in body

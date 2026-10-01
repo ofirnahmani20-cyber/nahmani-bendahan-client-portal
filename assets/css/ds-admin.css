@@ -1031,3 +1031,27 @@ body.admin .delivery-why {
   font-size: var(--ds-size-meta);
   color: var(--ds-ink-soft);                  /* 7.59:1 על לבן */
 }
+
+/* ---- עמודת האחראי ברשימת התיקים ----
+   שלושה מצבים, ושלושתם נאמרים במילים ולא בצבע בלבד:
+   "אני" · שם עורך הדין האחר · "לא שויך".
+
+   "לא שויך" הוא היחיד שדורש פעולה, ולכן הוא היחיד שמקבל
+   צבע - ברונזה, לא אוכמנית: זו תזכורת ולא כשל. */
+body.admin .own-mine {
+  font-weight: var(--ds-weight-medium);
+  color: var(--ds-ink);                       /* 16.42:1 על לבן */
+}
+body.admin .own-other {
+  color: var(--ds-ink-soft);                  /* 7.59:1 */
+  white-space: nowrap;
+}
+body.admin .own-none {
+  color: var(--ds-accent-ink);                /* 6.79:1 */
+  font-weight: var(--ds-weight-medium);
+  white-space: nowrap;
+}
+
+/* שבבי הסינון יושבים מעל הכרטיס ולא בתוכו - ראה ההערה
+   ב-admin.html: .table-block נושא overflow-x: auto. */
+body.admin #caseChips { margin: 0 0 var(--ds-space-16); }

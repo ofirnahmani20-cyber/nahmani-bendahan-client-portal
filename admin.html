@@ -8,12 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20260927161539">
-<link rel="stylesheet" href="assets/css/style.css?v=20260927161539">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260927161539">
-<link rel="stylesheet" href="assets/css/ds.css?v=20260927161539">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260927161539">
-<link rel="stylesheet" href="assets/css/ds-case.css?v=20260927161539">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20260930112131">
+<link rel="stylesheet" href="assets/css/style.css?v=20260930112131">
+<link rel="stylesheet" href="assets/css/admin.css?v=20260930112131">
+<link rel="stylesheet" href="assets/css/ds.css?v=20260930112131">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20260930112131">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20260930112131">
 </head>
 <body class="admin">
 
@@ -118,7 +118,7 @@
         <ul>
           <li><a href="#dashboard" data-view="dashboard">דשבורד</a></li>
           <li><a href="#tasks" data-view="tasks">ניהול משימות</a></li>
-          <li><a href="#cases" data-view="cases">התיקים בטיפולי</a></li>
+          <li><a href="#cases" data-view="cases">תיקי המשרד</a></li>
           <li><a href="#closed" data-view="closed">הושלמו ושכר טרחה</a></li>
           <li><a href="#documents" data-view="documents">מסמכים</a></li>
           <li><a href="#clients" data-view="clients">לקוחות</a></li>
@@ -193,7 +193,7 @@
     <ul class="drawer-list">
       <li><button type="button" class="drawer-link" data-view="dashboard"><span>דשבורד</span></button></li>
       <li><button type="button" class="drawer-link" data-view="tasks"><span>ניהול משימות</span></button></li>
-      <li><button type="button" class="drawer-link" data-view="cases"><span>התיקים בטיפולי</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="cases"><span>תיקי המשרד</span></button></li>
       <li><button type="button" class="drawer-link" data-view="closed"><span>תיקים שהושלמו ושכר טרחה</span></button></li>
       <li><button type="button" class="drawer-link" data-view="documents"><span>מסמכים</span></button></li>
       <li><button type="button" class="drawer-link" data-view="clients"><span>לקוחות</span></button></li>
@@ -345,10 +345,22 @@
         </div>
       </div>
 
-      <!-- ---- התיקים בטיפולי ---- -->
+      <!-- 29.09: הכותרת הייתה "התיקים בטיפולי" והרשימה הציגה
+           את כל תיקי המשרד בלי לומר מי אחראי על מה. הכותרת
+           הבטיחה דבר אחד והטבלה הראתה אחר.
+
+           עכשיו האזור הוא "תיקי המשרד", ו"בטיפולי" הוא סינון
+           בתוכו. עמודת האחראי אומרת בכל שורה של מי התיק. -->
       <div class="view" id="view-cases" hidden>
-        <h1 class="view-title" tabindex="-1">התיקים בטיפולי</h1>
+        <h1 class="view-title" tabindex="-1">תיקי המשרד</h1>
         <p class="lead" id="listSummary"></p>
+
+        <!-- השבבים מחוץ ל-.table-block במכוון: על הבלוק הזה
+             יש overflow-x: auto שמציל את הטבלה מגלישה, ושבב
+             שיושב בתוכו היה נגלל אופקית יחד איתה ונעלם מהמסך
+             בדיוק כשהטבלה רחבה - כלומר כשהסינון הכי נחוץ. -->
+        <div class="chips" id="caseChips" role="group"
+             aria-label="סינון לפי אחראי"></div>
 
         <div class="block table-block">
           <table class="cases">
@@ -357,6 +369,7 @@
               <tr>
                 <th scope="col">לקוח</th>
                 <th scope="col">תיק</th>
+                <th scope="col">אחראי</th>
                 <th scope="col">סוג התביעה</th>
                 <th scope="col">שלב נוכחי</th>
                 <th scope="col">ממתין לבדיקה</th>
@@ -880,9 +893,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260927161539"></script>
-<script src="assets/js/viewnav.js?v=20260927161539"></script>
-<script src="assets/js/ds-dashboard.js?v=20260927161539"></script>
-<script src="assets/js/admin.js?v=20260927161539"></script>
+<script src="assets/js/api.js?v=20260930112131"></script>
+<script src="assets/js/viewnav.js?v=20260930112131"></script>
+<script src="assets/js/ds-dashboard.js?v=20260930112131"></script>
+<script src="assets/js/admin.js?v=20260930112131"></script>
 </body>
 </html>
