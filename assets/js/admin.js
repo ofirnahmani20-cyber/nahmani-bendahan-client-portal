@@ -2225,6 +2225,16 @@
   };
   var kindsCache = null;
 
+  /* תפקיד הסימן, ולא רק האזור: ביטוי תומך בשורה 3 אינו "כותרת", וביטוי
+     כותרת באמצע שורה הוא אזכור. (נמצא בבדיקה החזותית של שלב 4.) */
+  function reasonRole(r) {
+    var role = (r.rule || '').split(':')[1];
+    if (role === 'title') return r.zone === 'header' ? 'כותרת' : 'אזכור, לא ככותרת';
+    if (role === 'negative') return 'ביטוי שולל';
+    if (role === 'number') return 'מספר טופס (תומך בלבד)';
+    return 'ביטוי תומך';
+  }
+
   function classificationPanel(doc, f) {
     var box = el('section', 'classify-panel');
     box.setAttribute('aria-label', 'סיווג אוטומטי של הקובץ ' + (f.name || ''));
@@ -2292,8 +2302,8 @@
         c.reasons.forEach(function (r) {
           list.appendChild(el('li', null,
             '"' + r.phrase + '" → ' + r.kindLabel +
+            ' · ' + reasonRole(r) +
             ' · עמוד ' + r.page + ', שורה ' + r.line +
-            ' · ' + (r.zone === 'header' ? 'כותרת' : 'גוף המסמך') +
             ' · משקל ' + (r.weight > 0 ? '+' : '') + r.weight +
             (r.approximate ? ' · התאמה חלקית (OCR)' : '')));
         });
@@ -3321,7 +3331,9 @@
   /** ממיר 2026-09-22 ל-22.09.2026 */
   function formatDate(iso) {
     if (!iso) return '';
-    var p = iso.split('-');
+    /* רק החלק של התאריך. זמן העלאת קובץ מגיע כחותמת ISO מלאה, ועד
+       2026-10-02 הוא הוצג כ-"02T13:12:22...+03:00.10.2026". */
+    var p = String(iso).slice(0, 10).split('-');
     return p[2] + '.' + p[1] + '.' + p[0];
   }
 

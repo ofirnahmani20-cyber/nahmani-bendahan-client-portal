@@ -1087,3 +1087,4 @@ body.admin .mismatch-warning {
   border-inline-start: 3px solid var(--ds-risk);
   color: var(--ds-risk);
 }
+body.admin .classify-actions select { max-width: 22rem; width: auto; flex: 0 1 22rem; }

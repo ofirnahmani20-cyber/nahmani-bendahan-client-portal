@@ -408,6 +408,36 @@ def test_review_actions_and_audit(api, classified):
                         order by id desc limit 1""")
         meta = cur.fetchone()["metadata"]
     assert set(meta) <= audit.SAFE_METADATA_KEYS and meta["decision"] == "reject"
+    assert "kind" not in meta, "קוד סוג רפואי ביומן שכל הצוות קורא"
+
+
+def test_audit_log_reader_without_medical_permission_sees_no_document_kind(api, classified):
+    """
+    ממצא סקירת האבטחה: היומן פתוח ל-require_staff, ואישור סיווג כתב אליו
+    קוד סוג ("psychiatric"). איש צוות בלי can_view_medical למד ממנו מידע רפואי.
+    """
+    login(api)
+    api.post(_url(classified) + "/review", json={"action": "choose", "kind": "psychiatric"},
+             headers={"X-CSRF-Token": api.cookies.get("portal_csrf")})
+    with cursor(commit=True) as cur:
+        cur.execute("update users set can_view_medical = false where email = %s",
+                    (OTHER_STAFF[0],))
+    try:
+        other = TestClient(app, client=LOCAL, base_url="http://127.0.0.1")
+        login(other, OTHER_STAFF)
+        with cursor() as cur:
+            cur.execute("select case_id from case_documents where id = %s",
+                        (classified["document_id"],))
+            case_id = cur.fetchone()["case_id"]
+        log = other.get("/api/office/audit-log?case_id=%s" % case_id)
+        assert log.status_code == 200
+        dump = json.dumps(log.json(), ensure_ascii=False)
+        for code in doc_taxonomy.ALL:
+            assert '"%s"' % code not in dump, "קוד סוג %s חשוף ביומן" % code
+    finally:
+        with cursor(commit=True) as cur:
+            cur.execute("update users set can_view_medical = true where email = %s",
+                        (OTHER_STAFF[0],))
 
 
 def test_confirm_is_refused_when_there_is_no_clear_suggestion(temp_case):

@@ -168,8 +168,11 @@ def review_classification(document_id: str, file_id: str, body: ClassificationRe
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    # בלי קוד הסוג. יומן הביקורת פתוח לכל הצוות (require_staff), וקוד
+    # כמו "psychiatric" הוא מידע רפואי. הסוג שאושר נשמר ב-
+    # document_classifications, מאחורי require_medical. (סקירת אבטחה, 2026-10-02.)
     audit.record(identity, "office.classification_reviewed", entity_type="document",
                  entity_id=document_id, case_id=str(row["case_id"]), request=request,
                  metadata={"file_id": str(file_id), "decision": body.action,
-                           "kind": chosen, "to_status": status})
+                           "to_status": status})
     return {"ok": True, "status": status, "confirmed": _kind_view(chosen)}

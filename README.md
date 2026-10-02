@@ -15,7 +15,7 @@
 | הצפנה במנוחה של קבצים | **implemented** — AES-256-GCM, מפתח נגזר לכל קובץ, מפתחות-על בקבצי סוד מחוץ לריפו ולמסד. נוהל DR: `docs/07` |
 | **הממשק בדפדפן** | ⚠️ **demo** — עדיין קורא ל-`data.js` ולא ל-API |
 | סריקת וירוסים | **implemented** — ClamAV (clamd). בלי `PORTAL_CLAMD_ADDR` קובץ נשאר `pending` ואינו נגיש |
-| עיבוד מסמכים — תשתית (Layer 2, שלב 2) | **implemented** — תור במסד, `server.worker`, sandbox עם תקרת זיכרון קשיחה, טבלאות מוצפנות, `can_view_medical`. **אין עדיין חילוץ טקסט/OCR** (שלב 3) |
+| עיבוד מסמכים (Layer 2, שלבים 2–4) | **implemented** — worker מבודד עם תקרת זיכרון, חילוץ טקסט ו-OCR (fast) מוצפנים ומקושרים לעמוד, וסיווג דטרמיניסטי עם אישור אנושי (`docs/09`). **סיווג אינו מאשר מסמך** |
 | שליחת SMS ל-OTP | ❌ **planned** — יש ממשק, אין ספק. ב-demo הקוד נכתב ללוג |
 | Object storage ו-signed URLs | ❌ **planned** — כרגע דיסק מקומי |
 | HTTPS ו-HSTS | ❌ **planned** |
