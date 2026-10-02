@@ -334,6 +334,8 @@
     'office.file_downloaded':    'הצוות פתח קובץ',
     'office.ai_invoked':         'הופעל ניתוח',
     'client.file_uploaded':      'הלקוח העלה מסמך',
+    'client.file_rejected':      'קובץ נחסם בסריקת אבטחה',
+    'system.file_rescanned':     'קובץ נסרק מחדש',
     'client.document_replied':   'הלקוח הגיב',
     'client.case_viewed':        'הלקוח צפה בתיק',
     'client.file_downloaded':    'הלקוח הוריד מסמך',

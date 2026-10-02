@@ -14,6 +14,28 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("PORTAL_ID_HMAC_KEY", "test-hmac-key-not-secret")
 os.environ.setdefault("PORTAL_ID_ENC_KEY", "TESTKEYTESTKEYTESTKEYTESTKEYTESTKEYTESTKEY0=")
 
+# אחסון ומפתחות-על של הבדיקות: תיקיות זמניות משלהן, ולא אלה של
+# סביבת הפיתוח. השמה ישירה ולא setdefault - .env של המפתח לא
+# יגבר, כי connect.py טוען אותו ב-setdefault אחרי השורות האלה.
+# בלי זה, קבצי בדיקה היו נשמרים ב-var/uploads מוצפנים במפתח
+# שנזרק בסוף הריצה.
+import shutil as _shutil
+import tempfile as _tempfile
+
+_TEST_ROOT = pathlib.Path(_tempfile.mkdtemp(prefix="nb-tests-"))
+os.environ["PORTAL_STORAGE_DIR"] = str(_TEST_ROOT / "uploads")
+os.environ["PORTAL_SECRETS_DIR"] = str(_TEST_ROOT / "secrets")
+# סורק אמיתי רק בבדיקות שמבקשות אותו במפורש.
+os.environ["PORTAL_CLAMD_ADDR"] = ""
+
+from server import crypto as _crypto  # noqa: E402
+
+_crypto.generate_keys(os.environ["PORTAL_SECRETS_DIR"])
+
+
+def pytest_sessionfinish(session, exitstatus):
+    _shutil.rmtree(_TEST_ROOT, ignore_errors=True)
+
 
 @pytest.fixture
 def client():

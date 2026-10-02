@@ -32,3 +32,13 @@ venv/
 .pgdata/
 
 # סודות. לעולם לא ב-git. (הכלל עצמו למעלה, תחת secrets/python.)
+# חבילת נאמנות ומפתחות-על - רשת ביטחון; מקומם לפי docs/07 הוא
+# מחוץ לריפו בכל מקרה.
+escrow*.json
+*_kek_v*
+
+# spike - קורפוס סינתטי ותוצרים נוצרים מחדש, לא נשמרים
+spikes/ocr/corpus/
+spikes/ocr/out/
+spikes/ocr/tessdata/
+spikes/ocr/.venv/

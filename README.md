@@ -11,9 +11,10 @@
 | הרשאות ובידוד בין לקוחות ובין משרדים | **implemented** — נאכף בשאילתה, מכוסה בבדיקות |
 | CSRF (double-submit + Origin) | **implemented** |
 | יומן ביקורת והיסטוריית שלבים | **implemented** |
-| העלאת קבצים (magic bytes, checksum, אחסון מחוץ ל-webroot) | **implemented** |
+| העלאת קבצים (magic bytes, checksum, אחסון מחוץ ל-webroot) | **implemented** — נקראת לזיכרון בלבד, בלי קובץ זמני |
+| הצפנה במנוחה של קבצים | **implemented** — AES-256-GCM, מפתח נגזר לכל קובץ, מפתחות-על בקבצי סוד מחוץ לריפו ולמסד. נוהל DR: `docs/07` |
 | **הממשק בדפדפן** | ⚠️ **demo** — עדיין קורא ל-`data.js` ולא ל-API |
-| סריקת וירוסים | ❌ **planned** — יש ממשק, אין מנוע. קובץ נשאר `pending` ואינו ניתן להורדה |
+| סריקת וירוסים | **implemented** — ClamAV (clamd). בלי `PORTAL_CLAMD_ADDR` קובץ נשאר `pending` ואינו נגיש |
 | שליחת SMS ל-OTP | ❌ **planned** — יש ממשק, אין ספק. ב-demo הקוד נכתב ללוג |
 | Object storage ו-signed URLs | ❌ **planned** — כרגע דיסק מקומי |
 | HTTPS ו-HSTS | ❌ **planned** |
@@ -30,8 +31,16 @@
 ```powershell
 .\scripts\pg-local.ps1 setup     # פעם אחת, ~330MB
 .\scripts\pg-local.ps1 start
-python -m server.db.keygen        # מדפיס מפתחות ל-.env
+python -m server.db.keygen        # מדפיס מפתחות ת"ז ל-.env
+python -m server.db.keygen init --dir $env:LOCALAPPDATA\nahmani-secrets   # מפתחות-על להצפנת קבצים
 python -m server.db.apply         # סכמה + נתוני הדגמה
+```
+
+### סורק קבצים (פיתוח)
+
+```powershell
+.\scripts\clamav-local.ps1 setup     # פעם אחת: ClamAV + חתימות (~500MB)
+.\scripts\clamav-local.ps1 start
 ```
 
 ### 2. משתני סביבה (`.env` בשורש, אינו נכנס ל-git)
@@ -44,6 +53,8 @@ python -m server.db.apply         # סכמה + נתוני הדגמה
 | `PORTAL_MODE` | לא | `demo` (ברירת מחדל) או `production` |
 | `ANTHROPIC_API_KEY` | לא | בלעדיו הניתוח המקצועי מושבת |
 | `PORTAL_STORAGE_DIR` | לא | ברירת מחדל: `var/uploads` |
+| `PORTAL_SECRETS_DIR` | כן, להעלאה | תיקיית מפתחות-העל (`files_kek_v1`…). מחוץ לריפו. בלעדיה העלאה מחזירה 503 |
+| `PORTAL_CLAMD_ADDR` | בייצור | `tcp://127.0.0.1:3310`. בלעדיו אין סריקה, וקבצים נשארים `pending` |
 | `PORTAL_ALLOWED_ORIGINS` | בייצור | רשימת מקורות מותרים ל-CSRF |
 
 ### 3. הרצה

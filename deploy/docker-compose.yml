@@ -1,0 +1,97 @@
+# docker-compose.yml - פריסת ייצור ב-Linux: app, clamd, postgres, ו-timer לסריקה חוזרת.
+#
+# ⚠️ נכתב ב-2026-10-02 ועדיין לא הורץ - אין Docker בסביבת הפיתוח.
+#    ראה "docs/07 - נוהל התאוששות מפתחות.md" לפני העלייה הראשונה.
+#
+# הכנה במארח (פעם אחת):
+#   sudo install -d -o 10001 -g 10001 -m 700 /etc/nahmani/secrets
+#   (השירות מחזיק את הסודות לקריאה בלבד; ליצירה - mount כתיב חד-פעמי)
+#   docker compose run --rm -v /etc/nahmani/secrets:/run/secrets/nahmani \
+#       app python -m server.db.keygen init
+#   docker compose run --rm -v /etc/nahmani/escrow-out:/out \
+#       app python -m server.db.keygen export-escrow --out /out/escrow.json
+#   (ולהוציא את החבילה מהשרת לפי docs/07 §3)
+#
+# במארח עצמו - מחוץ לקובץ הזה, ובאחריות המתפעל:
+#   * swap מוצפן או כבוי (זיכרון התהליך מחזיק מסמכים גלויים לרגע)
+#   * הצפנת הנפח של /var/lib/docker (מסד + קבצים)
+#   * reverse proxy עם HTTPS + HSTS מול השירות app
+
+services:
+  app:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    restart: unless-stopped
+    environment:
+      PORTAL_MODE: production
+      PORTAL_CLAMD_ADDR: tcp://clamd:3310
+      # DATABASE_URL (עם סיסמה), PORTAL_ID_HMAC_KEY, PORTAL_ID_ENC_KEY,
+      # PORTAL_ALLOWED_ORIGINS - מקובץ env חיצוני, לא מכאן:
+    env_file: [/etc/nahmani/portal.env]
+    volumes:
+      - uploads:/data/uploads
+      # תיקיית הסודות - קריאה בלבד. בעלות 10001 והרשאות 600 על כל קובץ;
+      # crypto.py מסרב לטעון מפתח שקריא לקבוצה או לכולם.
+      - /etc/nahmani/secrets:/run/secrets/nahmani:ro
+    # מערכת קבצים לקריאה בלבד; /tmp בזיכרון, בלי הרצה. ההעלאה אינה
+    # כותבת ל-/tmp בכלל (upload_stream.py) - זו שכבה נוספת.
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    ulimits: { core: 0 }                  # אין core dump עם מסמכים בזיכרון
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on: [db, clamd]
+    networks: [internal, edge]
+    ports: ["127.0.0.1:8777:8777"]        # רק ה-reverse proxy המקומי ניגש
+
+  # סריקה חוזרת לקבצים pending/failed, וניקוי יתומים. מפענח בזיכרון בלבד.
+  maintenance:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    restart: unless-stopped
+    environment:
+      PORTAL_MODE: production
+      PORTAL_CLAMD_ADDR: tcp://clamd:3310
+    env_file: [/etc/nahmani/portal.env]
+    volumes:
+      - uploads:/data/uploads
+      - /etc/nahmani/secrets:/run/secrets/nahmani:ro
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    ulimits: { core: 0 }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: >
+      sh -c 'while true; do
+               python -m server.maintenance rescan;
+               python -m server.maintenance sweep --apply;
+               sleep 300;
+             done'
+    depends_on: [db, clamd]
+    networks: [internal]                  # אין יציאה לאינטרנט
+
+  clamd:
+    image: clamav/clamav:1.5
+    restart: unless-stopped
+    # freshclam רץ בתוך האימג' ומעדכן חתימות - לכן יש לו רשת edge.
+    # שער הייצור ב-app מסרב לעלות אם החתימות ישנות מ-48 שעות.
+    volumes: [clamav-db:/var/lib/clamav]
+    networks: [internal, edge]
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: portal
+      POSTGRES_DB: portal
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    env_file: [/etc/nahmani/db.env]       # POSTGRES_PASSWORD
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [internal]
+
+networks:
+  internal: { internal: true }            # בלי יציאה החוצה
+  edge: {}
+
+volumes:
+  uploads: {}
+  pgdata: {}
+  clamav-db: {}

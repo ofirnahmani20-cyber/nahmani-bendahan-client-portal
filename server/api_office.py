@@ -175,7 +175,7 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
                 # הצוות צריך לדעת למה קובץ אינו ניתן לפתיחה.
                 # "ממתין לסריקה" ו"נדבק" אינם אותו דבר.
                 "scan": f["scan_status"],
-                "ready": scan.downloadable(f["scan_status"]),
+                "ready": scan.usable(f["scan_status"]),
                 "at": f["uploaded_at"].isoformat() if f["uploaded_at"] else None,
             })
 
@@ -603,7 +603,7 @@ def office_download_file(document_id: str, file_id: str, request: Request,
     if row is None:
         raise HTTPException(status_code=404, detail="הקובץ לא נמצא.")
 
-    if not scan.downloadable(row["scan_status"]):
+    if not scan.usable(row["scan_status"]):
         # 409 ולא 403: ההרשאה תקינה, הקובץ פשוט עדיין לא נסרק.
         raise HTTPException(
             status_code=409,
@@ -622,8 +622,8 @@ def office_download_file(document_id: str, file_id: str, request: Request,
         headers={
             # attachment + nosniff: הדפדפן לא ינחש סוג ולא יריץ
             # תוכן שהועלה כאילו הוא חלק מהאתר.
-            "Content-Disposition": 'attachment; filename="%s"'
-                                   % row["original_filename"],
+            "Content-Disposition": storage.content_disposition(
+                row["original_filename"]),
             "X-Content-Type-Options": "nosniff",
         },
     )
@@ -726,7 +726,7 @@ def office_documents(request: Request, status: str | None = None,
                 "id": str(r["file_id"]),
                 "name": r["original_filename"],
                 "scan": r["scan_status"],
-                "ready": scan.downloadable(r["scan_status"]),
+                "ready": scan.usable(r["scan_status"]),
                 "at": r["uploaded_at"].isoformat() if r["uploaded_at"] else None,
             } if r["file_id"] else None),
         } for r in rows],

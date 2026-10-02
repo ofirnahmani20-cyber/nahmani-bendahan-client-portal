@@ -35,6 +35,13 @@ SAFE_METADATA_KEYS = frozenset({
     # ולא מה נכתב - וטקסט חופשי עלול להכיל פרט מזהה.
     "requirement_id", "delivery_id", "reminder_id", "conversation_id",
     "channel", "kind", "direction", "every_days",
+    # סריקה, אחסון מוצפן וגישה לתוכן רפואי (Layer 2). מזהים, ספירות
+    # וסוגים בלבד. אין כאן - ולא יהיה - טקסט מסמך, ערך של עובדה
+    # רפואית, או טקסט של שאילתת חיפוש: שאילתה כמו "EMG ישראל" היא
+    # בעצמה מידע רפואי מזוהה. מחיפוש נרשמים kinds ו-result_count.
+    "file_id", "scan_signature", "rescanned", "swept_parts",
+    "swept_orphans", "result_count", "kinds", "page_count",
+    "ocr_page_count", "duration_ms", "fact_id",
 })
 
 

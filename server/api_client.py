@@ -12,10 +12,10 @@ JavaScript - יקבל את התיקים שלו בלבד, כי השאילתה ל�
 תיק מלא, גם בלי התחברות.
 """
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import audit, scan, storage
+from . import audit, crypto, scan, storage, upload_stream
 from .auth import require_client, require_csrf
 from .db.pool import cursor
 
@@ -235,23 +235,38 @@ def get_case(case_id: str, request: Request, identity=Depends(require_client)):
 #  העלאת מסמך
 # ================================================================
 
+SCAN_NOTES = {
+    "pending": "הקובץ התקבל ונשמר מוצפן. הוא יהיה זמין לאחר סריקת אבטחה.",
+    "failed":  "הקובץ התקבל ונשמר מוצפן. סריקת האבטחה תושלם בהקדם.",
+}
+
+
 @router.post("/api/client/documents/{document_id}/files")
 async def upload_file(document_id: str, request: Request,
-                      file: UploadFile = File(...),
                       identity=Depends(require_client)):
     """
     מקבל קובץ מהלקוח.
 
-    סדר הפעולות מכוון: קודם הרשאה, אחר כך זמינות סורק, ורק
-    בסוף קריאת הקובץ. אין טעם לקרוא 12MB לזיכרון לפני שברור
-    שמותר לקבל אותם.
+    סדר הפעולות מכוון: קודם הרשאה, אחר כך זמינות סורק והצפנה,
+    ורק בסוף קריאת הקובץ. אין טעם לקרוא 12MB לזיכרון לפני
+    שברור שמותר לקבל אותם.
+
+    מהרגע שהקובץ נקרא ועד שהוא נשמר הוא קיים בזיכרון בלבד:
+    הוא נסרק מהזיכרון, מוצפן בזיכרון, ורק הצופן נכתב לדיסק.
+    אין UploadFile - ראה upload_stream.py.
     """
     require_csrf(request)
 
     try:
         scan.assert_upload_allowed()
+        # בלי מפתח אין שמירה. בודקים לפני קריאת הקובץ, לא אחריה.
+        crypto.provider().active("files")
     except scan.ScannerNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc))
+    except crypto.KeysUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="אחסון מוצפן אינו מוגדר. העלאת מסמכים מושבתת.")
 
     with cursor() as cur:
         # המסמך חייב להיות של תיק ששייך ללקוח המחובר.
@@ -266,38 +281,68 @@ async def upload_file(document_id: str, request: Request,
     if doc is None:
         raise HTTPException(status_code=404, detail="המסמך לא נמצא.")
 
-    data = await file.read()
+    try:
+        data, filename = await upload_stream.read_single_file(
+            request, field="file", max_bytes=storage.MAX_BYTES)
+        mime = storage.validate(data)
+    except upload_stream.TooLarge:
+        raise HTTPException(
+            status_code=400,
+            detail="הקובץ גדול מ-%d מגה-בייט." % (storage.MAX_BYTES // (1024 * 1024)))
+    except (upload_stream.UploadError, storage.RejectedFile) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    # סריקה לפני שמירה. קובץ נגוע אינו נשמר כלל - לא גלוי ולא מוצפן.
+    result = scan.get_scanner().scan(data)
+    if result.status == "infected":
+        audit.record(identity, "client.file_rejected", entity_type="document",
+                     entity_id=document_id, case_id=str(doc["case_id"]),
+                     request=request,
+                     metadata={"mime_type": mime, "size_bytes": len(data),
+                               "scan_status": "infected",
+                               "scan_signature": result.detail})
+        raise HTTPException(
+            status_code=400,
+            detail="הקובץ נחסם בסריקת האבטחה ולא נשמר. אם לדעתך זו טעות, "
+                   "פנה למשרד.")
+
     try:
         meta = storage.validate_and_store(
             data, firm_id=identity.firm_id, case_id=doc["case_id"],
-            original_name=file.filename,
+            original_name=filename,
         )
-    except storage.RejectedFile as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except crypto.KeysUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="אחסון מוצפן אינו מוגדר. העלאת מסמכים מושבתת.")
 
-    result = scan.get_scanner().scan(data)
-
-    with cursor(commit=True) as cur:
-        # גרסה חדשה מחליפה את הקודמת כנוכחית, אך ההיסטוריה נשמרת.
-        cur.execute(
-            "update document_files set is_current = false where document_id = %s",
-            (document_id,),
-        )
-        cur.execute(
-            """insert into document_files
-                 (firm_id, document_id, storage_key, original_filename,
-                  mime_type, size_bytes, checksum, scan_status,
-                  uploaded_by_client_id)
-               values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
-            (identity.firm_id, document_id, meta["storage_key"],
-             meta["original_filename"], meta["mime_type"], meta["size_bytes"],
-             meta["checksum"], result.status, identity.subject_id),
-        )
-        file_id = cur.fetchone()["id"]
-        cur.execute(
-            "update case_documents set status = 'pending_review' where id = %s",
-            (document_id,),
-        )
+    try:
+        with cursor(commit=True) as cur:
+            # גרסה חדשה מחליפה את הקודמת כנוכחית, אך ההיסטוריה נשמרת.
+            cur.execute(
+                "update document_files set is_current = false where document_id = %s",
+                (document_id,),
+            )
+            cur.execute(
+                """insert into document_files
+                     (firm_id, document_id, storage_key, original_filename,
+                      mime_type, size_bytes, checksum, scan_status,
+                      uploaded_by_client_id)
+                   values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+                (identity.firm_id, document_id, meta["storage_key"],
+                 meta["original_filename"], meta["mime_type"], meta["size_bytes"],
+                 meta["checksum"], result.status, identity.subject_id),
+            )
+            file_id = cur.fetchone()["id"]
+            cur.execute(
+                "update case_documents set status = 'pending_review' where id = %s",
+                (document_id,),
+            )
+    except BaseException:
+        # פעולה מפצה: צופן בלי שורה הוא יתום. אם גם המחיקה לא
+        # מתבצעת (קריסה), storage.sweep() יאסוף אותו.
+        storage.delete(meta["storage_key"])
+        raise
 
     audit.record(identity, "client.file_uploaded", entity_type="document",
                  entity_id=document_id, case_id=str(doc["case_id"]),
@@ -312,8 +357,9 @@ async def upload_file(document_id: str, request: Request,
         "filename": meta["original_filename"],
         "scanStatus": result.status,
         # הלקוח צריך לדעת שהקובץ התקבל אך טרם נסרק, כדי שלא
-        # יופתע מכך שאינו יכול לפתוח אותו.
-        "note": result.detail,
+        # יופתע מכך שאינו יכול לפתוח אותו. פרטי תקלת סורק אינם
+        # עניינו - הם ביומן התהליך.
+        "note": SCAN_NOTES.get(result.status),
     }
 
 
@@ -339,7 +385,7 @@ def download_file(document_id: str, file_id: str, request: Request,
     if row is None:
         raise HTTPException(status_code=404, detail="הקובץ לא נמצא.")
 
-    if not scan.downloadable(row["scan_status"]):
+    if not scan.usable(row["scan_status"]):
         # 409 ולא 403: הקובץ שלך, פשוט עדיין לא נסרק.
         raise HTTPException(
             status_code=409,
@@ -356,8 +402,8 @@ def download_file(document_id: str, file_id: str, request: Request,
         headers={
             # attachment + nosniff: הדפדפן לא ינחש סוג ולא יריץ
             # תוכן שהועלה כאילו הוא חלק מהאתר.
-            "Content-Disposition": 'attachment; filename="%s"'
-                                   % row["original_filename"],
+            "Content-Disposition": storage.content_disposition(
+                row["original_filename"]),
             "X-Content-Type-Options": "nosniff",
         },
     )
