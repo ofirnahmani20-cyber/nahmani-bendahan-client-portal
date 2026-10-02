@@ -38,7 +38,7 @@ import time
 import urllib.parse
 import uuid
 
-from . import crypto
+from . import crypto, imagecheck
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -57,7 +57,9 @@ MAGIC = [
     (b"\x89PNG\r\n\x1a\n", "image/png"),
 ]
 
-ALLOWED_MIME = {"application/pdf", "image/jpeg", "image/png"}
+ALLOWED_MIME = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
+
+UNSUPPORTED = "סוג הקובץ אינו נתמך. אפשר להעלות PDF, JPG, PNG או WebP."
 
 
 class RejectedFile(ValueError):
@@ -123,7 +125,14 @@ def validate(data: bytes) -> str:
 
     mime = sniff_mime(data[:32])
     if mime is None or mime not in ALLOWED_MIME:
-        raise RejectedFile("סוג הקובץ אינו נתמך. אפשר להעלות PDF, JPG או PNG.")
+        raise RejectedFile(UNSUPPORTED)
+
+    # חתימה נכונה אינה תמונה תקינה: מבנה וממדים נבדקים מהכותרות,
+    # בלי פענוח. ראה imagecheck.py.
+    try:
+        imagecheck.check(data, mime)
+    except imagecheck.BadImage as exc:
+        raise RejectedFile(str(exc))
     return mime
 
 

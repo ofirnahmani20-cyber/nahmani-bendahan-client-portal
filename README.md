@@ -15,6 +15,7 @@
 | הצפנה במנוחה של קבצים | **implemented** — AES-256-GCM, מפתח נגזר לכל קובץ, מפתחות-על בקבצי סוד מחוץ לריפו ולמסד. נוהל DR: `docs/07` |
 | **הממשק בדפדפן** | ⚠️ **demo** — עדיין קורא ל-`data.js` ולא ל-API |
 | סריקת וירוסים | **implemented** — ClamAV (clamd). בלי `PORTAL_CLAMD_ADDR` קובץ נשאר `pending` ואינו נגיש |
+| עיבוד מסמכים — תשתית (Layer 2, שלב 2) | **implemented** — תור במסד, `server.worker`, sandbox עם תקרת זיכרון קשיחה, טבלאות מוצפנות, `can_view_medical`. **אין עדיין חילוץ טקסט/OCR** (שלב 3) |
 | שליחת SMS ל-OTP | ❌ **planned** — יש ממשק, אין ספק. ב-demo הקוד נכתב ללוג |
 | Object storage ו-signed URLs | ❌ **planned** — כרגע דיסק מקומי |
 | HTTPS ו-HSTS | ❌ **planned** |
@@ -41,6 +42,13 @@ python -m server.db.apply         # סכמה + נתוני הדגמה
 ```powershell
 .\scripts\clamav-local.ps1 setup     # פעם אחת: ClamAV + חתימות (~500MB)
 .\scripts\clamav-local.ps1 start
+```
+
+### עיבוד מסמכים (worker)
+
+```powershell
+python -m server.worker --enqueue-missing   # קבצים clean שנשמרו לפני שלב 2
+python -m server.worker                     # לולאה; --once לעבודה אחת
 ```
 
 ### 2. משתני סביבה (`.env` בשורש, אינו נכנס ל-git)

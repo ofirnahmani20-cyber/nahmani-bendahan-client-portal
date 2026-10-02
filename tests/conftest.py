@@ -33,7 +33,26 @@ from server import crypto as _crypto  # noqa: E402
 _crypto.generate_keys(os.environ["PORTAL_SECRETS_DIR"])
 
 
+import datetime as _dt
+
+_SESSION_START = _dt.datetime.now(_dt.timezone.utc)
+
+
 def pytest_sessionfinish(session, exitstatus):
+    # עבודות עיבוד שהבדיקות יצרו מפנות לקבצים בתיקייה הזמנית, שנמחקת
+    # כאן. בלי הניקוי, worker של סביבת הפיתוח היה מוצא אותן בתור.
+    try:
+        from server.db.pool import cursor as _cursor
+        with _cursor(commit=True) as cur:
+            cur.execute("delete from document_processing where queued_at >= %s",
+                        (_SESSION_START,))
+            # שורות קובץ שהבדיקות העלו למסמכי הזרע. הקבצים עצמם בתיקייה
+            # הזמנית; בלי הניקוי נשארו במסד הפיתוח 130 שורות בלי קובץ
+            # (נמצא ב-2026-10-02). CASCADE מוחק גם את הנגזרות.
+            cur.execute("delete from document_files where uploaded_at >= %s",
+                        (_SESSION_START,))
+    except Exception:
+        pass
     _shutil.rmtree(_TEST_ROOT, ignore_errors=True)
 
 

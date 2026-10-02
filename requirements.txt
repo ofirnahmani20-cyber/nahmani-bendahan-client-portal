@@ -19,3 +19,8 @@ python-multipart==0.0.32
 psycopg[binary]==3.3.5
 bcrypt==5.0.0
 cryptography==50.0.1
+
+# Layer 2 - פענוח מסמכים. רצים רק בתהליך המבודד (server/sandbox.py),
+# לעולם לא בתהליך השרת. pypdfium2: Apache-2.0/BSD (ולא PyMuPDF, AGPL).
+pypdfium2==5.13.0
+Pillow==12.3.0

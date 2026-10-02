@@ -336,6 +336,8 @@
     'client.file_uploaded':      'הלקוח העלה מסמך',
     'client.file_rejected':      'קובץ נחסם בסריקת אבטחה',
     'system.file_rescanned':     'קובץ נסרק מחדש',
+    'system.document_processed': 'מסמך עובד אוטומטית',
+    'office.document_text_viewed': 'צפייה בטקסט שחולץ ממסמך',
     'client.document_replied':   'הלקוח הגיב',
     'client.case_viewed':        'הלקוח צפה בתיק',
     'client.file_downloaded':    'הלקוח הוריד מסמך',

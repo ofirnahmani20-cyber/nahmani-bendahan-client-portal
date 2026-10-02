@@ -233,10 +233,13 @@ def run(conn) -> dict:
 
         users = {}
         for full_name, email, password, role, title, phone in STAFF:
+            # שני השותפים מורשים לתוכן רפואי מחולץ (החלטה מ-2026-10-02).
+            # ההרשאה היא עמודה על המשתמש ולא שמות בקוד: איש צוות
+            # שיצטרף יקבל אותה רק במפורש.
             cur.execute(
                 """INSERT INTO users (firm_id, full_name, email, password_hash,
-                                      role, title, phone)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                                      role, title, phone, can_view_medical)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,true) RETURNING id""",
                 (firm_id, full_name, email, _hash(password), role, title, phone),
             )
             users[email] = cur.fetchone()[0]

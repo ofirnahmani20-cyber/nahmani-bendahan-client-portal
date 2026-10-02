@@ -68,6 +68,33 @@ services:
     depends_on: [db, clamd]
     networks: [internal]                  # אין יציאה לאינטרנט
 
+  # עיבוד מסמכים (Layer 2). מחזיק מפתחות ומסד, ומפעיל את
+  # server.sandbox - שאין לו לא זה ולא זה - לכל קובץ.
+  # שלוש שכבות זיכרון: RLIMIT_AS בתוך ה-sandbox (limits.py),
+  # mem_limit כאן, ו-timeout ב-worker.py.
+  worker:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    restart: unless-stopped
+    command: ["python", "-m", "server.worker"]
+    environment:
+      PORTAL_MODE: production
+      PORTAL_WORKER_MEMORY_MB: "768"
+      PORTAL_WORKER_TIMEOUT: "120"
+    env_file: [/etc/nahmani/portal.env]
+    volumes:
+      - uploads:/data/uploads:ro          # קורא בלבד - ה-worker אינו כותב קבצים
+      - /etc/nahmani/secrets:/run/secrets/nahmani:ro
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    mem_limit: 1536m
+    memswap_limit: 1536m                  # בלי swap - מסמך לא יגיע לדיסק דרכו
+    pids_limit: 64
+    ulimits: { core: 0 }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on: [db]
+    networks: [internal]                  # אין יציאה לאינטרנט
+
   clamd:
     image: clamav/clamav:1.5
     restart: unless-stopped

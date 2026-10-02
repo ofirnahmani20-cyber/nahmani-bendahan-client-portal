@@ -119,6 +119,9 @@ class Identity:
         self.subject_id = row["subject_id"]
         self.role = row.get("role")
         self.display_name = row.get("display_name")
+        # הרשאה לתוכן רפואי מחולץ. נקראת מהמסד בכל בקשה, ולכן
+        # שלילתה חלה מיד - לא בהתחברות הבאה.
+        self.can_view_medical = bool(row.get("can_view_medical"))
 
     @property
     def is_staff(self):
@@ -134,7 +137,8 @@ def _load_session(token):
     with cursor() as cur:
         cur.execute(
             """select s.id, s.firm_id, s.subject_type, s.subject_id,
-                      u.role, coalesce(u.full_name, c.full_name) as display_name
+                      u.role, coalesce(u.full_name, c.full_name) as display_name,
+                      coalesce(u.can_view_medical, false) as can_view_medical
                  from sessions s
                  left join users   u on s.subject_type = 'user'   and u.id = s.subject_id
                  left join clients c on s.subject_type = 'client' and c.id = s.subject_id
@@ -231,6 +235,17 @@ def require_staff(request: Request):
     identity = require_identity(request)
     if not identity.is_staff:
         raise HTTPException(status_code=403, detail="נתיב זה מיועד לצוות המשרד.")
+    return identity
+
+
+def require_medical(request: Request):
+    """
+    צוות עם הרשאה מפורשת לתוכן רפואי מחולץ. admin אינו מקבל אותה
+    אוטומטית: ההרשאה היא החלטה על אדם, לא על תפקיד.
+    """
+    identity = require_staff(request)
+    if not identity.can_view_medical:
+        raise HTTPException(status_code=403, detail="אין הרשאה לצפייה בתוכן רפואי.")
     return identity
 
 

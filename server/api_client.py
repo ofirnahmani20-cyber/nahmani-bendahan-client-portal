@@ -15,7 +15,7 @@ JavaScript - יקבל את התיקים שלו בלבד, כי השאילתה ל�
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import audit, crypto, scan, storage, upload_stream
+from . import audit, crypto, processing, scan, storage, upload_stream
 from .auth import require_client, require_csrf
 from .db.pool import cursor
 
@@ -338,6 +338,9 @@ async def upload_file(document_id: str, request: Request,
                 "update case_documents set status = 'pending_review' where id = %s",
                 (document_id,),
             )
+            # רק קובץ clean נכנס לתור - והמסד אוכף זאת גם בעצמו.
+            if scan.usable(result.status):
+                processing.enqueue(cur, file_id, identity.firm_id)
     except BaseException:
         # פעולה מפצה: צופן בלי שורה הוא יתום. אם גם המחיקה לא
         # מתבצעת (קריסה), storage.sweep() יאסוף אותו.
