@@ -302,6 +302,9 @@
 - [ ] `read_only` + `tmpfs` על `/tmp`: העלאה ועיבוד עובדים בלי שום כתיבה מחוץ לתיקיית האחסון
 - [ ] swap מוצפן או כבוי, הצפנת הנפח של מסד וקבצים — אומת במארח
 - [ ] `scripts/dr_drill.py` עובר בתוך הקונטיינר
+- [ ] בדיקות ה-OCR ב-`tests/test_extraction.py` **רצות ולא מדולגות** בקונטיינר ה-worker (Tesseract מ-Debian + מודלים מקובעים), וספי ה-CER עוברים
+- [ ] `test_timeout_leaves_no_tesseract_behind` עובר עם `killpg`; ותקרת התהליכים של ה-sandbox נאכפת ב-`pids_limit` (ב-Windows היא נאכפת ב-Job Object ונבדקה)
+- [ ] `spikes/ocr/measure_stage3.py` רץ ב-Linux, והמדדים אינם גרועים מאלה שב-`spikes/ocr/STAGE3-QUALITY.md`
 
 ---
 

@@ -24,3 +24,6 @@ cryptography==50.0.1
 # לעולם לא בתהליך השרת. pypdfium2: Apache-2.0/BSD (ולא PyMuPDF, AGPL).
 pypdfium2==5.13.0
 Pillow==12.3.0
+# תיקון סדר מילים בשכבת טקסט עברית (server/textfix.py). LGPL-3.0 -
+# שימוש כספרייה, ללא שינוי. ראה docs/08 - רישיונות צד שלישי.md.
+python-bidi==0.6.11

@@ -39,7 +39,24 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 TIMEOUT_SECONDS = int(os.environ.get("PORTAL_WORKER_TIMEOUT", "120"))
 MEMORY_MB = int(os.environ.get("PORTAL_WORKER_MEMORY_MB", "768"))
-MAX_OUTPUT = 1024 * 1024
+MAX_OUTPUT = 16 * 1024 * 1024
+BATCH_PAGES = 4
+
+# OCR. הנתיבים מגיעים מהסביבה של ה-worker ומועברים ל-sandbox במפורש.
+TESSERACT = os.environ.get("PORTAL_TESSERACT", "tesseract")
+TESSDATA = os.environ.get("PORTAL_TESSDATA", "")
+OCR_MODE = os.environ.get("PORTAL_OCR_MODE", "fast")      # ראה ocr.py: מדיניות המודלים
+
+
+def extract_env(pages):
+    """
+    אצוות עמודים לתהליך sandbox אחד. כל אצווה תחת אותן מגבלות של
+    שלב 2 (זיכרון, CPU, timeout) - מסמך ארוך מתחלק, לא מקבל יותר.
+    """
+    return {"SANDBOX_TASK": "extract",
+            "SANDBOX_PAGES": ",".join(str(p) for p in pages),
+            "SANDBOX_TESSERACT": TESSERACT, "SANDBOX_TESSDATA": TESSDATA,
+            "SANDBOX_OCR_MODE": OCR_MODE}
 POLL_SECONDS = 5
 
 # המשתנים היחידים שהתהליך המבודד מקבל. SYSTEMROOT נדרש ב-Windows
@@ -129,10 +146,23 @@ def process_one(worker_id: str, file_ids=None) -> bool:
         processing.fail(job, "decrypt_failed", elapsed())
         return True
 
-    outcome, payload = run_sandbox(data)
+    outcome, payload = run_sandbox(data)                      # inspect
+    extracted = []
+    if outcome == "ok":
+        page_numbers = [p["page"] for p in payload["pages"]]
+        for i in range(0, len(page_numbers), BATCH_PAGES):
+            batch = page_numbers[i:i + BATCH_PAGES]
+            outcome, result = run_sandbox(data, extra_env=extract_env(batch))
+            if outcome != "ok":
+                payload = result
+                break
+            extracted += result["pages"]
+            payload["engine"].update(result["engine"])
     del data
 
     if outcome == "ok":
+        # כל העמודים יחד, או כלום: אצווה שנכשלה אינה משאירה חצי מסמך.
+        processing.replace_pages(job["file_id"], job["firm_id"], extracted)
         processing.complete(job["id"], payload, elapsed())
         status, code = "done", None
     else:

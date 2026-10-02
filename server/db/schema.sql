@@ -791,6 +791,21 @@ CREATE TABLE IF NOT EXISTS document_pages (
     REFERENCES document_files(id, firm_id) ON DELETE CASCADE
 );
 
+-- שלב 3: איזה מנוע הפיק את העמוד, והפריסה שלו - לכל שורה היסט
+-- בטקסט, תיבה בעמוד וביטחון. הקישור מכל קטע טקסט למקום שממנו
+-- נקרא. מוצפן גם הוא: יחד עם הטקסט הוא משחזר את המסמך.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'document_pages' AND column_name = 'model') THEN
+    ALTER TABLE document_pages
+      ADD COLUMN model text NOT NULL DEFAULT 'layer'
+        CHECK (model IN ('layer', 'fast', 'best', 'fast+best')),
+      ADD COLUMN layout_enc bytea
+        CHECK (layout_enc IS NULL
+               OR substring(layout_enc FROM 1 FOR 6) = '\x4e42454e4331'::bytea);
+  END IF;
+END $$;
+
 -- סיווג מוצע. code הוא מזהה מרשימה סגורה, לא טקסט חופשי.
 CREATE TABLE IF NOT EXISTS document_classifications (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),

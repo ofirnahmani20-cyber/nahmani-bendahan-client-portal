@@ -168,34 +168,80 @@ def recover_stale(older_than=STALE_AFTER) -> int:
 # ----------------------------------------------------------------
 
 def store_page_text(cur, *, firm_id, file_id, page_no, text, source,
-                    ocr_confidence=None):
+                    ocr_confidence=None, model="layer", layout=None):
     """
-    שומר טקסט עמוד מוצפן. מזהה הרשומה נוצר כאן כדי שישמש גם ב-AAD:
-    צופן שיועתק לעמוד אחר או לקובץ אחר לא יפוענח.
+    שומר טקסט עמוד מוצפן, ואת הפריסה שלו (layout) מוצפנת בנפרד.
+    מזהה הרשומה נוצר כאן כדי שישמש גם ב-AAD: צופן שיועתק לעמוד אחר
+    או לקובץ אחר לא יפוענח.
     """
     cur.execute("select gen_random_uuid() as id")
     page_id = str(cur.fetchone()["id"])
     blob = crypto.encrypt(text.encode("utf-8"), purpose="text", firm_id=str(firm_id),
                           record_id="page:" + page_id)
+    layout_blob = None
+    if layout is not None:
+        layout_blob = crypto.encrypt(json.dumps(layout).encode("utf-8"), purpose="text",
+                                     firm_id=str(firm_id), record_id="layout:" + page_id)
     cur.execute(
-        """insert into document_pages (id, firm_id, file_id, page_no, source,
-                                       ocr_confidence, char_count, text_enc)
-           values (%s, %s, %s, %s, %s, %s, %s, %s)""",
-        (page_id, firm_id, file_id, page_no, source, ocr_confidence, len(text), blob))
+        """insert into document_pages (id, firm_id, file_id, page_no, source, model,
+                                       ocr_confidence, char_count, text_enc, layout_enc)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (page_id, firm_id, file_id, page_no, source, model, ocr_confidence, len(text),
+         blob, layout_blob))
     return page_id
 
 
+def replace_pages(file_id, firm_id, pages):
+    """
+    כל עמודי הקובץ בטרנזקציה אחת: עיבוד חוזר מחליף, ואין מצב ביניים
+    שבו חלק מהעמודים חדשים וחלק ישנים.
+    """
+    with cursor(commit=True) as cur:
+        cur.execute("delete from document_pages where file_id = %s and firm_id = %s",
+                    (file_id, firm_id))
+        for p in pages:
+            store_page_text(cur, firm_id=firm_id, file_id=file_id, page_no=p["page"],
+                            text=p["text"], source=p["source"], model=p["model"],
+                            ocr_confidence=p.get("confidence"),
+                            layout={"segments": p.get("segments", []),
+                                    "alternatives": p.get("alternatives", []),
+                                    "icd": p.get("icd", []), "size": p.get("size"),
+                                    "fixes": p.get("fixes", []),
+                                    "flattened": p.get("flattened", False)})
+
+
 def read_pages(firm_id, file_id):
-    """מפענח את עמודי הקובץ. הקורא אחראי להרשאה ולרישום ביומן."""
+    """
+    מפענח את עמודי הקובץ. הקורא אחראי להרשאה ולרישום ביומן.
+
+    requiresHumanVerification: עמוד שנקרא ב-OCR. כל מספר בו - אחוז,
+    סכום, תאריך, מספר זהות - הוא קריאה ולא עובדה (25% נקרא 75%
+    ב-spike). שלב 5 לא יאפשר להעביר מספר כזה לתיק בלי אישור אדם.
+    """
     with cursor() as cur:
         cur.execute(
-            """select id, page_no, source, ocr_confidence, text_enc
+            """select id, page_no, source, model, ocr_confidence, text_enc, layout_enc
                  from document_pages where file_id = %s and firm_id = %s
                 order by page_no""", (file_id, firm_id))
         rows = cur.fetchall()
-    return [{"page": r["page_no"], "source": r["source"],
-             "ocrConfidence": float(r["ocr_confidence"]) if r["ocr_confidence"] is not None else None,
-             "text": crypto.decrypt(bytes(r["text_enc"]), purpose="text",
-                                    firm_id=str(firm_id),
-                                    record_id="page:" + str(r["id"])).decode("utf-8")}
-            for r in rows]
+    out = []
+    for r in rows:
+        layout = None
+        if r["layout_enc"] is not None:
+            layout = json.loads(crypto.decrypt(
+                bytes(r["layout_enc"]), purpose="text", firm_id=str(firm_id),
+                record_id="layout:" + str(r["id"])))
+        out.append({
+            "page": r["page_no"], "source": r["source"], "model": r["model"],
+            "ocrConfidence": (float(r["ocr_confidence"])
+                              if r["ocr_confidence"] is not None else None),
+            "requiresHumanVerification": r["source"] == "ocr",
+            "text": crypto.decrypt(bytes(r["text_enc"]), purpose="text",
+                                   firm_id=str(firm_id),
+                                   record_id="page:" + str(r["id"])).decode("utf-8"),
+            "segments": (layout or {}).get("segments", []),
+            # קריאה שנייה (best) של שורה חלשה. לא הוחלפה - שלב 5 יסמן
+            # מספר ששתי הקריאות חלוקות עליו.
+            "alternatives": (layout or {}).get("alternatives", []),
+        })
+    return out
