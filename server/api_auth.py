@@ -226,4 +226,7 @@ def me(request: Request):
         "type": identity.subject_type,
         "name": identity.display_name,
         "role": identity.role,
+        # אם להציג את מסך הסיווג. השרת אוכף בעצמו (require_medical);
+        # זה רק כדי לא להציג כפתור שיחזיר 403.
+        "canViewMedical": bool(identity.is_staff and identity.can_view_medical),
     }

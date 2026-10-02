@@ -42,6 +42,9 @@ SAFE_METADATA_KEYS = frozenset({
     "file_id", "scan_signature", "rescanned", "swept_parts",
     "swept_orphans", "result_count", "kinds", "page_count",
     "ocr_page_count", "duration_ms", "fact_id",
+    # סיווג (שלב 4): קוד סוג מרשימה סגורה - לא טקסט. ואישור מפורש של
+    # מסמך שאינו תואם לדרישה.
+    "mismatch_acknowledged",
 })
 
 

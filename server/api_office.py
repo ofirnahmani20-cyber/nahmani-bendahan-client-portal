@@ -11,10 +11,12 @@ api_office.py - ממשק הניהול.
 
 from datetime import datetime
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import audit, scan, storage
+from . import audit, processing, scan, storage
 from .auth import require_csrf, require_staff
 from .db.pool import cursor
 
@@ -288,6 +290,28 @@ def add_stage_event(case_id: str, body: StageEvent, request: Request,
 class DocumentReview(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     reject_reason: str | None = Field(default=None, max_length=1000)
+    # אישור מפורש של מסמך שהסיווג שלו אינו תואם לדרישה (שלב 4)
+    acknowledge_mismatch: bool = False
+
+
+def _classification_mismatch(cur, document_id, firm_id):
+    """
+    האם הקובץ הנוכחי של הדרישה סווג לסוג שהדרישה אינה מקבלת.
+    הסוג האפקטיבי: המאושר אם יש, אחרת המוצע. דרישה שלא מופתה, או
+    סיווג לא ברור - אינם "אי-התאמה".
+    """
+    cur.execute(
+        """select d.accepted_kinds, c.status, c.confirmed_type, c.suggested_type
+             from case_documents d
+             join document_files f on f.document_id = d.id and f.firm_id = d.firm_id
+                                  and f.is_current
+             join document_classifications c on c.file_id = f.id and c.firm_id = f.firm_id
+            where d.id = %s and d.firm_id = %s""", (document_id, firm_id))
+    row = cur.fetchone()
+    if row is None:
+        return False
+    kind = row["confirmed_type"] if row["status"] == "confirmed" else row["suggested_type"]
+    return processing.requirement_match(list(row["accepted_kinds"]), kind) == "mismatch"
 
 
 @router.post("/api/office/documents/{document_id}/review")
@@ -304,6 +328,15 @@ def review_document(document_id: str, body: DocumentReview, request: Request,
 
     with cursor(commit=True) as cur:
         doc = _owned_document(cur, document_id, identity)
+        mismatch = (body.decision == "approve"
+                    and _classification_mismatch(cur, document_id, identity.firm_id))
+        if mismatch and not body.acknowledge_mismatch:
+            # אזהרה, לא חסימה: עורך הדין רשאי לאשר - אבל במפורש.
+            raise HTTPException(status_code=409, detail={
+                "code": "classification_mismatch",
+                "message": "המסמך שהועלה סווג כסוג שאינו תואם לדרישה. "
+                           "אם בדקת ואתה מאשר בכל זאת - אשר במפורש.",
+            })
         new_status = "approved" if body.decision == "approve" else "rejected"
         cur.execute(
             """update case_documents
@@ -320,7 +353,8 @@ def review_document(document_id: str, body: DocumentReview, request: Request,
     audit.record(identity, "office.document_reviewed", entity_type="document",
                  entity_id=document_id, case_id=str(doc["case_id"]), request=request,
                  metadata={"decision": body.decision,
-                           "reason_given": bool(body.reject_reason)})
+                           "reason_given": bool(body.reject_reason),
+                           "mismatch_acknowledged": bool(mismatch)})
     return {"ok": True, "status": new_status}
 
 
@@ -328,6 +362,8 @@ class NewDocument(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     guidance: str = Field(min_length=1, max_length=2000)
     is_required: bool = True
+    # דרישה מהקטלוג יורשת ממנו אילו סוגי מסמכים מתקבלים בה (שלב 4).
+    template_id: UUID | None = None
 
 
 @router.post("/api/office/cases/{case_id}/documents")
@@ -341,12 +377,21 @@ def add_document(case_id: str, body: NewDocument, request: Request,
             (case_id,),
         )
         position = cur.fetchone()["next"]
+        accepted = []
+        if body.template_id:
+            cur.execute("""select accepted_kinds from required_document_templates
+                            where id = %s and firm_id = %s""",
+                        (str(body.template_id), identity.firm_id))
+            template = cur.fetchone()
+            if template is None:
+                raise HTTPException(status_code=404, detail="התבנית לא נמצאה.")
+            accepted = list(template["accepted_kinds"])
         cur.execute(
             """insert into case_documents
-                 (firm_id, case_id, name, guidance, is_required, position)
-               values (%s, %s, %s, %s, %s, %s) returning id""",
+                 (firm_id, case_id, name, guidance, is_required, position, accepted_kinds)
+               values (%s, %s, %s, %s, %s, %s, %s) returning id""",
             (identity.firm_id, case_id, body.name, body.guidance,
-             body.is_required, position),
+             body.is_required, position, accepted),
         )
         document_id = cur.fetchone()["id"]
 

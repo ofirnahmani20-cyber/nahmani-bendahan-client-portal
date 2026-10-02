@@ -903,4 +903,87 @@ CREATE TRIGGER trg_purge_derived_when_not_clean
   AFTER UPDATE OF scan_status ON document_files
   FOR EACH ROW EXECUTE FUNCTION purge_derived_when_not_clean();
 
+
+-- -------------------------------------------------------------
+--  11. סיווג מסמכים (Layer 2, שלב 4)
+--
+--  סוג המסמך (מה הוא) נפרד מההתאמה לדרישה (האם הוא מה שביקשנו).
+--  שניהם הצעה עד שאדם מאשר, ואף אחד מהם אינו נוגע ב-case_documents.status.
+-- -------------------------------------------------------------
+
+-- הרשימה עצמה מגיעה מ-server/doc_taxonomy.py (sync ב-apply.py). כאן
+-- היא כדי שהמסד יוכל לאכוף שסוג מאושר הוא סוג קיים, ועבור ממשק
+-- מנהל עתידי. סוג שהוסר מסומן active=false ואינו נמחק.
+CREATE TABLE IF NOT EXISTS document_kinds (
+  code     text PRIMARY KEY CHECK (code ~ '^[a-z_]+(\.[a-z0-9_]+)?$'),
+  category text NOT NULL,
+  parent   text REFERENCES document_kinds(code),
+  label    text NOT NULL,
+  active   boolean NOT NULL DEFAULT true
+);
+
+-- אילו סוגים מתקבלים בכל דרישה. ריק = הדרישה לא מופתה, וההתאמה
+-- מוצגת "לא נבדקה" ולא "לא תואם".
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'required_document_templates'
+                    AND column_name = 'accepted_kinds') THEN
+    ALTER TABLE required_document_templates
+      ADD COLUMN accepted_kinds text[] NOT NULL DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'case_documents' AND column_name = 'accepted_kinds') THEN
+    ALTER TABLE case_documents ADD COLUMN accepted_kinds text[] NOT NULL DEFAULT '{}';
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION accepted_kinds_exist() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT k FROM unnest(NEW.accepted_kinds) AS k
+             EXCEPT SELECT code FROM document_kinds) THEN
+    RAISE EXCEPTION 'accepted_kinds: unknown document kind'
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_template_kinds ON required_document_templates;
+CREATE TRIGGER trg_template_kinds BEFORE INSERT OR UPDATE OF accepted_kinds
+  ON required_document_templates FOR EACH ROW EXECUTE FUNCTION accepted_kinds_exist();
+DROP TRIGGER IF EXISTS trg_document_kinds ON case_documents;
+CREATE TRIGGER trg_document_kinds BEFORE INSERT OR UPDATE OF accepted_kinds
+  ON case_documents FOR EACH ROW EXECUTE FUNCTION accepted_kinds_exist();
+
+-- document_classifications מסעיף 10 מורחבת. עד שלב 4 הטבלה ריקה,
+-- ולכן השינויים בטוחים; הם עטופים בבדיקת קטלוג כדי לרוץ שוב.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'document_classifications'
+                    AND column_name = 'decision') THEN
+    ALTER TABLE document_classifications
+      DROP CONSTRAINT IF EXISTS document_classifications_suggested_type_check,
+      ALTER COLUMN suggested_type DROP NOT NULL,
+      ADD CONSTRAINT classification_suggested_kind
+        FOREIGN KEY (suggested_type) REFERENCES document_kinds(code),
+      DROP COLUMN IF EXISTS matches_requirement,
+      ADD COLUMN decision text NOT NULL DEFAULT 'unknown'
+        CHECK (decision IN ('clear', 'ambiguous', 'unknown', 'unreadable', 'mixed')),
+      ADD COLUMN candidates jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN reasons jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN page_kinds jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN rules_version text NOT NULL DEFAULT '',
+      ADD COLUMN requirement_match text NOT NULL DEFAULT 'unmapped'
+        CHECK (requirement_match IN ('match', 'mismatch', 'undetermined', 'unmapped')),
+      ADD COLUMN confirmed_type text REFERENCES document_kinds(code),
+      -- סיווג מחדש שהגיע לתוצאה אחרת ממה שאדם כבר אישר
+      ADD COLUMN differs_from_confirmed boolean NOT NULL DEFAULT false,
+      ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now(),
+      -- אין בחירה שרירותית: סוג מוצע קיים רק כשההחלטה "ברור"
+      ADD CONSTRAINT classification_kind_only_when_clear
+        CHECK ((decision = 'clear') = (suggested_type IS NOT NULL)),
+      ADD CONSTRAINT classification_confirmed_has_type
+        CHECK (status <> 'confirmed' OR confirmed_type IS NOT NULL);
+  END IF;
+END $$;
+
 COMMIT;

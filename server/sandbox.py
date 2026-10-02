@@ -140,9 +140,17 @@ def extract_pdf(data, wanted):
             if not 1 <= page_no <= n:
                 raise Rejected("bad_page_request")
             page = pdf[page_no - 1]
-            layer = page.get_textpage().get_text_range()
+            textpage = page.get_textpage()
+            layer = textpage.get_text_range()
             if len(layer.strip()) >= MIN_LAYER_CHARS:
-                text, fixes = textfix.fix_layer(layer)
+                visual = None
+                if len(layer) == textpage.count_chars():
+                    centers = []
+                    for i in range(len(layer)):
+                        l, b, r, t = textpage.get_charbox(i)
+                        centers.append(((l + r) / 2, (b + t) / 2) if r > l else None)
+                    visual = textfix.visual_word_order(layer, centers)
+                text, fixes = textfix.fix_layer(layer, visual)
                 # שכבת טקסט: הקישור הוא לעמוד ולשורה. תיבות לשורה
                 # יתווספו כשיידרשו (שלב 5); הטקסט עצמו אינו ניחוש.
                 segments, offset = [], 0

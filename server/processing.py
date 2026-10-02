@@ -245,3 +245,112 @@ def read_pages(firm_id, file_id):
             "alternatives": (layout or {}).get("alternatives", []),
         })
     return out
+
+
+# ----------------------------------------------------------------
+#  סיווג (שלב 4)
+# ----------------------------------------------------------------
+#  הסיווג הוא הצעה על *הקובץ*. הוא אינו נוגע ב-case_documents.status
+#  ואינו משלים דרישה - אין כאן אף UPDATE על case_documents, והבדיקות
+#  נועלות זאת.
+# ----------------------------------------------------------------
+
+def _accepted_kinds(cur, file_id, firm_id):
+    cur.execute("""select d.accepted_kinds from document_files f
+                     join case_documents d on d.id = f.document_id and d.firm_id = f.firm_id
+                    where f.id = %s and f.firm_id = %s""", (file_id, firm_id))
+    row = cur.fetchone()
+    return list(row["accepted_kinds"]) if row else []
+
+
+def requirement_match(accepted, kind):
+    """'unmapped' כשהדרישה לא מופתה - זה לא 'לא תואם'."""
+    from . import doc_taxonomy
+    if not accepted:
+        return "unmapped"
+    return doc_taxonomy.accepts(accepted, kind)
+
+
+def store_classification(file_id, firm_id, result):
+    """
+    שומר את ההצעה. סיווג שאדם כבר אישר אינו מוחלף: ההצעה החדשה נשמרת
+    לצידו, ו-differs_from_confirmed מסמן אם היא שונה ממנו.
+    """
+    from . import doc_taxonomy  # noqa: F401  (מוודא שהקודים קיימים - FK במסד)
+    with cursor(commit=True) as cur:
+        accepted = _accepted_kinds(cur, file_id, firm_id)
+        cur.execute("select status, confirmed_type from document_classifications"
+                    " where file_id = %s and firm_id = %s", (file_id, firm_id))
+        existing = cur.fetchone()
+        confirmed = existing["confirmed_type"] if existing and existing["status"] == "confirmed" \
+            else None
+        effective = confirmed or result["kind"]
+        values = (result["decision"], result["kind"], result["score"], result["margin"],
+                  json.dumps(result["candidates"]), json.dumps(result["reasons"]),
+                  json.dumps(result["page_kinds"]), result["rules_version"],
+                  requirement_match(accepted, effective),
+                  bool(confirmed and confirmed != result["kind"]),
+                  "rules:" + result["rules_version"])
+        if existing:
+            cur.execute(
+                """update document_classifications
+                      set decision = %s, suggested_type = %s, score = %s, margin = %s,
+                          candidates = %s, reasons = %s, page_kinds = %s, rules_version = %s,
+                          requirement_match = %s, differs_from_confirmed = %s, engine = %s,
+                          updated_at = now()
+                    where file_id = %s and firm_id = %s""", values + (file_id, firm_id))
+        else:
+            cur.execute(
+                """insert into document_classifications
+                     (decision, suggested_type, score, margin, candidates, reasons, page_kinds,
+                      rules_version, requirement_match, differs_from_confirmed, engine,
+                      file_id, firm_id)
+                   values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                values + (file_id, firm_id))
+
+
+def reclassify(file_id, firm_id):
+    """סיווג מחדש מהטקסט השמור (למשל אחרי עדכון כללים). מפענח בזיכרון."""
+    from . import classify
+    pages = read_pages(firm_id, file_id)
+    if not pages:
+        return None
+    result = classify.classify_document(pages)
+    store_classification(file_id, firm_id, result)
+    return result
+
+
+def review_classification(file_id, firm_id, user_id, action, kind=None):
+    """
+    confirm - מאשר את הסוג המוצע (רק כשההחלטה "ברור")
+    choose  - אדם בוחר סוג אחר מהרשימה הסגורה (כולל במקרה דו-משמעי)
+    reject  - דוחה את ההצעה; המסמך נשאר בלי סוג מאושר
+
+    אינו נוגע בסטטוס המסמך או בדרישה.
+    """
+    from . import doc_taxonomy
+    with cursor(commit=True) as cur:
+        cur.execute("select decision, suggested_type from document_classifications"
+                    " where file_id = %s and firm_id = %s for update", (file_id, firm_id))
+        row = cur.fetchone()
+        if row is None:
+            raise LookupError("no classification")
+        if action == "confirm":
+            if row["decision"] != "clear":
+                raise ValueError("אין סוג מוצע לאשר. בחר סוג מהרשימה או דחה.")
+            chosen, status = row["suggested_type"], "confirmed"
+        elif action == "choose":
+            if not doc_taxonomy.is_valid(kind or ""):
+                raise ValueError("סוג המסמך אינו ברשימה.")
+            chosen, status = kind, "confirmed"
+        else:
+            chosen, status = None, "rejected"
+        accepted = _accepted_kinds(cur, file_id, firm_id)
+        cur.execute(
+            """update document_classifications
+                  set status = %s, confirmed_type = %s, reviewed_by_user_id = %s,
+                      reviewed_at = now(), differs_from_confirmed = false,
+                      requirement_match = %s, updated_at = now()
+                where file_id = %s and firm_id = %s""",
+            (status, chosen, user_id, requirement_match(accepted, chosen), file_id, firm_id))
+        return status, chosen

@@ -32,6 +32,12 @@
   function ApiError(status, message) {
     this.name = 'ApiError';
     this.status = status;
+    /* detail יכול להיות גם אובייקט {code, message} - למשל אזהרה שדורשת
+       אישור מפורש (classification_mismatch). */
+    if (message && typeof message === 'object') {
+      this.code = message.code || null;
+      message = message.message;
+    }
     this.message = message || 'הפעולה נכשלה.';
   }
   ApiError.prototype = Object.create(Error.prototype);
@@ -142,13 +148,26 @@
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/stage-events',
                       { stage_template_id: stageTemplateId, note: note || null });
     },
-    reviewDocument: function (documentId, decision, rejectReason) {
+    reviewDocument: function (documentId, decision, rejectReason, acknowledgeMismatch) {
       return Api.post('/api/office/documents/' + encodeURIComponent(documentId) + '/review',
-                      { decision: decision, reject_reason: rejectReason || null });
+                      { decision: decision, reject_reason: rejectReason || null,
+                        acknowledge_mismatch: !!acknowledgeMismatch });
     },
-    addDocument: function (caseId, name, guidance, isRequired) {
+    /* סיווג (שלב 4). השרת דורש can_view_medical. */
+    classification: function (documentId, fileId) {
+      return Api.get('/api/office/documents/' + encodeURIComponent(documentId) +
+                     '/files/' + encodeURIComponent(fileId) + '/classification');
+    },
+    reviewClassification: function (documentId, fileId, action, kind) {
+      return Api.post('/api/office/documents/' + encodeURIComponent(documentId) +
+                      '/files/' + encodeURIComponent(fileId) + '/classification/review',
+                      { action: action, kind: kind || null });
+    },
+    documentKinds: function () { return Api.get('/api/office/document-kinds'); },
+    addDocument: function (caseId, name, guidance, isRequired, templateId) {
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/documents',
-                      { name: name, guidance: guidance, is_required: !!isRequired });
+                      { name: name, guidance: guidance, is_required: !!isRequired,
+                        template_id: templateId || null });
     },
     sendMessage: function (caseId, title, body, important) {
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/messages',

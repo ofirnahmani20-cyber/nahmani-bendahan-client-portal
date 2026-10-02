@@ -76,13 +76,53 @@ def fix_words_reversed(text: str) -> str:
     return "\n".join(out)
 
 
-def fix_layer(text: str):
-    """(טקסט מתוקן, אילו תיקונים הוחלו) - לשכבת טקסט של PDF."""
+def visual_word_order(text: str, centers) -> bool | None:
+    """
+    האם סדר המילים בשכבת הטקסט ויזואלי, לפי *מיקום התווים בעמוד*.
+
+    בשורה עברית בסדר לוגי, המילה הבאה נמצאת משמאל לקודמת. אם אחרי
+    רווח האות העברית הבאה נמצאת *מימין* - הסדר ויזואלי. זו עובדה על
+    העמוד, לא ניחוש: הזיהוי לפי פיסוק (words_reversed) נכשל במסמכים
+    קצרים בלי נקודות ונקודתיים (נמצא בשלב 4: "בתביעה החלטה").
+
+    centers: לכל אינדקס בטקסט (x, y) של מרכז התו, או None.
+    None כשאין מספיק מעברים כדי להחליט.
+    """
+    visual = logical = 0
+    prev, gap = None, False
+    for i, ch in enumerate(text):
+        if ch in " \t":
+            gap = prev is not None
+            continue
+        if ch in "\r\n" or not _HEB.match(ch) or centers[i] is None:
+            prev, gap = None, False
+            continue
+        if prev is not None and gap:
+            (px, py), (cx, cy) = centers[prev], centers[i]
+            if abs(cy - py) < 4:                       # אותה שורה
+                if cx > px:
+                    visual += 1
+                else:
+                    logical += 1
+        prev, gap = i, False
+    if visual + logical < 2:
+        return None
+    return visual > logical
+
+
+def fix_layer(text: str, visual_words=None):
+    """
+    (טקסט מתוקן, אילו תיקונים הוחלו) - לשכבת טקסט של PDF.
+    visual_words: התשובה של visual_word_order, אם חושבה. None -> זיהוי
+    לפי פיסוק, כגיבוי.
+    """
     applied = []
     if chars_reversed(text):
         text = fix_chars_reversed(text)
         applied.append("chars")
-    if words_reversed(text):
+    if visual_words is None:
+        visual_words = words_reversed(text)
+    if visual_words:
         text = fix_words_reversed(text)
         applied.append("words")
     return normalize(text), applied

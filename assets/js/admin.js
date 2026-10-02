@@ -313,8 +313,12 @@
     });
   }
 
+  /* התבנית שנבחרה. הדרישה יורשת ממנה את סוגי המסמכים המתקבלים - רק
+     אם השם לא נערך, כי דרישה שנערכה ידנית אינה בהכרח אותה דרישה. */
+  var pickedTemplate = null;
   $('reqPick').addEventListener('change', function () {
     var t = templates[parseInt(this.value, 10)];
+    pickedTemplate = t || null;
     if (!t) return;
     $('reqName').value = t.name;
     $('reqNote').value = t.guidance || '';
@@ -338,6 +342,8 @@
     'system.file_rescanned':     'קובץ נסרק מחדש',
     'system.document_processed': 'מסמך עובד אוטומטית',
     'office.document_text_viewed': 'צפייה בטקסט שחולץ ממסמך',
+    'office.classification_viewed': 'צפייה בסיווג מסמך',
+    'office.classification_reviewed': 'נבדק סיווג מסמך',
     'client.document_replied':   'הלקוח הגיב',
     'client.case_viewed':        'הלקוח צפה בתיק',
     'client.file_downloaded':    'הלקוח הוריד מסמך',
@@ -1615,12 +1621,14 @@
       return reqFail('המסמך "' + name + '" כבר קיים בתיק.', $('reqName'));
     }
 
-    Api.addDocument(openId, name, note, $('reqRequired').checked)
+    var templateId = pickedTemplate && pickedTemplate.name === name ? pickedTemplate.id : null;
+    Api.addDocument(openId, name, note, $('reqRequired').checked, templateId)
        .then(function () { return renderCase(); })
        .then(function () { toast('הדרישה נוספה והלקוח יראה אותה.'); })
        .catch(function (err) { toast(err.message || 'הוספת הדרישה נכשלה.'); });
 
     reqForm.reset();
+    pickedTemplate = null;
     $('reqRequired').checked = true;
   });
 
@@ -2159,6 +2167,11 @@
         if (f.size) row.appendChild(el('span', 'file-size', fileSize(f.size)));
         row.appendChild(fileLink(doc.id, f));
         li.appendChild(row);
+        /* סיווג אוטומטי (שלב 4): רק למי שמורשה לתוכן רפואי, ורק לקובץ
+           שעבר סריקה. השרת אוכף את שניהם בעצמו. */
+        if (staff && staff.canViewMedical && f.ready) {
+          li.appendChild(classificationPanel(doc, f));
+        }
       });
       if (doc.status === 'rejected' && doc.rejectReason) {
         li.appendChild(el('p', 'reject-note', 'סיבת הדחייה שנמסרה ללקוח: ' + doc.rejectReason));
@@ -2191,6 +2204,165 @@
     });
   }
 
+  /* ================= סיווג אוטומטי (שלב 4) =================
+     ההצעה, הנימוק שלה, וההתאמה לדרישה - ושלוש פעולות: אישור הסיווג,
+     בחירת סוג אחר, דחיית ההצעה. אף אחת מהן אינה מאשרת את המסמך או
+     משלימה את הדרישה; זה נשאר בכפתורי הבדיקה הרגילים.
+     אין כאן טקסט מהמסמך - רק ביטויים מהמילון, מיקום ומשקל. */
+
+  var DECISION_TEXT = {
+    'clear':      { tag: 'tag-wait', text: 'הוצע סוג' },
+    'ambiguous':  { tag: 'tag-warn', text: 'נדרשת הכרעה' },
+    'unknown':    { tag: 'tag-warn', text: 'לא זוהה סוג' },
+    'unreadable': { tag: 'tag-warn', text: 'לא ניתן לסווג' },
+    'mixed':      { tag: 'tag-warn', text: 'הקובץ מכיל כמה מסמכים' }
+  };
+  var MATCH_TEXT = {
+    'match':        'תואם לדרישה',
+    'mismatch':     'אינו תואם לדרישה',
+    'undetermined': 'לא ניתן לקבוע התאמה - נדרשת בדיקה',
+    'unmapped':     'לדרישה הזו לא הוגדרו סוגי מסמכים - ההתאמה לא נבדקה'
+  };
+  var kindsCache = null;
+
+  function classificationPanel(doc, f) {
+    var box = el('section', 'classify-panel');
+    box.setAttribute('aria-label', 'סיווג אוטומטי של הקובץ ' + (f.name || ''));
+    box.appendChild(el('h4', null, 'סיווג אוטומטי - הצעה בלבד'));
+    var body = el('div', 'classify-body', 'טוען…');
+    box.appendChild(body);
+
+    function load() {
+      return Api.classification(doc.id, f.id).then(function (c) { draw(c); })
+        .catch(function (err) { body.textContent = err.message || 'טעינת הסיווג נכשלה.'; });
+    }
+
+    function draw(c) {
+      body.textContent = '';
+      if (c.status === 'none') {
+        body.appendChild(el('p', 'item-note', 'הקובץ טרם עובד. הסיווג יופיע בסיום העיבוד.'));
+        return;
+      }
+      var d = DECISION_TEXT[c.decision] || DECISION_TEXT.unknown;
+      var tag = el('span', 'tag ' + (c.status === 'confirmed' ? 'tag-ok' : d.tag),
+                   c.status === 'confirmed' ? 'סיווג אושר' :
+                   c.status === 'rejected' ? 'ההצעה נדחתה' : d.text);
+      body.appendChild(tag);
+
+      if (c.status === 'confirmed' && c.confirmed) {
+        body.appendChild(el('p', 'classify-kind', 'סוג המסמך: ' + c.confirmed.label));
+        if (c.differsFromConfirmed) {
+          body.appendChild(el('p', 'classify-note',
+            'עיבוד חוזר הציע סוג אחר. הסיווג המאושר לא שונה - כדאי לבדוק שוב.'));
+        }
+      } else if (c.decision === 'clear' && c.suggested) {
+        body.appendChild(el('p', 'classify-kind', 'הוצע: ' + c.suggested.label));
+      } else if (c.decision === 'ambiguous') {
+        body.appendChild(el('p', 'classify-kind', 'שני סוגים קרובים: ' +
+          c.candidates.slice(0, 2).map(function (k) { return k.label; }).join(' או ') +
+          '. המערכת אינה בוחרת ביניהם.'));
+      } else if (c.decision === 'mixed') {
+        var pages = el('ul', 'classify-pages');
+        c.pages.forEach(function (p) {
+          pages.appendChild(el('li', null, 'עמוד ' + p.page + ': ' +
+            (p.kind ? p.kind.label + (p.decision === 'continuation' ? ' (המשך)' : '')
+                    : (DECISION_TEXT[p.decision] || DECISION_TEXT.unknown).text)));
+        });
+        body.appendChild(pages);
+        body.appendChild(el('p', 'classify-note',
+          'הקובץ לא פוצל. כל עמוד מוצג עם הסוג המוצע שלו.'));
+      } else if (c.decision === 'unreadable') {
+        body.appendChild(el('p', 'classify-kind', 'הטקסט שחולץ קצר מדי או לא ודאי - ' +
+          'כנראה בעיית קריאות. כדאי לפתוח את הקובץ.'));
+      }
+
+      var req = c.requirement || {};
+      var match = el('p', 'classify-match match-' + req.match,
+        MATCH_TEXT[req.match] || '');
+      if (req.match === 'mismatch' && req.accepted && req.accepted.length) {
+        match.textContent += ' - הדרישה: ' +
+          req.accepted.map(function (k) { return k.label; }).join(' / ');
+      }
+      body.appendChild(match);
+
+      if (c.reasons && c.reasons.length) {
+        var why = el('details', 'classify-why');
+        why.appendChild(el('summary', null, 'מדוע?'));
+        var list = el('ul');
+        c.reasons.forEach(function (r) {
+          list.appendChild(el('li', null,
+            '"' + r.phrase + '" → ' + r.kindLabel +
+            ' · עמוד ' + r.page + ', שורה ' + r.line +
+            ' · ' + (r.zone === 'header' ? 'כותרת' : 'גוף המסמך') +
+            ' · משקל ' + (r.weight > 0 ? '+' : '') + r.weight +
+            (r.approximate ? ' · התאמה חלקית (OCR)' : '')));
+        });
+        why.appendChild(list);
+        why.appendChild(el('p', 'item-note', 'כללים בגרסה ' + c.rulesVersion + '.'));
+        body.appendChild(why);
+      }
+
+      body.appendChild(actionsFor(c));
+    }
+
+    function actionsFor(c) {
+      var act = el('div', 'classify-actions');
+      act.appendChild(el('p', 'item-note',
+        'אישור הסיווג אינו מאשר את המסמך ואינו משלים את הדרישה.'));
+
+      function send(action, kind) {
+        return Api.reviewClassification(doc.id, f.id, action, kind)
+          .then(function () { toast('הסיווג עודכן.'); return load(); })
+          .catch(function (err) { toast(err.message || 'עדכון הסיווג נכשל.'); });
+      }
+
+      if (c.decision === 'clear' && c.status !== 'confirmed') {
+        var yes = el('button', 'btn btn-ok btn-sm', 'אישור הסיווג');
+        yes.type = 'button';
+        yes.addEventListener('click', function () { send('confirm'); });
+        act.appendChild(yes);
+      }
+
+      var pickId = 'kind-' + f.id;
+      var pickLabel = el('label', null, 'סוג אחר:');
+      pickLabel.setAttribute('for', pickId);
+      var pick = document.createElement('select');
+      pick.id = pickId;
+      pick.appendChild(new Option('בחירה מהרשימה…', ''));
+      var choose = el('button', 'btn btn-outline btn-sm', 'קביעת הסוג');
+      choose.type = 'button';
+      choose.addEventListener('click', function () {
+        if (!pick.value) { pick.focus(); return toast('יש לבחור סוג מהרשימה.'); }
+        send('choose', pick.value);
+      });
+      (kindsCache ? Promise.resolve(kindsCache) : Api.documentKinds())
+        .then(function (k) {
+          kindsCache = k;
+          k.categories.forEach(function (cat) {
+            var group = document.createElement('optgroup');
+            group.label = cat.label;
+            k.kinds.filter(function (x) { return x.category === cat.label; })
+                   .forEach(function (x) { group.appendChild(new Option(x.label, x.code)); });
+            pick.appendChild(group);
+          });
+        });
+      act.appendChild(pickLabel);
+      act.appendChild(pick);
+      act.appendChild(choose);
+
+      if (c.status !== 'rejected') {
+        var reject = el('button', 'btn btn-outline btn-sm', 'דחיית ההצעה');
+        reject.type = 'button';
+        reject.addEventListener('click', function () { send('reject'); });
+        act.appendChild(reject);
+      }
+      return act;
+    }
+
+    load();
+    return box;
+  }
+
   /** כפתורי אישור/דחייה + טופס סיבת הדחייה שנפתח מתחתיהם */
   function reviewControls(doc) {
     var wrap    = el('div');
@@ -2199,12 +2371,33 @@
     var ok = el('button', 'btn btn-ok btn-sm', 'אישור המסמך');
     ok.type = 'button';
     ok.setAttribute('aria-label', 'אישור המסמך ' + doc.name);
-    ok.addEventListener('click', function () {
-      Api.reviewDocument(doc.id, 'approve', null)
+    /* אזהרת אי-התאמה בין סיווג המסמך לדרישה. אינה חוסמת - עורך הדין
+       רשאי לאשר - אבל האישור הוא פעולה נפרדת ומפורשת, ולא אותה לחיצה. */
+    var warn = el('div', 'mismatch-warning');
+    warn.hidden = true;
+    warn.setAttribute('role', 'alert');
+
+    function approve(acknowledge) {
+      return Api.reviewDocument(doc.id, 'approve', null, acknowledge)
          .then(function () { return renderCase(); })
          .then(function () { toast('המסמך "' + doc.name + '" אושר.'); })
-         .catch(function (err) { toast(err.message || 'האישור נכשל.'); });
-    });
+         .catch(function (err) {
+           if (err.status === 409 && err.code === 'classification_mismatch') {
+             warn.textContent = '';
+             warn.appendChild(el('p', null, err.message));
+             var anyway = el('button', 'btn btn-outline btn-sm',
+                             'אישור המסמך למרות אי-ההתאמה');
+             anyway.type = 'button';
+             anyway.addEventListener('click', function () { approve(true); });
+             warn.appendChild(anyway);
+             warn.hidden = false;
+             anyway.focus();
+             return;
+           }
+           toast(err.message || 'האישור נכשל.');
+         });
+    }
+    ok.addEventListener('click', function () { approve(false); });
 
     var no = el('button', 'btn btn-stop btn-sm', 'דחייה');
     no.type = 'button';
@@ -2214,6 +2407,7 @@
     actions.appendChild(ok);
     actions.appendChild(no);
     wrap.appendChild(actions);
+    wrap.appendChild(warn);
 
     // הדחייה מחייבת סיבה - הלקוח צריך לדעת מה לתקן
     var form = el('div', 'reject-form');

@@ -44,6 +44,44 @@ CATALOG = {
 }
 
 
+# אילו סוגי מסמכים (server/doc_taxonomy.py) מתקבלים בכל דרישה.
+# הפרדה מכוונת: הסיווג אומר *מה* המסמך; המיפוי הזה אומר מה *ביקשנו*.
+# "imaging" מקבל כל בדיקת דימות; "nii_form.250" מקבל רק טופס 250.
+KINDS_BY_NAME = {
+    "צילום תעודת זהות + ספח":          ["id_card"],
+    "ייפוי כוח חתום":                  ["power_of_attorney"],
+    "טופס ויתור על סודיות רפואית":     ["nii_form.1811"],
+    "סיכומי אשפוז":                    ["hospital_discharge"],
+    "חוות דעת רפואית עדכנית":          ["expert_opinion", "treating_opinion"],
+    "תלושי שכר - 12 חודשים אחרונים":   ["payslip"],
+    "אישורי מחלה (טופס 100)":          ["sick_leave"],
+    "תוצאות בדיקות הדמיה":             ["imaging"],
+    "אישור על קצבאות אחרות":           ["benefits_confirmation"],
+    "פרוטוקול ועדה רפואית":            ["nii_committee"],
+    "הודעה על פגיעה בעבודה (ב.ל 250)": ["nii_form.250"],
+    "אישור על תאונת עבודה מהמעסיק":    ["employer_accident_report"],
+    "תיעוד חדר מיון":                  ["er_record"],
+    "פרוטוקול ועדה מדרג ראשון":        ["nii_committee.first_instance"],
+    "חוות דעת מומחה מטעמנו":           ["expert_opinion"],
+    "תיעוד טיפולים פיזיותרפיים":       ["physiotherapy"],
+    "תצהירי עדים לפגיעה":              ["affidavit"],
+}
+
+
+def backfill_kinds(cur) -> int:
+    """
+    ממלא accepted_kinds לתבניות ולדרישות קיימות לפי השם - רק היכן שעוד
+    ריק, כדי לא לדרוס מיפוי שנקבע ידנית. מחזיר כמה שורות עודכנו.
+    """
+    updated = 0
+    for name, kinds in KINDS_BY_NAME.items():
+        for table in ("required_document_templates", "case_documents"):
+            cur.execute("update %s set accepted_kinds = %%s"
+                        " where name = %%s and accepted_kinds = '{}'" % table, (kinds, name))
+            updated += cur.rowcount
+    return updated
+
+
 def run(cur) -> int:
     added = 0
     for claim_name, rows in CATALOG.items():
@@ -68,6 +106,7 @@ def run(cur) -> int:
                      required, position),
                 )
                 added += cur.rowcount
+    backfill_kinds(cur)
     return added
 
 

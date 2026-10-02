@@ -32,7 +32,7 @@ import subprocess
 import sys
 import time
 
-from . import audit, crypto, processing, scan, storage
+from . import audit, classify, crypto, processing, scan, storage
 from .db.pool import cursor
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -163,6 +163,10 @@ def process_one(worker_id: str, file_ids=None) -> bool:
     if outcome == "ok":
         # כל העמודים יחד, או כלום: אצווה שנכשלה אינה משאירה חצי מסמך.
         processing.replace_pages(job["file_id"], job["firm_id"], extracted)
+        # שלב 4: הצעת סוג, על הטקסט שכבר בזיכרון. הצעה בלבד - אינה
+        # נוגעת בסטטוס המסמך (processing.store_classification).
+        processing.store_classification(job["file_id"], job["firm_id"],
+                                        classify.classify_document(extracted))
         processing.complete(job["id"], payload, elapsed())
         status, code = "done", None
     else:
@@ -182,7 +186,20 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="python -m server.worker")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--enqueue-missing", action="store_true")
+    parser.add_argument("--reclassify", action="store_true",
+                        help="סיווג מחדש של קבצים שסווגו בגרסת כללים קודמת")
     args = parser.parse_args(argv)
+
+    if args.reclassify:
+        from .classify_rules import RULES_VERSION
+        with cursor() as cur:
+            cur.execute("""select file_id, firm_id from document_classifications
+                            where rules_version <> %s""", (RULES_VERSION,))
+            rows = cur.fetchall()
+        for r in rows:
+            processing.reclassify(r["file_id"], r["firm_id"])
+        print("reclassified=%d" % len(rows))
+        return 0
 
     if args.enqueue_missing:
         print("enqueued=%d" % processing.enqueue_missing())

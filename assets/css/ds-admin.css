@@ -1055,3 +1055,35 @@ body.admin .own-none {
 /* שבבי הסינון יושבים מעל הכרטיס ולא בתוכו - ראה ההערה
    ב-admin.html: .table-block נושא overflow-x: auto. */
 body.admin #caseChips { margin: 0 0 var(--ds-space-16); }
+
+/* ---- סיווג אוטומטי (שלב 4) ----
+   הצעה, לא החלטה: מסגרת שקטה, בלי צבע מילוי. אי-התאמה לדרישה
+   ואזהרת האישור מסומנות במילים ובקו - הצבע אינו הערוץ היחיד. */
+body.admin .classify-panel {
+  margin-top: var(--ds-space-12);
+  padding: var(--ds-space-12) var(--ds-space-16);
+  border-inline-start: 2px solid var(--ds-hairline);
+}
+body.admin .classify-panel h4 {
+  margin: 0 0 var(--ds-space-8);
+  font-size: var(--ds-size-label);
+  font-weight: var(--ds-weight-medium);
+}
+body.admin .classify-kind { margin: var(--ds-space-8) 0; }
+body.admin .classify-note { color: var(--ds-accent-ink); }
+body.admin .classify-match.match-mismatch,
+body.admin .classify-match.match-undetermined { color: var(--ds-risk); font-weight: var(--ds-weight-medium); }
+body.admin .classify-match.match-match { color: var(--ds-done); }
+body.admin .classify-why summary { cursor: pointer; }
+body.admin .classify-why li { overflow-wrap: anywhere; }
+body.admin .classify-actions {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--ds-space-8); margin-top: var(--ds-space-8);
+}
+body.admin .classify-actions .item-note { flex-basis: 100%; margin: 0; }
+body.admin .mismatch-warning {
+  margin-top: var(--ds-space-8);
+  padding: var(--ds-space-8) var(--ds-space-12);
+  border-inline-start: 3px solid var(--ds-risk);
+  color: var(--ds-risk);
+}
