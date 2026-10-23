@@ -220,6 +220,9 @@
                      (q ? '?q=' + encodeURIComponent(q) : ''));
     },
     officeCatalogs: function () { return Api.get('/api/office/catalogs'); },
+    setAutoDocuments: function (enabled) {
+      return Api.post('/api/office/settings/auto-documents', { enabled: !!enabled });
+    },
     /* /closed-cases ולא /cases/closed: הנתיב השני נתפס על ידי
        /api/office/cases/{case_id} שרשום לפניו. */
     officeClosedCases: function () { return Api.get('/api/office/closed-cases'); },

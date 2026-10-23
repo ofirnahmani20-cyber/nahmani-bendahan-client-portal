@@ -32,7 +32,7 @@ import subprocess
 import sys
 import time
 
-from . import audit, classify, crypto, processing, scan, storage
+from . import audit, classify, crypto, doc_decision, processing, scan, storage
 from .db.pool import cursor
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -165,8 +165,11 @@ def process_one(worker_id: str, file_ids=None) -> bool:
         processing.replace_pages(job["file_id"], job["firm_id"], extracted)
         # שלב 4: הצעת סוג, על הטקסט שכבר בזיכרון. הצעה בלבד - אינה
         # נוגעת בסטטוס המסמך (processing.store_classification).
-        processing.store_classification(job["file_id"], job["firm_id"],
-                                        classify.classify_document(extracted))
+        result = classify.classify_document(extracted)
+        processing.store_classification(job["file_id"], job["firm_id"], result)
+        # 23.10: החלטה אוטומטית - רק "לא קריא" או "ברור ותואם". שלב
+        # נפרד מהסיווג, וניתן לכיבוי למשרד (server/doc_decision.py).
+        doc_decision.decide(job["file_id"], job["firm_id"], result, extracted)
         processing.complete(job["id"], payload, elapsed())
         status, code = "done", None
     else:

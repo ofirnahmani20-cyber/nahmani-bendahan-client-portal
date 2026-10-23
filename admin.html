@@ -562,6 +562,21 @@
       <div class="view" id="view-settings" hidden>
         <h1 class="view-title" tabindex="-1">הגדרות</h1>
         <p class="lead" id="catalogIntro">הקטלוגים שמניעים את המערכת.</p>
+
+        <!-- 23.10: החלטה אוטומטית על מסמכים (server/doc_decision.py) -->
+        <section class="block" aria-labelledby="h-autodocs">
+          <h2 id="h-autodocs">אישור ודחייה אוטומטיים של מסמכים</h2>
+          <div class="field">
+            <label class="check">
+              <input type="checkbox" id="autoDocs" aria-describedby="autoDocsHint">
+              המערכת מחליטה לבד במקרים חד-משמעיים
+            </label>
+            <p class="hint" id="autoDocsHint">מסמך שאף עמוד בו לא נקרא - נדחה, והלקוח מתבקש לצלם שוב.
+              מסמך שזוהה בבירור כסוג הנדרש ונקרא היטב - מאושר. כל השאר נשאר לבדיקת אדם.
+              כל החלטה כזו מסומנת "אוטומטי" בתיק, ואפשר להפוך אותה. רק מנהל משנה הגדרה זו.</p>
+          </div>
+        </section>
+
         <div id="catalogBody"></div>
       </div>
 

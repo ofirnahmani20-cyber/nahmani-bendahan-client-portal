@@ -472,6 +472,17 @@
     'office.reminder_resumed':      'תזכורת חודשה',
     'office.conversation_sent':     'נשלחה הודעה ללקוח',
     'client.conversation_sent':     'הלקוח שלח הודעה',
+    /* 23.10 - פתיחת תיק, עריכה, אימות דו-שלבי, החלטה אוטומטית */
+    'office.case_created':          'נפתח תיק',
+    'office.case_updated':          'עודכנו פרטי התיק',
+    'office.client_updated':        'עודכנו פרטי הלקוח',
+    'office.client_lookup':         'נבדקה תעודת זהות בפתיחת תיק',
+    'office.mfa_reset':             'אופס אימות דו-שלבי לאיש צוות',
+    'office.auto_documents_changed': 'שונתה הגדרת האישור האוטומטי',
+    'staff.mfa_challenged':         'סיסמה נכונה - נדרש קוד אימות',
+    'staff.mfa_failed':             'קוד אימות שגוי',
+    'staff.mfa_enrolled':           'הופעל אימות דו-שלבי',
+    'system.document_auto_decided': 'המערכת החליטה על מסמך לבד',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
@@ -2127,6 +2138,18 @@
      הייתה שום דרך לראות אותם מהממשק, וכל שינוי חייב גישה
      ישירה למסד. */
 
+  $('autoDocs').addEventListener('change', function () {
+    var box = $('autoDocs');
+    var on = box.checked;
+    if (!on && !confirm('לכבות? כל מסמך שיועלה יחכה לבדיקת אדם.')) { box.checked = true; return; }
+    Api.setAutoDocuments(on).then(function () {
+      announce(on ? 'אישור ודחייה אוטומטיים הופעלו.' : 'אישור ודחייה אוטומטיים כובו.');
+    }).catch(function (err) {
+      box.checked = !on;
+      announce(err.message || 'השינוי לא נשמר.');
+    });
+  });
+
   function loadCatalogs() {
     var host = $('catalogBody');
     if (!host) return Promise.resolve();
@@ -2150,6 +2173,10 @@
       host.appendChild(taskTypesBlock(data.taskTypes));
 
       if (!data.editable) host.appendChild(catalogGap());
+
+      var auto = $('autoDocs');
+      auto.checked  = !!data.autoDocuments;
+      auto.disabled = !(staff && staff.role === 'admin');
     }).catch(function (err) {
       host.textContent = '';
       host.appendChild(el('p', 'item-note',
@@ -2534,6 +2561,12 @@
       tag.appendChild(el('span', null, s.mark, true));
       tag.appendChild(document.createTextNode(s.text));
       li.appendChild(tag);
+      /* 23.10: החלטה שהמערכת קיבלה לבד (doc_decision.py). גלויה,
+         ואפשר להפוך אותה בכפתורי האישור והדחייה הרגילים. */
+      if (doc.auto) {
+        li.appendChild(el('span', 'tag tag-auto',
+          doc.auto === 'approved' ? 'אוטומטי · אפשר לבטל' : 'אוטומטי · לא קריא'));
+      }
 
       li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
       li.appendChild(el('p', 'item-note', doc.note));

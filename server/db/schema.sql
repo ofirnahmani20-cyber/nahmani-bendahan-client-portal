@@ -1046,4 +1046,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS message_deliveries_dedupe
 CREATE INDEX IF NOT EXISTS message_deliveries_subject_sent
   ON message_deliveries (subject_type, subject_id, template_key, sent_at DESC);
 
+-- -------------------------------------------------------------
+--  החלטה אוטומטית על מסמך (server/doc_decision.py) - docs/10, 23.10
+--
+--  auto_document_decisions - המשרד יכול לכבות. ברירת המחדל: מופעל,
+--  לפי החלטת המוצר ("המערכת מאשרת כשהיא בטוחה, ספק - לאדם").
+--  decided_by_system - מה המערכת החליטה לבד, אם בכלל. NULL = אדם
+--  החליט, או שאיש עוד לא החליט. החלטת אדם מאוחרת מנקה אותו.
+-- -------------------------------------------------------------
+ALTER TABLE firms ADD COLUMN IF NOT EXISTS auto_document_decisions boolean NOT NULL DEFAULT true;
+ALTER TABLE case_documents ADD COLUMN IF NOT EXISTS decided_by_system text;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'decided_by_system_values') THEN
+    ALTER TABLE case_documents ADD CONSTRAINT decided_by_system_values
+      CHECK (decided_by_system IS NULL OR decided_by_system IN ('approved', 'unreadable'));
+  END IF;
+END $$;
+
 COMMIT;

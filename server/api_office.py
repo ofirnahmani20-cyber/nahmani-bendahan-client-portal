@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from . import audit, processing, scan, storage
-from .auth import case_scope, require_csrf, require_staff
+from .auth import case_scope, require_admin, require_csrf, require_staff
 from .db.pool import cursor
 
 router = APIRouter()
@@ -146,7 +146,8 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         case = cur.fetchone()
 
         cur.execute(
-            """select id, name, guidance, is_required, status, reject_reason, position
+            """select id, name, guidance, is_required, status, reject_reason, position,
+                      decided_by_system
                  from case_documents where case_id = %s and firm_id = %s
                 order by position""",
             (case_id, identity.firm_id),
@@ -231,6 +232,8 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
             "id": str(d["id"]), "name": d["name"], "note": d["guidance"],
             "required": d["is_required"], "status": d["status"],
             "rejectReason": d["reject_reason"],
+            # 'approved' / 'unreadable' כשהמערכת החליטה לבד; None אחרת
+            "auto": d["decided_by_system"],
             "files": files_by_doc.get(str(d["id"]), []),
         } for d in docs],
         "stageOptions": [{
@@ -347,7 +350,9 @@ def review_document(document_id: str, body: DocumentReview, request: Request,
                   set status = %s,
                       reject_reason = %s,
                       reviewed_by_user_id = %s,
-                      reviewed_at = now()
+                      reviewed_at = now(),
+                      -- החלטת אדם דורסת החלטה אוטומטית (doc_decision.py)
+                      decided_by_system = null
                 where id = %s and firm_id = %s""",
             (new_status,
              body.reject_reason if new_status == "rejected" else None,
@@ -918,6 +923,10 @@ def office_catalogs(request: Request, identity=Depends(require_staff)):
         )
         case_counts = {str(r["claim_type_id"]): r["n"] for r in cur.fetchall()}
 
+        cur.execute("select auto_document_decisions from firms where id = %s",
+                    (identity.firm_id,))
+        auto_documents = cur.fetchone()["auto_document_decisions"]
+
     by_type_stages = {}
     for s in stages:
         by_type_stages.setdefault(str(s["claim_type_id"]), []).append({
@@ -948,7 +957,29 @@ def office_catalogs(request: Request, identity=Depends(require_staff)):
         # מה שאין, ונאמר במפורש במקום להשאיר מסך שנראה שלם:
         # עריכה מהממשק טרם נבנתה.
         "editable": False,
+        # החלטה אוטומטית על מסמכים (doc_decision.py) - מנהל מכבה ומדליק
+        "autoDocuments": auto_documents,
     }
+
+
+class AutoDocuments(BaseModel):
+    enabled: bool
+
+
+@router.post("/api/office/settings/auto-documents")
+def set_auto_documents(body: AutoDocuments, request: Request,
+                       identity=Depends(require_admin)):
+    """
+    הפעלה וכיבוי של אישור ודחייה אוטומטיים. כיבוי אינו מבטל החלטות
+    שכבר התקבלו - הן נשארות מסומנות "אוטומטי" ואפשר להפוך כל אחת.
+    """
+    require_csrf(request)
+    with cursor(commit=True) as cur:
+        cur.execute("update firms set auto_document_decisions = %s where id = %s",
+                    (body.enabled, identity.firm_id))
+    audit.record(identity, "office.auto_documents_changed", request=request,
+                 metadata={"enabled": body.enabled})
+    return {"ok": True, "enabled": body.enabled}
 
 
 # הנתיב הוא /closed-cases ולא /cases/closed במכוון:

@@ -327,11 +327,17 @@ def staff_digest_counts(cur, user):
              (select count(*) from cases c
                where c.firm_id = %(firm)s and c.status = 'active'
                  and c.next_hearing_at between now() and now() + interval '7 days'
-                 and """ + scope + """) as hearings""", params)
+                 and """ + scope + """) as hearings,
+             -- "השותף רק מקבל עדכון": מה המערכת החליטה לבד ביממה האחרונה
+             (select count(*) from case_documents d join cases c on c.id = d.case_id
+               where d.firm_id = %(firm)s and d.decided_by_system is not null
+                 and d.reviewed_at > now() - interval '24 hours'
+                 and """ + scope + """) as auto_decided""", params)
     other = cur.fetchone()
     return {"overdue": tasks["overdue"], "today": tasks["today"],
             "critical": tasks["critical"], "toReview": other["to_review"],
-            "unread": other["unread"], "hearings": other["hearings"]}
+            "unread": other["unread"], "hearings": other["hearings"],
+            "autoDecided": other["auto_decided"]}
 
 
 def run_staff_digest(now):
