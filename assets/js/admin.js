@@ -35,7 +35,13 @@
 
     /* ההשוואה בשרת, מול bcrypt. הדפדפן אינו מחזיק סיסמאות. */
     Api.staffLogin(u, p)
-       .then(function () { start(); })
+       .then(function (res) {
+         /* 23.10: סיסמה נכונה עשויה להחזיר כרטיס במקום session -
+            השלב השני של האימות. ראו server/mfa.py. */
+         if (res && res.mfa === 'verify') return showMfaVerify(res.ticket);
+         if (res && res.mfa === 'enroll') return showMfaEnroll(res.ticket);
+         start();
+       })
        .catch(function (err) {
          loginFail(err.status === 429
            ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
@@ -43,11 +49,108 @@
        });
   });
 
-  function loginFail(msg) {
+  function loginFail(msg, focusId) {
     loginErr.textContent = msg;
     loginErr.hidden = false;
-    $('staffUser').focus();
+    $(focusId || 'staffUser').focus();
   }
+
+  /* ================= אימות דו-שלבי ================= */
+
+  var mfaTicket = null;
+
+  function onlyStep(id) {
+    ['staffLoginForm', 'mfaVerifyForm', 'mfaEnrollForm', 'mfaBackupView']
+      .forEach(function (x) { $(x).hidden = x !== id; });
+    loginErr.hidden = true;
+  }
+
+  /* כרטיס שפג (5 דקות לאימות, 15 להרשמה) - חוזרים לסיסמה. */
+  function mfaExpired() {
+    mfaTicket = null;
+    onlyStep('staffLoginForm');
+    $('staffPass').value = '';
+    loginFail('עבר יותר מדי זמן. צריך להתחבר מחדש.', 'staffPass');
+  }
+
+  function showMfaVerify(ticket) {
+    mfaTicket = ticket;
+    onlyStep('mfaVerifyForm');
+    $('mfaCode').value = '';
+    $('mfaCode').focus();
+  }
+
+  $('mfaVerifyForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = $('mfaCode').value.trim();
+    if (!code) return loginFail('צריך להזין את הקוד.', 'mfaCode');
+    Api.mfaVerify(mfaTicket, code)
+       .then(function (res) {
+         if (res && res.backupCodesLeft !== undefined && res.backupCodesLeft <= 3) {
+           alert('נכנסת עם קוד גיבוי. נותרו ' + res.backupCodesLeft +
+                 ' קודים. כדאי לבקש ממנהל איפוס והרשמה מחדש.');
+         }
+         start();
+       })
+       .catch(function (err) {
+         /* אותה הודעה לקוד שגוי ולכרטיס שפג - השרת אינו מבדיל
+            ביניהם, בכוונה. נשארים במסך הקוד, וההודעה אומרת מה
+            לעשות אם זה חוזר. */
+         loginFail(err.status === 429
+           ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
+           : 'הקוד שגוי או שפג תוקפו. אם זה חוזר - התחבר מחדש.', 'mfaCode');
+       });
+  });
+
+  function showMfaEnroll(ticket) {
+    mfaTicket = ticket;
+    onlyStep('mfaEnrollForm');
+    $('mfaQr').innerHTML = '';
+    $('mfaSecret').textContent = '';
+    Api.mfaEnrollStart(ticket)
+       .then(function (res) {
+         /* SVG שנוצר בשרת שלנו - לא קלט משתמש. */
+         $('mfaQr').innerHTML = res.qrSvg;
+         $('mfaSecret').textContent = res.secret;
+         $('mfaEnrollCode').focus();
+       })
+       .catch(function (err) {
+         if (err.status === 401) return mfaExpired();
+         loginFail('לא הצלחנו להתחיל את ההרשמה. נסה שוב.', 'mfaEnrollCode');
+       });
+  }
+
+  $('mfaEnrollForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = $('mfaEnrollCode').value.trim();
+    if (!code) return loginFail('צריך להזין את הקוד מהאפליקציה.', 'mfaEnrollCode');
+    Api.mfaEnrollConfirm(mfaTicket, code)
+       .then(function (res) { showBackupCodes(res.backupCodes || []); })
+       .catch(function (err) {
+         if (err.status === 401) return mfaExpired();
+         loginFail(err.status === 429
+           ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
+           : 'הקוד אינו תואם. ודא שהשעון בטלפון מכוון ונסה את הקוד הבא.',
+           'mfaEnrollCode');
+       });
+  });
+
+  function showBackupCodes(codes) {
+    onlyStep('mfaBackupView');
+    var ul = $('mfaCodes');
+    ul.innerHTML = '';
+    codes.forEach(function (c) {
+      var li = document.createElement('li');
+      li.textContent = c;
+      ul.appendChild(li);
+    });
+    $('mfaBackupDone').focus();
+  }
+
+  $('mfaBackupDone').addEventListener('click', function () {
+    mfaTicket = null;
+    start();
+  });
 
   $('staffLogout').addEventListener('click', function () {
     Api.staffLogout().then(reloadPage, reloadPage);

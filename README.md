@@ -14,7 +14,8 @@
 | העלאת קבצים (magic bytes, checksum, אחסון מחוץ ל-webroot) | **implemented** — נקראת לזיכרון בלבד, בלי קובץ זמני |
 | הצפנה במנוחה של קבצים | **implemented** — AES-256-GCM, מפתח נגזר לכל קובץ, מפתחות-על בקבצי סוד מחוץ לריפו ולמסד. נוהל DR: `docs/07` |
 | הממשק בדפדפן | **implemented** — כל הדפים קוראים ל-API דרך `assets/js/api.js`, בלי נפילה ל-`localStorage` |
-| אימות דו-שלבי לצוות (TOTP) | ❌ **planned** — עמודת `totp_secret` קיימת, אין קוד |
+| אימות דו-שלבי לצוות (TOTP) | **implemented** — `server/mfa.py`; חובה ב-production (או `PORTAL_REQUIRE_MFA=1`), קודי גיבוי, איפוס בידי מנהל |
+| היקף תיקים לפי אחראי | **implemented** — מנהל רואה הכול, איש צוות רק את התיקים שלו (`auth.case_scope`) |
 | יצירת לקוח ותיק מהממשק | ❌ **planned** — כרגע רק דרך נתוני הזרע |
 | סריקת וירוסים | **implemented** — ClamAV (clamd). בלי `PORTAL_CLAMD_ADDR` קובץ נשאר `pending` ואינו נגיש |
 | עיבוד מסמכים (Layer 2, שלבים 2–4) | **implemented** — worker מבודד עם תקרת זיכרון, חילוץ טקסט ו-OCR (fast) מוצפנים ומקושרים לעמוד, וסיווג דטרמיניסטי עם אישור אנושי (`docs/09`). **סיווג אינו מאשר מסמך** |

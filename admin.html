@@ -41,6 +41,47 @@
       <button type="submit" class="btn btn-primary btn-block">כניסה</button>
     </form>
 
+    <!-- שלב שני: קוד מאפליקציית האימות (docs/10) -->
+    <form id="mfaVerifyForm" novalidate hidden>
+      <div class="field">
+        <label for="mfaCode">קוד אימות</label>
+        <input type="text" id="mfaCode" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="11" required aria-describedby="mfaCodeHint">
+        <p class="hint" id="mfaCodeHint">6 הספרות שמופיעות עכשיו באפליקציית האימות.
+          אין לך את הטלפון? אפשר להקליד אחד מקודי הגיבוי.</p>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">אימות וכניסה</button>
+    </form>
+
+    <!-- הרשמה ראשונה לאימות דו-שלבי -->
+    <form id="mfaEnrollForm" novalidate hidden>
+      <h2 class="mfa-title">הפעלת אימות דו-שלבי</h2>
+      <ol class="mfa-steps">
+        <li>פתח באפליקציית אימות (Google Authenticator, Microsoft Authenticator וכדומה)
+          את האפשרות להוסיף חשבון.</li>
+        <li>סרוק את הקוד:
+          <div class="mfa-qr" id="mfaQr" aria-label="קוד QR להוספת החשבון לאפליקציה"></div>
+          <p class="hint">או הקלד ידנית: <code id="mfaSecret" dir="ltr"></code></p>
+        </li>
+        <li>הקלד את הקוד שהאפליקציה מציגה.</li>
+      </ol>
+      <div class="field">
+        <label for="mfaEnrollCode">קוד מהאפליקציה</label>
+        <input type="text" id="mfaEnrollCode" inputmode="numeric"
+               autocomplete="one-time-code" maxlength="6" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">אישור והפעלה</button>
+    </form>
+
+    <!-- קודי גיבוי - מוצגים פעם אחת -->
+    <div id="mfaBackupView" hidden>
+      <h2 class="mfa-title">קודי גיבוי</h2>
+      <p>אם הטלפון יאבד, כל אחד מהקודים האלה יכניס אותך פעם אחת.
+        <strong>שמור אותם עכשיו במקום בטוח - הם לא יוצגו שוב.</strong></p>
+      <ul class="mfa-codes" id="mfaCodes" dir="ltr"></ul>
+      <button type="button" class="btn btn-primary btn-block" id="mfaBackupDone">שמרתי, המשך</button>
+    </div>
+
     <div class="demo-box">
       <strong>גרסת הדגמה</strong><br>
       ההתחברות היא עם כתובת האימייל של המשתמש במשרד.
