@@ -202,6 +202,7 @@
     docs:       { el: 'case-view-docs',       title: 'מסמכי התיק' },
     committees: { el: 'case-view-committees', title: 'ועדות, החלטות ומועדים' },
     tasks:      { el: 'case-view-tasks',      title: 'משימות' },
+    money:      { el: 'case-view-money',      title: 'כספים' },
     history:    { el: 'case-view-history',    title: 'היסטוריה' }
   };
 
@@ -247,6 +248,7 @@
       setHash('cases/' + openId + '/' + name);
       /* הודעות מסומנות כנקראו רק כשנכנסים ללשונית שמציגה אותן. */
       if (name === 'comms') loadConversation();
+      if (name === 'money') loadMoney();
     }
   });
 
@@ -472,6 +474,29 @@
     'office.reminder_resumed':      'תזכורת חודשה',
     'office.conversation_sent':     'נשלחה הודעה ללקוח',
     'client.conversation_sent':     'הלקוח שלח הודעה',
+    /* 23.10 - פתיחת תיק, עריכה, אימות דו-שלבי, החלטה אוטומטית */
+    'office.case_created':          'נפתח תיק',
+    'office.case_updated':          'עודכנו פרטי התיק',
+    'office.client_updated':        'עודכנו פרטי הלקוח',
+    'office.client_lookup':         'נבדקה תעודת זהות בפתיחת תיק',
+    'office.mfa_reset':             'אופס אימות דו-שלבי לאיש צוות',
+    'office.auto_documents_changed': 'שונתה הגדרת האישור האוטומטי',
+    'staff.mfa_challenged':         'סיסמה נכונה - נדרש קוד אימות',
+    'staff.mfa_failed':             'קוד אימות שגוי',
+    'staff.mfa_enrolled':           'הופעל אימות דו-שלבי',
+    'system.document_auto_decided': 'המערכת החליטה על מסמך לבד',
+    'office.clean_pdf_downloaded':  'הורד עותק נקי של מסמך',
+    'office.binder_downloaded':     'הופק קלסר להגשה',
+    'office.mailbox_assigned':      'קובץ שהגיע במייל שויך למסמך',
+    'office.mailbox_discarded':     'קובץ שהגיע במייל נמחק',
+    'office.mailbox_file_viewed':   'נפתח קובץ שהגיע במייל',
+    'office.fee_agreement_set':         'עודכן הסכם שכר הטרחה',
+    'office.benefit_payment_added':     'נרשם תשלום מהגוף ללקוח',
+    'office.benefit_payment_updated':   'עודכן תשלום מהגוף',
+    'office.benefit_payment_cancelled': 'בוטל תשלום מהגוף',
+    'office.fee_payment_recorded':      'נרשם תשלום שכר טרחה',
+    'office.fee_payment_cancelled':     'בוטל תשלום שכר טרחה',
+    'client.payments_viewed':           'הלקוח צפה בתשלומים',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
@@ -989,6 +1014,211 @@
     }).catch(function (err) {
       ncError(err.message || 'פתיחת התיק נכשלה.');
     });
+  });
+
+
+  /* ================= כספים (23.10) =================
+     החישוב בשרת (server/fees.py). כאן רק תצוגה וטפסים - אין חשבון
+     בדפדפן, כדי שהמשרד והלקוח יראו את אותו מספר בדיוק. */
+
+  var KIND_LABEL  = { retro: 'רטרו', grant: 'מענק', monthly: 'קצבה חודשית', other: 'אחר' };
+  var PAYER_LABEL = { nii: 'ביטוח לאומי', mod: 'משרד הביטחון', insurer: 'חברת ביטוח',
+                      pension_fund: 'קרן פנסיה', other: 'אחר' };
+  var METHOD_LABEL = { transfer: 'העברה', check: "צ'ק", card: 'אשראי', cash: 'מזומן',
+                       offset: 'קיזוז', other: 'אחר' };
+
+  /** סכום מהשרת (מחרוזת עם שתי ספרות) בתצוגה עברית. */
+  function shekel(v) {
+    var n = Number(v || 0);
+    return '₪' + n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function sumRow(dl, label, value, strong) {
+    var dt = el('dt', null, label);
+    var dd = el('dd', strong ? 'num money-strong' : 'num', value);
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  }
+
+  function moneyError(id, err) {
+    var box = $(id);
+    box.textContent = err ? (err.message || 'הפעולה נכשלה.') : '';
+    box.hidden = !err;
+  }
+
+  function loadMoney() {
+    if (!openId) return Promise.resolve();
+    var caseId = openId;
+    return Api.casePayments(caseId).then(function (data) {
+      if (caseId !== openId) return;
+      renderMoneySum(data.calc);
+      renderBenefits(data.payments);
+      renderAgreement(data.agreement);
+      renderFeePayments(data.feePayments);
+    }).catch(function (err) { moneyError('benefitError', err); });
+  }
+
+  function renderMoneySum(calc) {
+    var dl = $('moneySum');
+    dl.textContent = '';
+    var b = calc.benefits;
+    sumRow(dl, 'הלקוח קיבל עד היום', shekel(b.received));
+    if (Number(b.expected)) sumRow(dl, 'צפוי ללקוח (חד-פעמי)', shekel(b.expected));
+    if (Number(b.monthly)) sumRow(dl, 'קצבה חודשית פעילה', shekel(b.monthly) + ' לחודש');
+    if (Number(b.monthlyExpected)) sumRow(dl, 'קצבה שנקבעה וטרם החלה', shekel(b.monthlyExpected) + ' לחודש');
+
+    var lines = $('moneyLines');
+    lines.textContent = '';
+    var f = calc.fee;
+    if (!f) {
+      sumRow(dl, 'שכר טרחה', 'לא הוזן הסכם');
+      return;
+    }
+    sumRow(dl, 'שכר טרחה שמגיע עכשיו', shekel(f.dueNow), true);
+    if (Number(f.dueLater)) sumRow(dl, 'שכר טרחה צפוי בהמשך', shekel(f.dueLater));
+    sumRow(dl, 'שולם למשרד', shekel(f.paid));
+    sumRow(dl, Number(f.balance) < 0 ? 'יתרת זכות ללקוח' : 'יתרה לתשלום',
+           shekel(Math.abs(Number(f.balance))), true);
+
+    /* פירוט החישוב - אותו פירוט שהלקוח רואה */
+    f.lines.forEach(function (l) {
+      lines.appendChild(el('li', 'item-note',
+        (KIND_LABEL[l.kind] || l.kind) + (l.label ? ' · ' + l.label : '') + ': ' + l.basis +
+        ' → עכשיו ' + shekel(l.now) + (Number(l.later) ? ', בהמשך ' + shekel(l.later) : '')));
+    });
+    lines.appendChild(el('li', 'item-note',
+      f.percent + '% מהבסיס' + (Number(f.fixed) ? ' + ' + shekel(f.fixed) + ' קבוע' : '') +
+      (f.vatIncluded ? ' (כולל מע"מ)' : ' + מע"מ ' + f.vatPercent + '%') +
+      (f.capped ? ' · הוגבל לתקרה של ' + shekel(f.cap) : '')));
+  }
+
+  function renderBenefits(list) {
+    var ul = $('benefitList');
+    ul.textContent = '';
+    if (!list.length) { ul.appendChild(el('li', 'item-note', 'לא נרשמו תשלומים.')); return; }
+    list.forEach(function (p) {
+      var li = el('li', 'money-row');
+      var text = (KIND_LABEL[p.kind] || p.kind) + ' · ' + (PAYER_LABEL[p.payer] || p.payer) +
+                 ' · ' + shekel(p.amount) + (p.kind === 'monthly' ? ' לחודש' : '');
+      if (p.label) text += ' · ' + p.label;
+      if (p.kind === 'monthly') {
+        text += ' · מ-' + formatDate(p.periodStart) + (p.periodEnd ? ' עד ' + formatDate(p.periodEnd) : '');
+      }
+      text += p.status === 'received'
+        ? ' · שולם' + (p.receivedDate && p.kind !== 'monthly' ? ' ' + formatDate(p.receivedDate) : '')
+        : ' · צפוי' + (p.expectedDate ? ' ' + formatDate(p.expectedDate) : '');
+      li.appendChild(el('span', null, text));
+      var x = el('button', 'btn btn-quiet btn-sm', 'ביטול');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'ביטול התשלום ' + text);
+      x.addEventListener('click', function () {
+        if (!confirm('לבטל את התשלום? הרישום יישאר בהיסטוריה.')) return;
+        Api.cancelBenefitPayment(p.id).then(loadMoney, function (e) { moneyError('benefitError', e); });
+      });
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+
+  function renderAgreement(a) {
+    moneyError('agreementError', null);
+    var applies = a ? a.appliesTo : ['retro', 'grant'];
+    $('agPercent').value = a ? a.percent : '';
+    $('agFixed').value = a && Number(a.fixed) ? a.fixed : '';
+    $('agRetro').checked = applies.indexOf('retro') !== -1;
+    $('agGrant').checked = applies.indexOf('grant') !== -1;
+    $('agMonthly').checked = applies.indexOf('monthly') !== -1;
+    $('agOther').checked = applies.indexOf('other') !== -1;
+    $('agMonths').value = a && a.monthlyMonths ? a.monthlyMonths : '';
+    $('agMonthsField').hidden = !$('agMonthly').checked;
+    $('agVatIncl').checked = !!(a && a.vatIncluded);
+    $('agCap').value = a && a.cap ? a.cap : '';
+    $('agSigned').value = a && a.signedAt ? a.signedAt : '';
+  }
+
+  function renderFeePayments(list) {
+    var ul = $('feePayList');
+    ul.textContent = '';
+    if (!list.length) { ul.appendChild(el('li', 'item-note', 'לא נרשמו תשלומים.')); return; }
+    list.forEach(function (f) {
+      var li = el('li', 'money-row');
+      var text = formatDate(f.paidAt) + ' · ' + shekel(f.amount) + ' · ' +
+                 (METHOD_LABEL[f.method] || f.method) + (f.reference ? ' · ' + f.reference : '');
+      li.appendChild(el('span', null, text));
+      var x = el('button', 'btn btn-quiet btn-sm', 'ביטול');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'ביטול התשלום ' + text);
+      x.addEventListener('click', function () {
+        if (!confirm('לבטל את רישום התשלום? הרישום יישאר בהיסטוריה.')) return;
+        Api.cancelFeePayment(f.id).then(loadMoney, function (e) { moneyError('feePayError', e); });
+      });
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+
+  $('bfKind').addEventListener('change', function () {
+    $('bfPeriod').hidden = $('bfKind').value !== 'monthly';
+  });
+  $('agMonthly').addEventListener('change', function () {
+    $('agMonthsField').hidden = !$('agMonthly').checked;
+  });
+
+  $('benefitForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var kind = $('bfKind').value, status = $('bfStatus').value, d = $('bfDate').value || null;
+    var body = { kind: kind, payer: $('bfPayer').value, amount: Number($('bfAmount').value),
+                 status: status, label: $('bfLabel').value.trim() || null };
+    if (status === 'received') body.received_date = d; else body.expected_date = d;
+    if (kind === 'monthly') {
+      body.period_start = $('bfStart').value || null;
+      body.period_end = $('bfEnd').value || null;
+    }
+    if (!(body.amount > 0)) return moneyError('benefitError', { message: 'צריך סכום.' });
+    Api.addBenefitPayment(openId, body).then(function () {
+      moneyError('benefitError', null);
+      $('benefitForm').reset();
+      $('bfPeriod').hidden = true;
+      announce('התשלום נרשם.');
+      return loadMoney();
+    }, function (err) { moneyError('benefitError', err); });
+  });
+
+  $('agreementForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var applies = [];
+    if ($('agRetro').checked) applies.push('retro');
+    if ($('agGrant').checked) applies.push('grant');
+    if ($('agMonthly').checked) applies.push('monthly');
+    if ($('agOther').checked) applies.push('other');
+    var body = {
+      percent: Number($('agPercent').value || 0),
+      fixed_amount: Number($('agFixed').value || 0),
+      applies_to: applies,
+      monthly_months: $('agMonthly').checked ? Number($('agMonths').value || 0) || null : null,
+      vat_included: $('agVatIncl').checked,
+      cap_amount: $('agCap').value ? Number($('agCap').value) : null,
+      signed_at: $('agSigned').value || null
+    };
+    Api.setFeeAgreement(openId, body).then(function () {
+      announce('הסכם שכר הטרחה נשמר.');
+      return loadMoney();
+    }, function (err) { moneyError('agreementError', err); });
+  });
+
+  $('feePayForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var body = { amount: Number($('fpAmount').value), paid_at: $('fpDate').value,
+                 method: $('fpMethod').value, reference: $('fpRef').value.trim() || null };
+    if (!(body.amount > 0) || !body.paid_at) {
+      return moneyError('feePayError', { message: 'צריך סכום ותאריך.' });
+    }
+    Api.addFeePayment(openId, body).then(function () {
+      moneyError('feePayError', null);
+      $('feePayForm').reset();
+      announce('התשלום נרשם.');
+      return loadMoney();
+    }, function (err) { moneyError('feePayError', err); });
   });
 
 
@@ -1765,6 +1995,7 @@
       $('caseMeta').textContent = '';
 
       renderCaseMeta(file);
+      $('binderLink').href = Api.officeBinderUrl(file.id);
       renderStage(file);
       renderDecisionForm(file);
       renderCatalog(file);
@@ -2127,6 +2358,18 @@
      הייתה שום דרך לראות אותם מהממשק, וכל שינוי חייב גישה
      ישירה למסד. */
 
+  $('autoDocs').addEventListener('change', function () {
+    var box = $('autoDocs');
+    var on = box.checked;
+    if (!on && !confirm('לכבות? כל מסמך שיועלה יחכה לבדיקת אדם.')) { box.checked = true; return; }
+    Api.setAutoDocuments(on).then(function () {
+      announce(on ? 'אישור ודחייה אוטומטיים הופעלו.' : 'אישור ודחייה אוטומטיים כובו.');
+    }).catch(function (err) {
+      box.checked = !on;
+      announce(err.message || 'השינוי לא נשמר.');
+    });
+  });
+
   function loadCatalogs() {
     var host = $('catalogBody');
     if (!host) return Promise.resolve();
@@ -2150,6 +2393,10 @@
       host.appendChild(taskTypesBlock(data.taskTypes));
 
       if (!data.editable) host.appendChild(catalogGap());
+
+      var auto = $('autoDocs');
+      auto.checked  = !!data.autoDocuments;
+      auto.disabled = !(staff && staff.role === 'admin');
     }).catch(function (err) {
       host.textContent = '';
       host.appendChild(el('p', 'item-note',
@@ -2371,7 +2618,124 @@
      אינו משימה, והוא מסתיר את מה שכן. */
   var binderFilter = 'pending_review';
 
+  /* ---- הגיע במייל (23.10) ----
+     כל פריט: הקובץ, ממי ומתי, התיק שהמערכת מציעה, ובחירת דרישה.
+     בלי תיק מוצע (רק מנהל רואה כאלה) - בוחרים קודם תיק. */
+
+  function loadMailbox() {
+    var block = $('mailboxBlock');
+    return Api.mailbox().then(function (data) {
+      var items = data.items;
+      block.hidden = !items.length;
+      if (!items.length) return;
+      $('mailboxIntro').textContent = (items.length === 1 ? 'קובץ אחד' : items.length + ' קבצים') +
+        ' מחכים לשיוך. ההתאמה לתיק היא הצעה לפי כתובת השולח - כדאי לוודא.';
+      var list = $('mailboxList');
+      list.textContent = '';
+      items.forEach(function (it) { list.appendChild(mailboxRow(it)); });
+    }).catch(function () { block.hidden = true; });
+  }
+
+  function mailboxRow(it) {
+    var li = el('li', 'mailbox-row');
+    li.appendChild(el('h3', 'client-name', it.name || 'קובץ'));
+    var meta = el('p', 'client-meta');
+    meta.appendChild(el('span', null, 'התקבל ' + formatDate(it.at)));
+    if (it.from) meta.appendChild(el('span', null, 'מאת ' + it.from));
+    meta.appendChild(el('span', null, it.caseNumber
+      ? 'מוצע: ' + it.clientName + ' · ' + it.caseNumber
+      : 'לא זוהה תיק'));
+    li.appendChild(meta);
+
+    if (it.ready) {
+      var open = el('a', 'btn btn-outline btn-sm', 'צפייה בקובץ');
+      open.href = Api.mailboxFileUrl(it.id);
+      open.setAttribute('download', it.name || '');
+      li.appendChild(open);
+    } else {
+      li.appendChild(el('span', 'file-blocked', 'ממתין לסריקת אבטחה.'));
+    }
+
+    var uid = 'mb' + it.id.slice(0, 8);
+    var caseField = el('div', 'field');
+    var cl = el('label', null, 'תיק');
+    cl.htmlFor = uid + 'c';
+    var caseSel = el('select');
+    caseSel.id = uid + 'c';
+    caseField.appendChild(cl);
+    caseField.appendChild(caseSel);
+
+    var docField = el('div', 'field');
+    var dl = el('label', null, 'לאיזו דרישה בתיק');
+    dl.htmlFor = uid + 'd';
+    var docSel = el('select');
+    docSel.id = uid + 'd';
+    docField.appendChild(dl);
+    docField.appendChild(docSel);
+
+    var err = el('p', 'alert alert-error');
+    err.setAttribute('role', 'alert');
+    err.hidden = true;
+
+    function fillDocs(caseId) {
+      docSel.textContent = '';
+      if (!caseId) return;
+      Api.officeCase(caseId).then(function (file) {
+        file.documents.filter(function (d) { return d.status !== 'cancelled'; })
+          .forEach(function (d) {
+            var o = el('option', null, d.name + (d.status === 'approved' ? ' (כבר אושר)' : ''));
+            o.value = d.id;
+            docSel.appendChild(o);
+          });
+      });
+    }
+
+    Api.officeCases().then(function (data) {
+      var none = el('option', null, 'בחר תיק');
+      none.value = '';
+      caseSel.appendChild(none);
+      data.cases.forEach(function (c) {
+        var o = el('option', null, c.clientName + ' · ' + c.caseNumber);
+        o.value = c.id;
+        if (c.id === it.caseId) o.selected = true;
+        caseSel.appendChild(o);
+      });
+      fillDocs(caseSel.value);
+    });
+    caseSel.addEventListener('change', function () { fillDocs(caseSel.value); });
+
+    li.appendChild(caseField);
+    li.appendChild(docField);
+    li.appendChild(err);
+
+    var acts = el('div', 'binder-acts');
+    var go = el('button', 'btn btn-primary btn-sm', 'שיוך');
+    go.type = 'button';
+    go.addEventListener('click', function () {
+      err.hidden = true;
+      if (!docSel.value) { err.textContent = 'צריך לבחור תיק ודרישה.'; err.hidden = false; return; }
+      Api.mailboxAssign(it.id, docSel.value).then(function () {
+        announce('הקובץ שויך ונכנס לבדיקה.');
+        return Promise.all([loadMailbox(), loadBinder()]);
+      }).catch(function (x) { err.textContent = x.message || 'השיוך נכשל.'; err.hidden = false; });
+    });
+    var drop = el('button', 'btn btn-quiet btn-sm', 'לא רלוונטי - מחיקה');
+    drop.type = 'button';
+    drop.addEventListener('click', function () {
+      if (!confirm('למחוק את הקובץ? לא יהיה אפשר לשחזר אותו.')) return;
+      Api.mailboxDiscard(it.id).then(function () {
+        announce('הקובץ נמחק.');
+        return loadMailbox();
+      }).catch(function (x) { err.textContent = x.message || 'המחיקה נכשלה.'; err.hidden = false; });
+    });
+    acts.appendChild(go);
+    acts.appendChild(drop);
+    li.appendChild(acts);
+    return li;
+  }
+
   function loadBinder() {
+    loadMailbox();
     var list  = $('binderList');
     var intro = $('binderIntro');
     if (!list) return Promise.resolve();
@@ -2490,7 +2854,16 @@
       a.href = Api.officeFileUrl(documentId, f.id);
       a.setAttribute('download', f.name || '');
       a.setAttribute('aria-label', 'הורדת הקובץ ' + (f.name || 'שהלקוח העלה'));
-      return a;
+      if (!f.clean) return a;
+      /* 23.10: עותק נקי - מיושר, בגווני אפור, PDF אחד (api_binder.py) */
+      var wrap = el('span', 'file-links');
+      wrap.appendChild(a);
+      var c = el('a', 'btn btn-outline btn-sm', 'PDF נקי');
+      c.href = Api.officeCleanPdfUrl(documentId, f.id);
+      c.setAttribute('download', '');
+      c.setAttribute('aria-label', 'הורדת עותק נקי של ' + (f.name || 'הקובץ'));
+      wrap.appendChild(c);
+      return wrap;
     }
     var why = f.scan === 'infected'
       ? 'הקובץ נמצא נגוע בסריקה ואינו ניתן לפתיחה.'
@@ -2534,6 +2907,12 @@
       tag.appendChild(el('span', null, s.mark, true));
       tag.appendChild(document.createTextNode(s.text));
       li.appendChild(tag);
+      /* 23.10: החלטה שהמערכת קיבלה לבד (doc_decision.py). גלויה,
+         ואפשר להפוך אותה בכפתורי האישור והדחייה הרגילים. */
+      if (doc.auto) {
+        li.appendChild(el('span', 'tag tag-auto',
+          doc.auto === 'approved' ? 'אוטומטי · אפשר לבטל' : 'אוטומטי · לא קריא'));
+      }
 
       li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
       li.appendChild(el('p', 'item-note', doc.note));

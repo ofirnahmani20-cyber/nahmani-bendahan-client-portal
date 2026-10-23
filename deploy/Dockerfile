@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # מסמכים רפואיים. ראה docs/08 - רישיונות צד שלישי.md.
 ENV PORTAL_TESSERACT=/usr/bin/tesseract \
     PORTAL_TESSDATA=/opt/tessdata
-RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr curl ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr fonts-dejavu-core curl ca-certificates \
  && mkdir -p /opt/tessdata/fast /opt/tessdata/best \
  && cd /opt/tessdata \
  && curl -fsSL -o fast/heb.traineddata https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/heb.traineddata \

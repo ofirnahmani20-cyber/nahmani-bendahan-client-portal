@@ -40,7 +40,9 @@ TEMPLATES = {
                              "פרטים והכנה: {portal_url}",
     "staff.morning_digest": "סיכום הבוקר: {overdue} משימות באיחור, {critical} דחופות, "
                             "{today} להיום, {toReview} מסמכים לבדיקה, {unread} הודעות "
-                            "שלא נקראו, {hearings} ועדות השבוע.",
+                            "שלא נקראו, {hearings} ועדות השבוע, {autoDecided} מסמכים "
+                            "שהמערכת אישרה או דחתה לבד, {mailbox} קבצים מהמייל "
+                            "שממתינים לשיוך.",
 }
 
 #: הפרמטרים שמותר להעביר לכל נוסח. כל דבר אחר - נדחה.
@@ -48,7 +50,8 @@ TEMPLATE_PARAMS = {
     "requirement.reminder": {"requirement_id"},
     "case.update": set(),
     "case.hearing_reminder": {"date", "time"},
-    "staff.morning_digest": {"overdue", "critical", "today", "toReview", "unread", "hearings"},
+    "staff.morning_digest": {"overdue", "critical", "today", "toReview", "unread", "hearings",
+                             "autoDecided", "mailbox"},
 }
 
 

@@ -31,6 +31,7 @@
     uploaded: { el: 'view-uploaded', title: 'המסמכים שהעלית' },
     roadmap:  { el: 'view-roadmap',  title: 'מפת ההליך' },
     updates:  { el: 'view-updates',  title: 'החלטות ועדכונים' },
+    payments: { el: 'view-payments', title: 'התשלומים שלך' },
     contact:  { el: 'view-contact',  title: 'יצירת קשר' }
   };
 
@@ -65,6 +66,11 @@
       if (head) head.focus();
     }
     window.scrollTo(0, 0);
+
+    // התשלומים נטענים רק כשנכנסים אליהם (payments.js)
+    if (name === 'payments' && typeof window.loadPayments === 'function') {
+      window.loadPayments();
+    }
 
     // מפת הדרכים מונפשת רק כשנכנסים אליה
     if (name === 'roadmap' && typeof window.playRoadmap === 'function') {

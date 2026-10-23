@@ -257,6 +257,7 @@ def test_update_client_contact_details(admin, made, claim_type):
         meta = cur.fetchone()["metadata"]
     assert row["phone"] == "052-1112222" and row["email"] == "x@example.com"
     # היומן אומר אילו שדות, לא מה נכתב בהם
+    assert sorted(meta["fields"]) == ["email", "phone"]
     assert "052" not in str(meta) and "example" not in str(meta)
 
 

@@ -19,6 +19,9 @@ inspect (שלב 2) - סוג, מספר עמודים, ממדים, ואילו עמ�
                   שכבת טקסט ואילו יזדקקו ל-OCR.
 extract (שלב 3) - הטקסט של אצוות עמודים (SANDBOX_PAGES): שכבת
                   טקסט מתוקנת (textfix.py), או OCR (ocr.py).
+clean  (23.10) - עמודים נקיים לאצוות עמודים: גווני אפור, יישור
+                  תאורה והטיה, JPEG (cleanpage.py). מהם נבנים ה-PDF
+                  הנקי והקלסר, בלי לפענח את המקור שוב.
 
 ניסיון הפריצה מתבטא כ-rejected, לא כקריסה של המערכת.
 """
@@ -209,6 +212,64 @@ def extract(data):
                                        "ocr_mode": ocr.MODE}}
 
 
+def clean_pages(data):
+    """task clean: [{page, jpeg (base64), width, height, deskew}]"""
+    import base64
+    import io
+
+    from PIL import Image
+
+    from . import cleanpage
+
+    wanted = _wanted_pages()
+    out = []
+
+    def emit(page_no, img, flatten):
+        jpeg, w, h, angle = cleanpage.clean(img, flatten=flatten)
+        out.append({"page": page_no, "jpeg": base64.b64encode(jpeg).decode("ascii"),
+                    "width": w, "height": h, "deskew": angle})
+
+    if data.startswith(b"%PDF-"):
+        import pypdfium2 as pdfium
+        try:
+            pdf = pdfium.PdfDocument(data)
+        except pdfium.PdfiumError:
+            raise Rejected("corrupt_pdf")
+        try:
+            n = len(pdf)
+            if n > MAX_PAGES:
+                raise Rejected("too_many_pages")
+            for page_no in wanted:
+                if not 1 <= page_no <= n:
+                    raise Rejected("bad_page_request")
+                page = pdf[page_no - 1]
+                w, h = page.get_size()
+                dpi = cleanpage.TARGET_DPI
+                if (w / 72 * dpi) * (h / 72 * dpi) > MAX_PAGE_PIXELS:
+                    raise Rejected("page_too_large")
+                # עמוד דיגיטלי (שכבת טקסט) אינו צריך יישור תאורה.
+                digital = len(page.get_textpage().get_text_range().strip()) >= MIN_LAYER_CHARS
+                img = page.render(scale=dpi / 72).to_pil()
+                emit(page_no, img, flatten=not digital)
+                del img
+        finally:
+            pdf.close()
+    elif data[:3] == b"\xff\xd8\xff" or data[:8] == b"\x89PNG\r\n\x1a\n" or \
+            (data[:4] == b"RIFF" and data[8:12] == b"WEBP"):
+        Image.MAX_IMAGE_PIXELS = MAX_PAGE_PIXELS
+        try:
+            img = Image.open(io.BytesIO(data))
+            img.load()
+        except Image.DecompressionBombError:
+            raise Rejected("image_too_large")
+        except Exception:
+            raise Rejected("corrupt_image")
+        emit(1, img, flatten=True)
+    else:
+        raise Rejected("unsupported_type")
+    return {"pages": out}
+
+
 def inspect(data):
     if data.startswith(b"%PDF-"):
         return inspect_pdf(data)
@@ -250,11 +311,11 @@ def main():
         _out({"ok": False, "code": "limits_unavailable"}, EXIT_NO_LIMITS)
 
     try:
-        if task in ("inspect", "extract"):
+        if task in ("inspect", "extract", "clean"):
             data = sys.stdin.buffer.read(MAX_INPUT + 1)
             if len(data) > MAX_INPUT:
                 raise Rejected("input_too_large")
-            result = inspect(data) if task == "inspect" else extract(data)
+            result = {"inspect": inspect, "extract": extract, "clean": clean_pages}[task](data)
             del data
         else:
             if os.environ.get("SANDBOX_SELFTEST") != "1":

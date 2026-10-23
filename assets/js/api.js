@@ -220,6 +220,9 @@
                      (q ? '?q=' + encodeURIComponent(q) : ''));
     },
     officeCatalogs: function () { return Api.get('/api/office/catalogs'); },
+    setAutoDocuments: function (enabled) {
+      return Api.post('/api/office/settings/auto-documents', { enabled: !!enabled });
+    },
     /* /closed-cases ולא /cases/closed: הנתיב השני נתפס על ידי
        /api/office/cases/{case_id} שרשום לפניו. */
     officeClosedCases: function () { return Api.get('/api/office/closed-cases'); },
@@ -237,6 +240,42 @@
     officeFileUrl: function (documentId, fileId) {
       return '/api/office/documents/' + encodeURIComponent(documentId) +
              '/files/' + encodeURIComponent(fileId);
+    },
+    officeCleanPdfUrl: function (documentId, fileId) {
+      return Api.officeFileUrl(documentId, fileId) + '/clean.pdf';
+    },
+    mailbox: function () { return Api.get('/api/office/mailbox'); },
+    casePayments: function (caseId) {
+      return Api.get('/api/office/cases/' + encodeURIComponent(caseId) + '/payments');
+    },
+    setFeeAgreement: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/fee-agreement', body);
+    },
+    addBenefitPayment: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/benefit-payments', body);
+    },
+    cancelBenefitPayment: function (id) {
+      return Api.post('/api/office/benefit-payments/' + encodeURIComponent(id) + '/cancel');
+    },
+    addFeePayment: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/fee-payments', body);
+    },
+    cancelFeePayment: function (id) {
+      return Api.post('/api/office/fee-payments/' + encodeURIComponent(id) + '/cancel');
+    },
+    clientPayments: function () { return Api.get('/api/client/payments'); },
+    mailboxFileUrl: function (id) {
+      return '/api/office/mailbox/' + encodeURIComponent(id) + '/file';
+    },
+    mailboxAssign: function (id, documentId) {
+      return Api.post('/api/office/mailbox/' + encodeURIComponent(id) + '/assign',
+                      { document_id: documentId });
+    },
+    mailboxDiscard: function (id) {
+      return Api.post('/api/office/mailbox/' + encodeURIComponent(id) + '/discard');
+    },
+    officeBinderUrl: function (caseId) {
+      return '/api/office/cases/' + encodeURIComponent(caseId) + '/binder.pdf';
     },
 
     auditLog: function (caseId, limit) {

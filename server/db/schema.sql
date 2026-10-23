@@ -1046,4 +1046,167 @@ CREATE UNIQUE INDEX IF NOT EXISTS message_deliveries_dedupe
 CREATE INDEX IF NOT EXISTS message_deliveries_subject_sent
   ON message_deliveries (subject_type, subject_id, template_key, sent_at DESC);
 
+-- -------------------------------------------------------------
+--  החלטה אוטומטית על מסמך (server/doc_decision.py) - docs/10, 23.10
+--
+--  auto_document_decisions - המשרד יכול לכבות. ברירת המחדל: מופעל,
+--  לפי החלטת המוצר ("המערכת מאשרת כשהיא בטוחה, ספק - לאדם").
+--  decided_by_system - מה המערכת החליטה לבד, אם בכלל. NULL = אדם
+--  החליט, או שאיש עוד לא החליט. החלטת אדם מאוחרת מנקה אותו.
+-- -------------------------------------------------------------
+ALTER TABLE firms ADD COLUMN IF NOT EXISTS auto_document_decisions boolean NOT NULL DEFAULT true;
+ALTER TABLE case_documents ADD COLUMN IF NOT EXISTS decided_by_system text;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'decided_by_system_values') THEN
+    ALTER TABLE case_documents ADD CONSTRAINT decided_by_system_values
+      CHECK (decided_by_system IS NULL OR decided_by_system IN ('approved', 'unreadable'));
+  END IF;
+END $$;
+
+-- -------------------------------------------------------------
+--  עמודים נקיים (server/cleanpage.py) - docs/10, 23.10
+--
+--  לכל עמוד של קובץ שעובד: תמונה בגווני אפור, מיושרת, עם תאורה
+--  אחידה, ב-JPEG מוצפן באחסון (אותו מנגנון של הקובץ המקורי). מהם
+--  נבנים ה-PDF הנקי והקלסר - בלי לפענח את הקובץ המקורי שוב.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS document_clean_pages (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  file_id     uuid NOT NULL REFERENCES document_files(id) ON DELETE CASCADE,
+  page_no     integer NOT NULL CHECK (page_no >= 1),
+  storage_key text NOT NULL UNIQUE,
+  width       integer NOT NULL CHECK (width > 0),
+  height      integer NOT NULL CHECK (height > 0),
+  size_bytes  integer NOT NULL CHECK (size_bytes > 0),
+  -- הזווית שבה יושר העמוד, במעלות. 0 = לא נדרש יישור.
+  deskew_deg  real NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (file_id, page_no)
+);
+
+-- -------------------------------------------------------------
+--  קליטת מסמכים ממייל (server/mail_intake.py) - docs/10, 23.10
+--
+--  כל קובץ מצורף שעבר בדיקת סוג וסריקה - שורה כאן, והקובץ מוצפן
+--  באחסון (firms/{firm}/intake/{uuid}). השולח והתיק הם *הצעה*:
+--  כתובת שולח קלה לזיוף, ולכן אדם משייך כל פריט לדרישה, ורק אז
+--  הוא נכנס לתיק ולעיבוד.
+--
+--  נושא ההודעה וגופה אינם נשמרים. "בדיקת MRI של רוחמה" בשורת
+--  נושא היא מידע רפואי מזוהה, ואין בו צורך כדי לשייך קובץ.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS intake_items (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id           uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  received_at       timestamptz NOT NULL DEFAULT now(),
+  from_address      text,
+  -- hash של Message-ID + מספר הקובץ: הודעה שנקראה פעמיים לא נכנסת פעמיים
+  dedupe_hash       text NOT NULL,
+  matched_client_id uuid REFERENCES clients(id) ON DELETE SET NULL,
+  matched_case_id   uuid REFERENCES cases(id) ON DELETE SET NULL,
+  storage_key       text NOT NULL UNIQUE,
+  original_filename text,
+  mime_type         text NOT NULL,
+  size_bytes        bigint NOT NULL CHECK (size_bytes > 0),
+  checksum          text NOT NULL,
+  scan_status       text NOT NULL CHECK (scan_status IN ('pending', 'clean', 'failed')),
+  status            text NOT NULL DEFAULT 'new'
+                    CHECK (status IN ('new', 'assigned', 'discarded')),
+  assigned_file_id  uuid REFERENCES document_files(id) ON DELETE SET NULL,
+  handled_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  handled_at        timestamptz,
+  UNIQUE (firm_id, dedupe_hash),
+  CONSTRAINT intake_handled_has_handler
+    CHECK (status = 'new' OR (handled_by_user_id IS NOT NULL AND handled_at IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS intake_items_new ON intake_items (firm_id, received_at) WHERE status = 'new';
+
+-- מאיפה הגיע קובץ: הפורטל (הלקוח) או מייל ששויך בידי הצוות.
+ALTER TABLE document_files ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'portal';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'document_files_source_values') THEN
+    ALTER TABLE document_files ADD CONSTRAINT document_files_source_values
+      CHECK (source IN ('portal', 'email', 'office'));
+  END IF;
+END $$;
+
+-- -------------------------------------------------------------
+--  תשלומים ושכר טרחה (server/fees.py, api_payments.py) - docs/10, 23.10
+--
+--  שלוש טבלאות, וחישוב אחד שמשרת את שני הצדדים:
+--    fee_agreements   - הסכם שכר הטרחה של התיק (אחד לתיק)
+--    benefit_payments - מה הגוף משלם ללקוח: רטרו, מענק, קצבה חודשית
+--    fee_payments     - מה הלקוח שילם למשרד
+--
+--  אין כאן תקרה חוקית קבועה בקוד. תקרה, אם חלה, מוזנת בהסכם בידי
+--  עורך הדין - המערכת אינה ממציאה מספרים משפטיים.
+--
+--  רישום כספי אינו נמחק: תשלום שגוי מבוטל (cancelled_at) ונשאר.
+-- -------------------------------------------------------------
+ALTER TABLE firms ADD COLUMN IF NOT EXISTS vat_percent numeric(5,2) NOT NULL DEFAULT 18
+  CHECK (vat_percent BETWEEN 0 AND 50);
+
+CREATE TABLE IF NOT EXISTS fee_agreements (
+  case_id        uuid PRIMARY KEY REFERENCES cases(id) ON DELETE CASCADE,
+  firm_id        uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  percent        numeric(5,2) NOT NULL DEFAULT 0 CHECK (percent BETWEEN 0 AND 100),
+  fixed_amount   numeric(12,2) NOT NULL DEFAULT 0 CHECK (fixed_amount >= 0),
+  -- על אילו תשלומים חל האחוז
+  applies_to     text[] NOT NULL DEFAULT '{retro,grant}'
+                 CHECK (applies_to <@ ARRAY['retro', 'grant', 'monthly', 'other']::text[]),
+  -- קצבה חודשית: האחוז חל על N החודשים הראשונים בלבד
+  monthly_months integer CHECK (monthly_months BETWEEN 1 AND 120),
+  vat_included   boolean NOT NULL DEFAULT false,
+  -- תקרה כוללת (כולל מע"מ), אם הוסכם או אם חלה על התיק
+  cap_amount     numeric(12,2) CHECK (cap_amount > 0),
+  signed_at      date,
+  updated_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT fee_has_a_basis CHECK (percent > 0 OR fixed_amount > 0),
+  CONSTRAINT monthly_needs_months CHECK (NOT ('monthly' = ANY(applies_to)) OR monthly_months IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS benefit_payments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id       uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id       uuid NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  kind          text NOT NULL CHECK (kind IN ('retro', 'grant', 'monthly', 'other')),
+  payer         text NOT NULL DEFAULT 'nii'
+                CHECK (payer IN ('nii', 'mod', 'insurer', 'pension_fund', 'other')),
+  -- חד-פעמי: הסכום. חודשי: הסכום לחודש.
+  amount        numeric(12,2) NOT NULL CHECK (amount > 0),
+  -- expected = נקבע, טרם שולם. received = שולם (חודשי: התחיל להשתלם).
+  status        text NOT NULL DEFAULT 'expected'
+                CHECK (status IN ('expected', 'received')),
+  expected_date date,
+  received_date date,
+  -- חודשי בלבד
+  period_start  date,
+  period_end    date,
+  label         text,
+  cancelled_at  timestamptz,
+  created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT monthly_has_start CHECK (kind <> 'monthly' OR period_start IS NOT NULL),
+  CONSTRAINT received_has_date CHECK (status <> 'received' OR received_date IS NOT NULL),
+  CONSTRAINT period_is_ordered CHECK (period_end IS NULL OR period_end >= period_start)
+);
+CREATE INDEX IF NOT EXISTS benefit_payments_case ON benefit_payments (case_id) WHERE cancelled_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS fee_payments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id       uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id       uuid NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  amount        numeric(12,2) NOT NULL CHECK (amount > 0),
+  paid_at       date NOT NULL,
+  method        text NOT NULL DEFAULT 'transfer'
+                CHECK (method IN ('transfer', 'check', 'cash', 'card', 'offset', 'other')),
+  reference     text,
+  cancelled_at  timestamptz,
+  recorded_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS fee_payments_case ON fee_payments (case_id) WHERE cancelled_at IS NULL;
+
 COMMIT;
