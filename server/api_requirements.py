@@ -15,9 +15,9 @@ api_requirements.py - דרישות מהלקוח, משלוח ותזכורות.
    ב-worker שירוץ בעתיד: ההשלמה עצמה מבטלת את המשלוחים הממתינים
    ומשהה את הכללים, בתוך אותה טרנזקציה.
 
-⚠️ אין כאן scheduler ואין ספק אמיתי. get_sender() מחזיר
-   ConsoleSender בפיתוח ו-NullSender בייצור, ושניהם אינם שולחים
-   דבר החוצה. השליחה יזומה בלחיצה בלבד.
+⚠️ אין עדיין ספק אמיתי. get_sender() מחזיר ConsoleSender בפיתוח
+   ו-NullSender בייצור, ושניהם אינם שולחים דבר החוצה.
+   הכללים כן רצים מאז 23.10 - server/notifier.py.
 """
 
 from datetime import datetime
@@ -489,8 +489,8 @@ class NewReminder(BaseModel):
 def create_reminder(requirement_id: str, body: NewReminder, request: Request,
                     identity=Depends(require_staff)):
     """
-    שומר כלל תזכורת. הוא אינו רץ: אין scheduler בפרויקט, והשליחה
-    יזומה. הכלל נשמר כדי שהפעלת worker בעתיד לא תדרוש הזנה מחדש.
+    שומר כלל תזכורת. server/notifier.py מריץ אותו (23.10), בחלון
+    השעות והימים שהוגדרו בו.
     """
     require_csrf(request)
     if body.hours_from >= body.hours_to:

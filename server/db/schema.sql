@@ -1030,4 +1030,20 @@ CREATE TABLE IF NOT EXISTS mfa_backup_codes (
 );
 CREATE INDEX IF NOT EXISTS mfa_backup_codes_user ON mfa_backup_codes (user_id) WHERE used_at IS NULL;
 
+-- -------------------------------------------------------------
+--  שירות ההתראות (server/notifier.py) - docs/10, 23.10
+--
+--  message_deliveries משמשת לכל משלוח, ולא רק לתזכורת על דרישה.
+--  case_id    - לאיזה תיק המשלוח שייך (עדכון, ועדה).
+--  dedupe_key - מפתח שמונע משלוח כפול של אותו אירוע, גם כשהשירות
+--               רץ פעמיים או נפל באמצע. NULL מותר וחוזר על עצמו
+--               (משלוח ידני מהממשק).
+-- -------------------------------------------------------------
+ALTER TABLE message_deliveries ADD COLUMN IF NOT EXISTS case_id    uuid;
+ALTER TABLE message_deliveries ADD COLUMN IF NOT EXISTS dedupe_key text;
+CREATE UNIQUE INDEX IF NOT EXISTS message_deliveries_dedupe
+  ON message_deliveries (firm_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS message_deliveries_subject_sent
+  ON message_deliveries (subject_type, subject_id, template_key, sent_at DESC);
+
 COMMIT;

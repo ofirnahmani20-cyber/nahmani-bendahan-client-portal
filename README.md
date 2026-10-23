@@ -20,6 +20,7 @@
 | סריקת וירוסים | **implemented** — ClamAV (clamd). בלי `PORTAL_CLAMD_ADDR` קובץ נשאר `pending` ואינו נגיש |
 | עיבוד מסמכים (Layer 2, שלבים 2–4) | **implemented** — worker מבודד עם תקרת זיכרון, חילוץ טקסט ו-OCR (fast) מוצפנים ומקושרים לעמוד, וסיווג דטרמיניסטי עם אישור אנושי (`docs/09`). **סיווג אינו מאשר מסמך** |
 | שליחת SMS ל-OTP | ❌ **planned** — יש ממשק, אין ספק. ב-demo הקוד נכתב ללוג |
+| שירות התראות | **implemented** — `server/notifier.py`: תזכורות לפי כללים, "יש עדכון" מרוכז (לכל היותר אחת ל-6 שעות), ועדה 3 ימים ויום לפני, סיכום בוקר לצוות. נשלח בפועל רק כשיהיה ספק |
 | Object storage ו-signed URLs | ❌ **planned** — כרגע דיסק מקומי |
 | HTTPS ו-HSTS | ❌ **planned** |
 
@@ -50,6 +51,13 @@ python -m server.db.apply         # סכמה + נתוני הדגמה
 ```powershell
 python -m server.worker --enqueue-missing   # קבצים clean שנשמרו לפני שלב 2
 python -m server.worker                     # לולאה; --once לעבודה אחת
+```
+
+### התראות (notifier)
+
+```powershell
+python -m server.notifier          # סבב אחד
+python -m server.notifier --loop   # כל 5 דקות
 ```
 
 ### 2. משתני סביבה (`.env` בשורש, אינו נכנס ל-git)

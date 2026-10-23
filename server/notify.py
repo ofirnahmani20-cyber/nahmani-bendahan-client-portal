@@ -27,6 +27,42 @@ class SmsNotConfigured(RuntimeError):
 CHANNELS = ("sms", "whatsapp", "email", "portal")
 
 
+#: נוסחי ההודעות. ספק אמיתי ירנדר מהם; עד אז הם החוזה.
+#:
+#: הכלל: אין כאן שום מידע על מצב רפואי, סוג מסמך או תוצאה. SMS נשאר
+#: בטלפון ומוצג על מסך נעול. הפרטים - רק אחרי כניסה מאומתת לאתר.
+#: tests/test_notifier.py אוכף את הרשימה הסגורה של הפרמטרים.
+TEMPLATES = {
+    "requirement.reminder": "תזכורת ממשרד נחמני-בן דהן: מחכה לך פריט להשלמה בתיק. "
+                            "לפרטים: {portal_url}",
+    "case.update": "יש עדכון חדש בתיק שלך במשרד נחמני-בן דהן. לצפייה: {portal_url}",
+    "case.hearing_reminder": "תזכורת: נקבע לך מועד ב-{date} בשעה {time}. "
+                             "פרטים והכנה: {portal_url}",
+    "staff.morning_digest": "סיכום הבוקר: {overdue} משימות באיחור, {critical} דחופות, "
+                            "{today} להיום, {toReview} מסמכים לבדיקה, {unread} הודעות "
+                            "שלא נקראו, {hearings} ועדות השבוע.",
+}
+
+#: הפרמטרים שמותר להעביר לכל נוסח. כל דבר אחר - נדחה.
+TEMPLATE_PARAMS = {
+    "requirement.reminder": {"requirement_id"},
+    "case.update": set(),
+    "case.hearing_reminder": {"date", "time"},
+    "staff.morning_digest": {"overdue", "critical", "today", "toReview", "unread", "hearings"},
+}
+
+
+def render(template_key, params=None):
+    """הנוסח הסופי. portal_url מגיע מהסביבה, לא מהקורא."""
+    allowed = TEMPLATE_PARAMS[template_key]
+    extra = set(params or {}) - allowed
+    if extra:
+        raise ValueError("פרמטרים אסורים לנוסח %s: %s" % (template_key, sorted(extra)))
+    values = {"portal_url": os.environ.get("PORTAL_PUBLIC_URL", "")}
+    values.update(params or {})
+    return TEMPLATES[template_key].format(**values)
+
+
 class Sender:
     """
     הממשק שספק אמיתי יצטרך לממש.

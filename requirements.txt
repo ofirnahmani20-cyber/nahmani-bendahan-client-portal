@@ -22,6 +22,9 @@ cryptography==50.0.1
 # קוד QR להרשמה לאימות הדו-שלבי של הצוות (server/mfa.py). Python טהור,
 # בלי תלויות. BSD-3-Clause. ה-TOTP עצמו ממומש ב-hmac של הספרייה הסטנדרטית.
 segno==1.6.6
+# אזור הזמן של ישראל לשירות ההתראות (zoneinfo). בתמונת slim של Linux
+# אין מסד אזורי זמן של המערכת, ובלעדיו Asia/Jerusalem נכשל.
+tzdata==2026.3
 
 # Layer 2 - פענוח מסמכים. רצים רק בתהליך המבודד (server/sandbox.py),
 # לעולם לא בתהליך השרת. pypdfium2: Apache-2.0/BSD (ולא PyMuPDF, AGPL).
