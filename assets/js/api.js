@@ -245,6 +245,25 @@
       return Api.officeFileUrl(documentId, fileId) + '/clean.pdf';
     },
     mailbox: function () { return Api.get('/api/office/mailbox'); },
+    casePayments: function (caseId) {
+      return Api.get('/api/office/cases/' + encodeURIComponent(caseId) + '/payments');
+    },
+    setFeeAgreement: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/fee-agreement', body);
+    },
+    addBenefitPayment: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/benefit-payments', body);
+    },
+    cancelBenefitPayment: function (id) {
+      return Api.post('/api/office/benefit-payments/' + encodeURIComponent(id) + '/cancel');
+    },
+    addFeePayment: function (caseId, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/fee-payments', body);
+    },
+    cancelFeePayment: function (id) {
+      return Api.post('/api/office/fee-payments/' + encodeURIComponent(id) + '/cancel');
+    },
+    clientPayments: function () { return Api.get('/api/client/payments'); },
     mailboxFileUrl: function (id) {
       return '/api/office/mailbox/' + encodeURIComponent(id) + '/file';
     },

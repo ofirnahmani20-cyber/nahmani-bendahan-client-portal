@@ -202,6 +202,7 @@
     docs:       { el: 'case-view-docs',       title: 'מסמכי התיק' },
     committees: { el: 'case-view-committees', title: 'ועדות, החלטות ומועדים' },
     tasks:      { el: 'case-view-tasks',      title: 'משימות' },
+    money:      { el: 'case-view-money',      title: 'כספים' },
     history:    { el: 'case-view-history',    title: 'היסטוריה' }
   };
 
@@ -247,6 +248,7 @@
       setHash('cases/' + openId + '/' + name);
       /* הודעות מסומנות כנקראו רק כשנכנסים ללשונית שמציגה אותן. */
       if (name === 'comms') loadConversation();
+      if (name === 'money') loadMoney();
     }
   });
 
@@ -488,6 +490,13 @@
     'office.mailbox_assigned':      'קובץ שהגיע במייל שויך למסמך',
     'office.mailbox_discarded':     'קובץ שהגיע במייל נמחק',
     'office.mailbox_file_viewed':   'נפתח קובץ שהגיע במייל',
+    'office.fee_agreement_set':         'עודכן הסכם שכר הטרחה',
+    'office.benefit_payment_added':     'נרשם תשלום מהגוף ללקוח',
+    'office.benefit_payment_updated':   'עודכן תשלום מהגוף',
+    'office.benefit_payment_cancelled': 'בוטל תשלום מהגוף',
+    'office.fee_payment_recorded':      'נרשם תשלום שכר טרחה',
+    'office.fee_payment_cancelled':     'בוטל תשלום שכר טרחה',
+    'client.payments_viewed':           'הלקוח צפה בתשלומים',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
@@ -1005,6 +1014,211 @@
     }).catch(function (err) {
       ncError(err.message || 'פתיחת התיק נכשלה.');
     });
+  });
+
+
+  /* ================= כספים (23.10) =================
+     החישוב בשרת (server/fees.py). כאן רק תצוגה וטפסים - אין חשבון
+     בדפדפן, כדי שהמשרד והלקוח יראו את אותו מספר בדיוק. */
+
+  var KIND_LABEL  = { retro: 'רטרו', grant: 'מענק', monthly: 'קצבה חודשית', other: 'אחר' };
+  var PAYER_LABEL = { nii: 'ביטוח לאומי', mod: 'משרד הביטחון', insurer: 'חברת ביטוח',
+                      pension_fund: 'קרן פנסיה', other: 'אחר' };
+  var METHOD_LABEL = { transfer: 'העברה', check: "צ'ק", card: 'אשראי', cash: 'מזומן',
+                       offset: 'קיזוז', other: 'אחר' };
+
+  /** סכום מהשרת (מחרוזת עם שתי ספרות) בתצוגה עברית. */
+  function shekel(v) {
+    var n = Number(v || 0);
+    return '₪' + n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function sumRow(dl, label, value, strong) {
+    var dt = el('dt', null, label);
+    var dd = el('dd', strong ? 'num money-strong' : 'num', value);
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  }
+
+  function moneyError(id, err) {
+    var box = $(id);
+    box.textContent = err ? (err.message || 'הפעולה נכשלה.') : '';
+    box.hidden = !err;
+  }
+
+  function loadMoney() {
+    if (!openId) return Promise.resolve();
+    var caseId = openId;
+    return Api.casePayments(caseId).then(function (data) {
+      if (caseId !== openId) return;
+      renderMoneySum(data.calc);
+      renderBenefits(data.payments);
+      renderAgreement(data.agreement);
+      renderFeePayments(data.feePayments);
+    }).catch(function (err) { moneyError('benefitError', err); });
+  }
+
+  function renderMoneySum(calc) {
+    var dl = $('moneySum');
+    dl.textContent = '';
+    var b = calc.benefits;
+    sumRow(dl, 'הלקוח קיבל עד היום', shekel(b.received));
+    if (Number(b.expected)) sumRow(dl, 'צפוי ללקוח (חד-פעמי)', shekel(b.expected));
+    if (Number(b.monthly)) sumRow(dl, 'קצבה חודשית פעילה', shekel(b.monthly) + ' לחודש');
+    if (Number(b.monthlyExpected)) sumRow(dl, 'קצבה שנקבעה וטרם החלה', shekel(b.monthlyExpected) + ' לחודש');
+
+    var lines = $('moneyLines');
+    lines.textContent = '';
+    var f = calc.fee;
+    if (!f) {
+      sumRow(dl, 'שכר טרחה', 'לא הוזן הסכם');
+      return;
+    }
+    sumRow(dl, 'שכר טרחה שמגיע עכשיו', shekel(f.dueNow), true);
+    if (Number(f.dueLater)) sumRow(dl, 'שכר טרחה צפוי בהמשך', shekel(f.dueLater));
+    sumRow(dl, 'שולם למשרד', shekel(f.paid));
+    sumRow(dl, Number(f.balance) < 0 ? 'יתרת זכות ללקוח' : 'יתרה לתשלום',
+           shekel(Math.abs(Number(f.balance))), true);
+
+    /* פירוט החישוב - אותו פירוט שהלקוח רואה */
+    f.lines.forEach(function (l) {
+      lines.appendChild(el('li', 'item-note',
+        (KIND_LABEL[l.kind] || l.kind) + (l.label ? ' · ' + l.label : '') + ': ' + l.basis +
+        ' → עכשיו ' + shekel(l.now) + (Number(l.later) ? ', בהמשך ' + shekel(l.later) : '')));
+    });
+    lines.appendChild(el('li', 'item-note',
+      f.percent + '% מהבסיס' + (Number(f.fixed) ? ' + ' + shekel(f.fixed) + ' קבוע' : '') +
+      (f.vatIncluded ? ' (כולל מע"מ)' : ' + מע"מ ' + f.vatPercent + '%') +
+      (f.capped ? ' · הוגבל לתקרה של ' + shekel(f.cap) : '')));
+  }
+
+  function renderBenefits(list) {
+    var ul = $('benefitList');
+    ul.textContent = '';
+    if (!list.length) { ul.appendChild(el('li', 'item-note', 'לא נרשמו תשלומים.')); return; }
+    list.forEach(function (p) {
+      var li = el('li', 'money-row');
+      var text = (KIND_LABEL[p.kind] || p.kind) + ' · ' + (PAYER_LABEL[p.payer] || p.payer) +
+                 ' · ' + shekel(p.amount) + (p.kind === 'monthly' ? ' לחודש' : '');
+      if (p.label) text += ' · ' + p.label;
+      if (p.kind === 'monthly') {
+        text += ' · מ-' + formatDate(p.periodStart) + (p.periodEnd ? ' עד ' + formatDate(p.periodEnd) : '');
+      }
+      text += p.status === 'received'
+        ? ' · שולם' + (p.receivedDate && p.kind !== 'monthly' ? ' ' + formatDate(p.receivedDate) : '')
+        : ' · צפוי' + (p.expectedDate ? ' ' + formatDate(p.expectedDate) : '');
+      li.appendChild(el('span', null, text));
+      var x = el('button', 'btn btn-quiet btn-sm', 'ביטול');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'ביטול התשלום ' + text);
+      x.addEventListener('click', function () {
+        if (!confirm('לבטל את התשלום? הרישום יישאר בהיסטוריה.')) return;
+        Api.cancelBenefitPayment(p.id).then(loadMoney, function (e) { moneyError('benefitError', e); });
+      });
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+
+  function renderAgreement(a) {
+    moneyError('agreementError', null);
+    var applies = a ? a.appliesTo : ['retro', 'grant'];
+    $('agPercent').value = a ? a.percent : '';
+    $('agFixed').value = a && Number(a.fixed) ? a.fixed : '';
+    $('agRetro').checked = applies.indexOf('retro') !== -1;
+    $('agGrant').checked = applies.indexOf('grant') !== -1;
+    $('agMonthly').checked = applies.indexOf('monthly') !== -1;
+    $('agOther').checked = applies.indexOf('other') !== -1;
+    $('agMonths').value = a && a.monthlyMonths ? a.monthlyMonths : '';
+    $('agMonthsField').hidden = !$('agMonthly').checked;
+    $('agVatIncl').checked = !!(a && a.vatIncluded);
+    $('agCap').value = a && a.cap ? a.cap : '';
+    $('agSigned').value = a && a.signedAt ? a.signedAt : '';
+  }
+
+  function renderFeePayments(list) {
+    var ul = $('feePayList');
+    ul.textContent = '';
+    if (!list.length) { ul.appendChild(el('li', 'item-note', 'לא נרשמו תשלומים.')); return; }
+    list.forEach(function (f) {
+      var li = el('li', 'money-row');
+      var text = formatDate(f.paidAt) + ' · ' + shekel(f.amount) + ' · ' +
+                 (METHOD_LABEL[f.method] || f.method) + (f.reference ? ' · ' + f.reference : '');
+      li.appendChild(el('span', null, text));
+      var x = el('button', 'btn btn-quiet btn-sm', 'ביטול');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'ביטול התשלום ' + text);
+      x.addEventListener('click', function () {
+        if (!confirm('לבטל את רישום התשלום? הרישום יישאר בהיסטוריה.')) return;
+        Api.cancelFeePayment(f.id).then(loadMoney, function (e) { moneyError('feePayError', e); });
+      });
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+
+  $('bfKind').addEventListener('change', function () {
+    $('bfPeriod').hidden = $('bfKind').value !== 'monthly';
+  });
+  $('agMonthly').addEventListener('change', function () {
+    $('agMonthsField').hidden = !$('agMonthly').checked;
+  });
+
+  $('benefitForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var kind = $('bfKind').value, status = $('bfStatus').value, d = $('bfDate').value || null;
+    var body = { kind: kind, payer: $('bfPayer').value, amount: Number($('bfAmount').value),
+                 status: status, label: $('bfLabel').value.trim() || null };
+    if (status === 'received') body.received_date = d; else body.expected_date = d;
+    if (kind === 'monthly') {
+      body.period_start = $('bfStart').value || null;
+      body.period_end = $('bfEnd').value || null;
+    }
+    if (!(body.amount > 0)) return moneyError('benefitError', { message: 'צריך סכום.' });
+    Api.addBenefitPayment(openId, body).then(function () {
+      moneyError('benefitError', null);
+      $('benefitForm').reset();
+      $('bfPeriod').hidden = true;
+      announce('התשלום נרשם.');
+      return loadMoney();
+    }, function (err) { moneyError('benefitError', err); });
+  });
+
+  $('agreementForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var applies = [];
+    if ($('agRetro').checked) applies.push('retro');
+    if ($('agGrant').checked) applies.push('grant');
+    if ($('agMonthly').checked) applies.push('monthly');
+    if ($('agOther').checked) applies.push('other');
+    var body = {
+      percent: Number($('agPercent').value || 0),
+      fixed_amount: Number($('agFixed').value || 0),
+      applies_to: applies,
+      monthly_months: $('agMonthly').checked ? Number($('agMonths').value || 0) || null : null,
+      vat_included: $('agVatIncl').checked,
+      cap_amount: $('agCap').value ? Number($('agCap').value) : null,
+      signed_at: $('agSigned').value || null
+    };
+    Api.setFeeAgreement(openId, body).then(function () {
+      announce('הסכם שכר הטרחה נשמר.');
+      return loadMoney();
+    }, function (err) { moneyError('agreementError', err); });
+  });
+
+  $('feePayForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var body = { amount: Number($('fpAmount').value), paid_at: $('fpDate').value,
+                 method: $('fpMethod').value, reference: $('fpRef').value.trim() || null };
+    if (!(body.amount > 0) || !body.paid_at) {
+      return moneyError('feePayError', { message: 'צריך סכום ותאריך.' });
+    }
+    Api.addFeePayment(openId, body).then(function () {
+      moneyError('feePayError', null);
+      $('feePayForm').reset();
+      announce('התשלום נרשם.');
+      return loadMoney();
+    }, function (err) { moneyError('feePayError', err); });
   });
 
 

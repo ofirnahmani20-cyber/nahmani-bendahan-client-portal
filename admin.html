@@ -8,12 +8,12 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
      תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/style.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/admin.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/ds.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/ds-admin.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/ds-case.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/style.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/admin.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/ds.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20261023180000">
 </head>
 <body class="admin">
 
@@ -616,6 +616,7 @@
           <li><a href="#docs" data-view="docs">מסמכי התיק</a></li>
           <li><a href="#committees" data-view="committees">ועדות, החלטות ומועדים</a></li>
           <li><a href="#tasks" data-view="tasks">משימות</a></li>
+          <li><a href="#money" data-view="money">כספים</a></li>
           <li><a href="#history" data-view="history">היסטוריה</a></li>
         </ul>
       </nav>
@@ -1023,6 +1024,108 @@
           </section>
       </div>
 
+      <!-- ============ כספים (23.10) ============
+           תשלומים מהגוף ללקוח, הסכם שכר הטרחה, ותשלומי הלקוח למשרד.
+           החישוב בשרת (server/fees.py), אחד למשרד וללקוח. -->
+      <div class="case-view" id="case-view-money" hidden>
+        <h2 class="view-title" tabindex="-1">כספים</h2>
+
+        <section class="block" aria-labelledby="h-money-sum">
+          <h3 id="h-money-sum">סיכום</h3>
+          <dl class="money-sum" id="moneySum"></dl>
+          <ul class="plain-list money-lines" id="moneyLines"></ul>
+        </section>
+
+        <section class="block" aria-labelledby="h-benefits">
+          <h3 id="h-benefits">תשלומים מהגוף ללקוח</h3>
+          <ul class="plain-list" id="benefitList"></ul>
+          <div class="alert alert-error" id="benefitError" role="alert" hidden></div>
+          <form id="benefitForm" class="money-form" novalidate>
+            <div class="field"><label for="bfKind">סוג</label>
+              <select id="bfKind">
+                <option value="retro">רטרו (חד-פעמי)</option>
+                <option value="grant">מענק</option>
+                <option value="monthly">קצבה חודשית</option>
+                <option value="other">אחר</option>
+              </select></div>
+            <div class="field"><label for="bfPayer">משלם</label>
+              <select id="bfPayer">
+                <option value="nii">ביטוח לאומי</option>
+                <option value="mod">משרד הביטחון</option>
+                <option value="insurer">חברת ביטוח</option>
+                <option value="pension_fund">קרן פנסיה</option>
+                <option value="other">אחר</option>
+              </select></div>
+            <div class="field"><label for="bfAmount">סכום (₪; בקצבה - לחודש)</label>
+              <input type="number" id="bfAmount" min="0" step="0.01" dir="ltr"></div>
+            <div class="field"><label for="bfStatus">מצב</label>
+              <select id="bfStatus">
+                <option value="expected">נקבע, טרם שולם</option>
+                <option value="received">שולם / משתלם</option>
+              </select></div>
+            <div class="field"><label for="bfDate">תאריך (תשלום, או צפוי)</label>
+              <input type="date" id="bfDate"></div>
+            <div class="field" id="bfPeriod" hidden><label for="bfStart">קצבה: חודש התחלה</label>
+              <input type="date" id="bfStart">
+              <label for="bfEnd">חודש סיום (לא חובה)</label>
+              <input type="date" id="bfEnd"></div>
+            <div class="field"><label for="bfLabel">תיאור (לא חובה)</label>
+              <input type="text" id="bfLabel" maxlength="120"></div>
+            <button type="submit" class="btn btn-primary btn-sm">הוספת תשלום</button>
+          </form>
+        </section>
+
+        <section class="block" aria-labelledby="h-agreement">
+          <h3 id="h-agreement">הסכם שכר טרחה</h3>
+          <div class="alert alert-error" id="agreementError" role="alert" hidden></div>
+          <form id="agreementForm" class="money-form" novalidate>
+            <div class="field"><label for="agPercent">אחוז</label>
+              <input type="number" id="agPercent" min="0" max="100" step="0.01" dir="ltr"></div>
+            <fieldset class="field"><legend>האחוז חל על</legend>
+              <label class="check"><input type="checkbox" id="agRetro" checked> רטרו</label>
+              <label class="check"><input type="checkbox" id="agGrant" checked> מענק</label>
+              <label class="check"><input type="checkbox" id="agMonthly"> קצבה חודשית</label>
+              <label class="check"><input type="checkbox" id="agOther"> אחר</label>
+            </fieldset>
+            <div class="field" id="agMonthsField" hidden><label for="agMonths">על כמה חודשי קצבה</label>
+              <input type="number" id="agMonths" min="1" max="120" dir="ltr"></div>
+            <div class="field"><label for="agFixed">סכום קבוע (₪, לא חובה)</label>
+              <input type="number" id="agFixed" min="0" step="0.01" dir="ltr"></div>
+            <div class="field"><label class="check"><input type="checkbox" id="agVatIncl"> הסכומים כוללים מע"מ</label></div>
+            <div class="field"><label for="agCap">תקרה כוללת (₪, לא חובה)</label>
+              <input type="number" id="agCap" min="0" step="0.01" dir="ltr" aria-describedby="agCapHint">
+              <p class="hint" id="agCapHint">אם חלה על התיק תקרה לפי דין או לפי הסכם - להזין כאן. המערכת אינה קובעת תקרה בעצמה.</p></div>
+            <div class="field"><label for="agSigned">תאריך חתימה</label>
+              <input type="date" id="agSigned"></div>
+            <button type="submit" class="btn btn-primary btn-sm">שמירת ההסכם</button>
+          </form>
+        </section>
+
+        <section class="block" aria-labelledby="h-feepay">
+          <h3 id="h-feepay">תשלומי הלקוח למשרד</h3>
+          <ul class="plain-list" id="feePayList"></ul>
+          <div class="alert alert-error" id="feePayError" role="alert" hidden></div>
+          <form id="feePayForm" class="money-form" novalidate>
+            <div class="field"><label for="fpAmount">סכום (₪)</label>
+              <input type="number" id="fpAmount" min="0" step="0.01" dir="ltr"></div>
+            <div class="field"><label for="fpDate">תאריך</label>
+              <input type="date" id="fpDate"></div>
+            <div class="field"><label for="fpMethod">אמצעי</label>
+              <select id="fpMethod">
+                <option value="transfer">העברה בנקאית</option>
+                <option value="check">צ'ק</option>
+                <option value="card">כרטיס אשראי</option>
+                <option value="cash">מזומן</option>
+                <option value="offset">קיזוז</option>
+                <option value="other">אחר</option>
+              </select></div>
+            <div class="field"><label for="fpRef">אסמכתא (פנימי, לא מוצג ללקוח)</label>
+              <input type="text" id="fpRef" maxlength="80"></div>
+            <button type="submit" class="btn btn-primary btn-sm">רישום תשלום</button>
+          </form>
+        </section>
+      </div>
+
       <!-- ============ 6. היסטוריה ============ -->
       <div class="case-view" id="case-view-history" hidden>
         <h2 class="view-title" tabindex="-1">היסטוריה</h2>
@@ -1041,9 +1144,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20261002150000"></script>
-<script src="assets/js/viewnav.js?v=20261002150000"></script>
-<script src="assets/js/ds-dashboard.js?v=20261002150000"></script>
-<script src="assets/js/admin.js?v=20261002150000"></script>
+<script src="assets/js/api.js?v=20261023180000"></script>
+<script src="assets/js/viewnav.js?v=20261023180000"></script>
+<script src="assets/js/ds-dashboard.js?v=20261023180000"></script>
+<script src="assets/js/admin.js?v=20261023180000"></script>
 </body>
 </html>

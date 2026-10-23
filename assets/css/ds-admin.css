@@ -1123,3 +1123,11 @@ body.admin .file-links { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 /* ---- הגיע במייל (23.10) ---- */
 body.admin .mailbox-row { padding: 14px 0; border-bottom: var(--ds-hairline-w) solid var(--ds-hairline); }
 body.admin .mailbox-row .field { max-width: 28rem; margin-top: 10px; }
+
+/* ---- כספים (23.10) ---- */
+body.admin .money-sum { display: grid; grid-template-columns: auto auto; gap: 6px 24px; justify-content: start; margin: 0 0 12px; }
+body.admin .money-sum dd { margin: 0; }
+body.admin .money-strong { font-weight: var(--ds-weight-medium); }
+body.admin .money-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 6px 0; flex-wrap: wrap; }
+body.admin .money-form { max-width: 28rem; margin-top: 12px; }
+body.admin .money-form fieldset { border: 0; padding: 0; }

@@ -1424,3 +1424,10 @@ img.ph::after { content: none; }
    בלי רווחים היה מותח את הבועה מעבר לרוחב המסך בטלפון. */
 .chat-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-link { margin: 6px 0 0; font-size: 13px; color: var(--text-soft); }
+
+/* ---- התשלומים שלך (23.10, payments.js) ---- */
+.pay-case { margin: 0 0 32px; }
+.pay-sum { display: grid; grid-template-columns: auto auto; gap: 8px 24px; justify-content: start; margin: 12px 0 16px; }
+.pay-sum dd { margin: 0; font-weight: 600; }
+.pay-list li { padding: 4px 0; }
+@media (max-width: 480px) { .pay-sum { grid-template-columns: 1fr; gap: 2px; } .pay-sum dd { margin-bottom: 8px; } }

@@ -1131,4 +1131,82 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- -------------------------------------------------------------
+--  תשלומים ושכר טרחה (server/fees.py, api_payments.py) - docs/10, 23.10
+--
+--  שלוש טבלאות, וחישוב אחד שמשרת את שני הצדדים:
+--    fee_agreements   - הסכם שכר הטרחה של התיק (אחד לתיק)
+--    benefit_payments - מה הגוף משלם ללקוח: רטרו, מענק, קצבה חודשית
+--    fee_payments     - מה הלקוח שילם למשרד
+--
+--  אין כאן תקרה חוקית קבועה בקוד. תקרה, אם חלה, מוזנת בהסכם בידי
+--  עורך הדין - המערכת אינה ממציאה מספרים משפטיים.
+--
+--  רישום כספי אינו נמחק: תשלום שגוי מבוטל (cancelled_at) ונשאר.
+-- -------------------------------------------------------------
+ALTER TABLE firms ADD COLUMN IF NOT EXISTS vat_percent numeric(5,2) NOT NULL DEFAULT 18
+  CHECK (vat_percent BETWEEN 0 AND 50);
+
+CREATE TABLE IF NOT EXISTS fee_agreements (
+  case_id        uuid PRIMARY KEY REFERENCES cases(id) ON DELETE CASCADE,
+  firm_id        uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  percent        numeric(5,2) NOT NULL DEFAULT 0 CHECK (percent BETWEEN 0 AND 100),
+  fixed_amount   numeric(12,2) NOT NULL DEFAULT 0 CHECK (fixed_amount >= 0),
+  -- על אילו תשלומים חל האחוז
+  applies_to     text[] NOT NULL DEFAULT '{retro,grant}'
+                 CHECK (applies_to <@ ARRAY['retro', 'grant', 'monthly', 'other']::text[]),
+  -- קצבה חודשית: האחוז חל על N החודשים הראשונים בלבד
+  monthly_months integer CHECK (monthly_months BETWEEN 1 AND 120),
+  vat_included   boolean NOT NULL DEFAULT false,
+  -- תקרה כוללת (כולל מע"מ), אם הוסכם או אם חלה על התיק
+  cap_amount     numeric(12,2) CHECK (cap_amount > 0),
+  signed_at      date,
+  updated_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT fee_has_a_basis CHECK (percent > 0 OR fixed_amount > 0),
+  CONSTRAINT monthly_needs_months CHECK (NOT ('monthly' = ANY(applies_to)) OR monthly_months IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS benefit_payments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id       uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id       uuid NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  kind          text NOT NULL CHECK (kind IN ('retro', 'grant', 'monthly', 'other')),
+  payer         text NOT NULL DEFAULT 'nii'
+                CHECK (payer IN ('nii', 'mod', 'insurer', 'pension_fund', 'other')),
+  -- חד-פעמי: הסכום. חודשי: הסכום לחודש.
+  amount        numeric(12,2) NOT NULL CHECK (amount > 0),
+  -- expected = נקבע, טרם שולם. received = שולם (חודשי: התחיל להשתלם).
+  status        text NOT NULL DEFAULT 'expected'
+                CHECK (status IN ('expected', 'received')),
+  expected_date date,
+  received_date date,
+  -- חודשי בלבד
+  period_start  date,
+  period_end    date,
+  label         text,
+  cancelled_at  timestamptz,
+  created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT monthly_has_start CHECK (kind <> 'monthly' OR period_start IS NOT NULL),
+  CONSTRAINT received_has_date CHECK (status <> 'received' OR received_date IS NOT NULL),
+  CONSTRAINT period_is_ordered CHECK (period_end IS NULL OR period_end >= period_start)
+);
+CREATE INDEX IF NOT EXISTS benefit_payments_case ON benefit_payments (case_id) WHERE cancelled_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS fee_payments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id       uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  case_id       uuid NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  amount        numeric(12,2) NOT NULL CHECK (amount > 0),
+  paid_at       date NOT NULL,
+  method        text NOT NULL DEFAULT 'transfer'
+                CHECK (method IN ('transfer', 'check', 'cash', 'card', 'offset', 'other')),
+  reference     text,
+  cancelled_at  timestamptz,
+  recorded_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS fee_payments_case ON fee_payments (case_id) WHERE cancelled_at IS NULL;
+
 COMMIT;

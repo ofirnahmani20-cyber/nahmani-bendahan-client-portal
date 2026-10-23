@@ -7,10 +7,10 @@
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <!-- tokens מצהיר בלבד; ds-front מעצב, והכול בתוכו תחת body.front.
      admin.html אינו נושא את המחלקה ואינו טוען את הקובץ. -->
-<link rel="stylesheet" href="assets/css/tokens.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/style.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/ds.css?v=20261002150000">
-<link rel="stylesheet" href="assets/css/ds-front.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/tokens.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/style.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/ds.css?v=20261023180000">
+<link rel="stylesheet" href="assets/css/ds-front.css?v=20261023180000">
 </head>
 <body class="front">
 
@@ -44,6 +44,7 @@
         <li><a href="#uploaded" data-view="uploaded">המסמכים שהעלית</a></li>
         <li><a href="#roadmap" data-view="roadmap">מפת ההליך</a></li>
         <li><a href="#updates" data-view="updates">עדכונים</a></li>
+        <li><a href="#payments" data-view="payments">תשלומים</a></li>
         <li><a href="#contact" data-view="contact">יצירת קשר</a></li>
       </ul>
     </nav>
@@ -96,6 +97,11 @@
     <li>
       <button type="button" class="drawer-link" data-view="updates">
         <span>החלטות ועדכונים</span>
+      </button>
+    </li>
+    <li>
+      <button type="button" class="drawer-link" data-view="payments">
+        <span>התשלומים שלך</span>
       </button>
     </li>
     <li>
@@ -263,6 +269,18 @@
     </div>
   </div>
 
+  <!-- ===================== התשלומים שלך (23.10) ===================== -->
+  <div class="view" id="view-payments" hidden>
+    <div class="band">
+      <div class="band-in">
+        <h1 class="view-title" id="paymentsTitle" tabindex="-1">התשלומים שלך</h1>
+        <p class="lead measure">מה קיבלת, מה צפוי להגיע אליך, ושכר הטרחה למשרד - עם החישוב המלא.
+          הנתונים מוזנים בידי המשרד. אם משהו לא נראה לך נכון, כתוב לנו במסך "יצירת קשר".</p>
+        <div id="paymentsBody"><p class="measure">טוען…</p></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== יצירת קשר ===================== -->
   <div class="view" id="view-contact" hidden>
     <div class="band">
@@ -326,9 +344,10 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20261002150000"></script>
-<script src="assets/js/quality.js?v=20261002150000"></script>
-<script src="assets/js/dashboard.js?v=20261002150000"></script>
-<script src="assets/js/nav.js?v=20261002150000"></script>
+<script src="assets/js/api.js?v=20261023180000"></script>
+<script src="assets/js/quality.js?v=20261023180000"></script>
+<script src="assets/js/dashboard.js?v=20261023180000"></script>
+<script src="assets/js/payments.js?v=20261023180000"></script>
+<script src="assets/js/nav.js?v=20261023180000"></script>
 </body>
 </html>
