@@ -495,6 +495,15 @@
         <h1 class="view-title" tabindex="-1">מסמכים</h1>
         <p class="lead" id="binderIntro">מבט רוחבי על מסמכי המשרד.</p>
 
+        <!-- 23.10: קבצים שהגיעו לתיבת המייל של המשרד (mail_intake.py).
+             השולח והתיק הם הצעה - כתובת שולח ניתנת לזיוף - ולכן כל
+             קובץ משויך לדרישה בידי אדם. -->
+        <section class="block" id="mailboxBlock" aria-labelledby="h-mailbox" hidden>
+          <h2 id="h-mailbox">הגיע במייל - ממתין לשיוך</h2>
+          <p class="item-note" id="mailboxIntro"></p>
+          <ul class="plain-list" id="mailboxList"></ul>
+        </section>
+
         <div class="block">
           <div class="chips" id="binderChips" role="group"
                aria-label="סינון לפי מצב המסמך"></div>

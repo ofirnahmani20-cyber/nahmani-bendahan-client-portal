@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import (api_auth, api_binder, api_client, api_conversation, api_intake, api_medical, api_office,
+from . import (api_auth, api_binder, api_client, api_conversation, api_intake, api_mailbox, api_medical, api_office,
                api_requirements, api_search, audit, crypto, maintenance, scan)
 from .auth import require_csrf, require_staff
 from .db.pool import healthy as db_healthy
@@ -103,6 +103,7 @@ app.include_router(api_search.router)
 app.include_router(api_medical.router)
 app.include_router(api_intake.router)
 app.include_router(api_binder.router)
+app.include_router(api_mailbox.router)
 
 
 # ============================================================

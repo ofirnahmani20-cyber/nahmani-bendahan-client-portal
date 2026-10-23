@@ -1085,4 +1085,50 @@ CREATE TABLE IF NOT EXISTS document_clean_pages (
   UNIQUE (file_id, page_no)
 );
 
+-- -------------------------------------------------------------
+--  קליטת מסמכים ממייל (server/mail_intake.py) - docs/10, 23.10
+--
+--  כל קובץ מצורף שעבר בדיקת סוג וסריקה - שורה כאן, והקובץ מוצפן
+--  באחסון (firms/{firm}/intake/{uuid}). השולח והתיק הם *הצעה*:
+--  כתובת שולח קלה לזיוף, ולכן אדם משייך כל פריט לדרישה, ורק אז
+--  הוא נכנס לתיק ולעיבוד.
+--
+--  נושא ההודעה וגופה אינם נשמרים. "בדיקת MRI של רוחמה" בשורת
+--  נושא היא מידע רפואי מזוהה, ואין בו צורך כדי לשייך קובץ.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS intake_items (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id           uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  received_at       timestamptz NOT NULL DEFAULT now(),
+  from_address      text,
+  -- hash של Message-ID + מספר הקובץ: הודעה שנקראה פעמיים לא נכנסת פעמיים
+  dedupe_hash       text NOT NULL,
+  matched_client_id uuid REFERENCES clients(id) ON DELETE SET NULL,
+  matched_case_id   uuid REFERENCES cases(id) ON DELETE SET NULL,
+  storage_key       text NOT NULL UNIQUE,
+  original_filename text,
+  mime_type         text NOT NULL,
+  size_bytes        bigint NOT NULL CHECK (size_bytes > 0),
+  checksum          text NOT NULL,
+  scan_status       text NOT NULL CHECK (scan_status IN ('pending', 'clean', 'failed')),
+  status            text NOT NULL DEFAULT 'new'
+                    CHECK (status IN ('new', 'assigned', 'discarded')),
+  assigned_file_id  uuid REFERENCES document_files(id) ON DELETE SET NULL,
+  handled_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  handled_at        timestamptz,
+  UNIQUE (firm_id, dedupe_hash),
+  CONSTRAINT intake_handled_has_handler
+    CHECK (status = 'new' OR (handled_by_user_id IS NOT NULL AND handled_at IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS intake_items_new ON intake_items (firm_id, received_at) WHERE status = 'new';
+
+-- מאיפה הגיע קובץ: הפורטל (הלקוח) או מייל ששויך בידי הצוות.
+ALTER TABLE document_files ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'portal';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'document_files_source_values') THEN
+    ALTER TABLE document_files ADD CONSTRAINT document_files_source_values
+      CHECK (source IN ('portal', 'email', 'office'));
+  END IF;
+END $$;
+
 COMMIT;

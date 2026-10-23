@@ -70,6 +70,31 @@ def rescan(limit=200):
                                metadata={"file_id": str(row["id"]),
                                          "scan_status": result.status,
                                          "scan_signature": result.detail})
+
+    # 23.10: קבצים שהגיעו במייל (mail_intake.py) וממתינים לסריקה.
+    # נגוע - נמחק עם השורה, כמו קובץ נגוע בפורטל שאינו נשמר כלל.
+    with cursor() as cur:
+        cur.execute("""select id, storage_key from intake_items
+                        where status = 'new' and scan_status in ('pending', 'failed')
+                        order by received_at limit %s""", (limit,))
+        intake = cur.fetchall()
+    for row in intake:
+        try:
+            data = storage.read(row["storage_key"])
+        except (FileNotFoundError, crypto.DecryptionFailed, crypto.KeysUnavailable):
+            counts["unreadable"] += 1
+            continue
+        result = scanner.scan(data)
+        del data
+        counts[result.status] += 1
+        with cursor(commit=True) as cur:
+            if result.status == "infected":
+                cur.execute("delete from intake_items where id = %s", (row["id"],))
+            else:
+                cur.execute("update intake_items set scan_status = %s where id = %s",
+                            (result.status, row["id"]))
+        if result.status == "infected":
+            storage.delete(row["storage_key"])
     return counts
 
 
@@ -79,7 +104,9 @@ def _known_keys():
         # הניקוי היה מוחק אותם כ"יתומים" שעה אחרי שנוצרו.
         cur.execute("""select storage_key from document_files
                        union all
-                       select storage_key from document_clean_pages""")
+                       select storage_key from document_clean_pages
+                       union all
+                       select storage_key from intake_items where status <> 'discarded'""")
         return {r["storage_key"] for r in cur.fetchall()}
 
 
@@ -107,7 +134,9 @@ def orphan_report():
     with cursor() as cur:
         cur.execute("""select storage_key from document_files
                        union all
-                       select storage_key from document_clean_pages""")
+                       select storage_key from document_clean_pages
+                       union all
+                       select storage_key from intake_items where status <> 'discarded'""")
         known = {r["storage_key"] for r in cur.fetchall()}
 
     rows = []

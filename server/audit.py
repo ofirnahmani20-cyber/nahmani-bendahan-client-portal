@@ -50,6 +50,8 @@ SAFE_METADATA_KEYS = frozenset({
     # לא ערכים. "fields" הוא *אילו* שדות השתנו (phone), לא למה.
     "purpose", "mfa", "found", "client_new", "documents", "fields",
     "enabled", "pages", "missing_clean_copy", "clean_page_count",
+    # קליטה ממייל: האם השיוך תאם להצעה של המערכת
+    "matched",
 })
 
 

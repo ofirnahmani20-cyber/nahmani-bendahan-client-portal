@@ -485,6 +485,9 @@
     'system.document_auto_decided': 'המערכת החליטה על מסמך לבד',
     'office.clean_pdf_downloaded':  'הורד עותק נקי של מסמך',
     'office.binder_downloaded':     'הופק קלסר להגשה',
+    'office.mailbox_assigned':      'קובץ שהגיע במייל שויך למסמך',
+    'office.mailbox_discarded':     'קובץ שהגיע במייל נמחק',
+    'office.mailbox_file_viewed':   'נפתח קובץ שהגיע במייל',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
@@ -2401,7 +2404,124 @@
      אינו משימה, והוא מסתיר את מה שכן. */
   var binderFilter = 'pending_review';
 
+  /* ---- הגיע במייל (23.10) ----
+     כל פריט: הקובץ, ממי ומתי, התיק שהמערכת מציעה, ובחירת דרישה.
+     בלי תיק מוצע (רק מנהל רואה כאלה) - בוחרים קודם תיק. */
+
+  function loadMailbox() {
+    var block = $('mailboxBlock');
+    return Api.mailbox().then(function (data) {
+      var items = data.items;
+      block.hidden = !items.length;
+      if (!items.length) return;
+      $('mailboxIntro').textContent = (items.length === 1 ? 'קובץ אחד' : items.length + ' קבצים') +
+        ' מחכים לשיוך. ההתאמה לתיק היא הצעה לפי כתובת השולח - כדאי לוודא.';
+      var list = $('mailboxList');
+      list.textContent = '';
+      items.forEach(function (it) { list.appendChild(mailboxRow(it)); });
+    }).catch(function () { block.hidden = true; });
+  }
+
+  function mailboxRow(it) {
+    var li = el('li', 'mailbox-row');
+    li.appendChild(el('h3', 'client-name', it.name || 'קובץ'));
+    var meta = el('p', 'client-meta');
+    meta.appendChild(el('span', null, 'התקבל ' + formatDate(it.at)));
+    if (it.from) meta.appendChild(el('span', null, 'מאת ' + it.from));
+    meta.appendChild(el('span', null, it.caseNumber
+      ? 'מוצע: ' + it.clientName + ' · ' + it.caseNumber
+      : 'לא זוהה תיק'));
+    li.appendChild(meta);
+
+    if (it.ready) {
+      var open = el('a', 'btn btn-outline btn-sm', 'צפייה בקובץ');
+      open.href = Api.mailboxFileUrl(it.id);
+      open.setAttribute('download', it.name || '');
+      li.appendChild(open);
+    } else {
+      li.appendChild(el('span', 'file-blocked', 'ממתין לסריקת אבטחה.'));
+    }
+
+    var uid = 'mb' + it.id.slice(0, 8);
+    var caseField = el('div', 'field');
+    var cl = el('label', null, 'תיק');
+    cl.htmlFor = uid + 'c';
+    var caseSel = el('select');
+    caseSel.id = uid + 'c';
+    caseField.appendChild(cl);
+    caseField.appendChild(caseSel);
+
+    var docField = el('div', 'field');
+    var dl = el('label', null, 'לאיזו דרישה בתיק');
+    dl.htmlFor = uid + 'd';
+    var docSel = el('select');
+    docSel.id = uid + 'd';
+    docField.appendChild(dl);
+    docField.appendChild(docSel);
+
+    var err = el('p', 'alert alert-error');
+    err.setAttribute('role', 'alert');
+    err.hidden = true;
+
+    function fillDocs(caseId) {
+      docSel.textContent = '';
+      if (!caseId) return;
+      Api.officeCase(caseId).then(function (file) {
+        file.documents.filter(function (d) { return d.status !== 'cancelled'; })
+          .forEach(function (d) {
+            var o = el('option', null, d.name + (d.status === 'approved' ? ' (כבר אושר)' : ''));
+            o.value = d.id;
+            docSel.appendChild(o);
+          });
+      });
+    }
+
+    Api.officeCases().then(function (data) {
+      var none = el('option', null, 'בחר תיק');
+      none.value = '';
+      caseSel.appendChild(none);
+      data.cases.forEach(function (c) {
+        var o = el('option', null, c.clientName + ' · ' + c.caseNumber);
+        o.value = c.id;
+        if (c.id === it.caseId) o.selected = true;
+        caseSel.appendChild(o);
+      });
+      fillDocs(caseSel.value);
+    });
+    caseSel.addEventListener('change', function () { fillDocs(caseSel.value); });
+
+    li.appendChild(caseField);
+    li.appendChild(docField);
+    li.appendChild(err);
+
+    var acts = el('div', 'binder-acts');
+    var go = el('button', 'btn btn-primary btn-sm', 'שיוך');
+    go.type = 'button';
+    go.addEventListener('click', function () {
+      err.hidden = true;
+      if (!docSel.value) { err.textContent = 'צריך לבחור תיק ודרישה.'; err.hidden = false; return; }
+      Api.mailboxAssign(it.id, docSel.value).then(function () {
+        announce('הקובץ שויך ונכנס לבדיקה.');
+        return Promise.all([loadMailbox(), loadBinder()]);
+      }).catch(function (x) { err.textContent = x.message || 'השיוך נכשל.'; err.hidden = false; });
+    });
+    var drop = el('button', 'btn btn-quiet btn-sm', 'לא רלוונטי - מחיקה');
+    drop.type = 'button';
+    drop.addEventListener('click', function () {
+      if (!confirm('למחוק את הקובץ? לא יהיה אפשר לשחזר אותו.')) return;
+      Api.mailboxDiscard(it.id).then(function () {
+        announce('הקובץ נמחק.');
+        return loadMailbox();
+      }).catch(function (x) { err.textContent = x.message || 'המחיקה נכשלה.'; err.hidden = false; });
+    });
+    acts.appendChild(go);
+    acts.appendChild(drop);
+    li.appendChild(acts);
+    return li;
+  }
+
   function loadBinder() {
+    loadMailbox();
     var list  = $('binderList');
     var intro = $('binderIntro');
     if (!list) return Promise.resolve();

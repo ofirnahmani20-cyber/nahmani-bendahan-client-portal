@@ -244,6 +244,17 @@
     officeCleanPdfUrl: function (documentId, fileId) {
       return Api.officeFileUrl(documentId, fileId) + '/clean.pdf';
     },
+    mailbox: function () { return Api.get('/api/office/mailbox'); },
+    mailboxFileUrl: function (id) {
+      return '/api/office/mailbox/' + encodeURIComponent(id) + '/file';
+    },
+    mailboxAssign: function (id, documentId) {
+      return Api.post('/api/office/mailbox/' + encodeURIComponent(id) + '/assign',
+                      { document_id: documentId });
+    },
+    mailboxDiscard: function (id) {
+      return Api.post('/api/office/mailbox/' + encodeURIComponent(id) + '/discard');
+    },
     officeBinderUrl: function (caseId) {
       return '/api/office/cases/' + encodeURIComponent(caseId) + '/binder.pdf';
     },

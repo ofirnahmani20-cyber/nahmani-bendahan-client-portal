@@ -329,6 +329,11 @@ def staff_digest_counts(cur, user):
                  and c.next_hearing_at between now() and now() + interval '7 days'
                  and """ + scope + """) as hearings,
              -- "השותף רק מקבל עדכון": מה המערכת החליטה לבד ביממה האחרונה
+             (select count(*) from intake_items i
+                left join cases c on c.id = i.matched_case_id
+               where i.firm_id = %(firm)s and i.status = 'new'
+                 and """ + ("true" if user["role"] == "admin" else
+                            "c.id is not null and " + scope) + """) as mailbox,
              (select count(*) from case_documents d join cases c on c.id = d.case_id
                where d.firm_id = %(firm)s and d.decided_by_system is not null
                  and d.reviewed_at > now() - interval '24 hours'
@@ -337,7 +342,7 @@ def staff_digest_counts(cur, user):
     return {"overdue": tasks["overdue"], "today": tasks["today"],
             "critical": tasks["critical"], "toReview": other["to_review"],
             "unread": other["unread"], "hearings": other["hearings"],
-            "autoDecided": other["auto_decided"]}
+            "autoDecided": other["auto_decided"], "mailbox": other["mailbox"]}
 
 
 def run_staff_digest(now):
@@ -373,9 +378,20 @@ def run_staff_digest(now):
 #  הרצה
 # ================================================================
 
+def run_mail_intake():
+    """קליטת מסמכים ממייל (mail_intake.py), אם הוגדרה תיבה. תקלה כאן
+    אינה עוצרת את ההתראות - התיבה תיקרא שוב בסבב הבא."""
+    from . import mail_intake
+    try:
+        return mail_intake.poll()
+    except Exception as exc:                             # noqa: BLE001
+        return {"error": type(exc).__name__}
+
+
 def run_once(now=None):
     now = now or datetime.now(timezone.utc)
     return {
+        "mail": run_mail_intake(),
         "reminders": run_reminders(now),
         "updates": run_client_updates(now),
         "hearings": run_hearing_reminders(now),

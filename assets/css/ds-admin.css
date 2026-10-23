@@ -1119,3 +1119,7 @@ body.admin .tag-auto { color: var(--ds-ink-soft); margin-inline-start: 6px; font
 
 /* ---- עותק נקי וקלסר (23.10) ---- */
 body.admin .file-links { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* ---- הגיע במייל (23.10) ---- */
+body.admin .mailbox-row { padding: 14px 0; border-bottom: var(--ds-hairline-w) solid var(--ds-hairline); }
+body.admin .mailbox-row .field { max-width: 28rem; margin-top: 10px; }
