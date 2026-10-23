@@ -1063,4 +1063,26 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- -------------------------------------------------------------
+--  עמודים נקיים (server/cleanpage.py) - docs/10, 23.10
+--
+--  לכל עמוד של קובץ שעובד: תמונה בגווני אפור, מיושרת, עם תאורה
+--  אחידה, ב-JPEG מוצפן באחסון (אותו מנגנון של הקובץ המקורי). מהם
+--  נבנים ה-PDF הנקי והקלסר - בלי לפענח את הקובץ המקורי שוב.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS document_clean_pages (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  file_id     uuid NOT NULL REFERENCES document_files(id) ON DELETE CASCADE,
+  page_no     integer NOT NULL CHECK (page_no >= 1),
+  storage_key text NOT NULL UNIQUE,
+  width       integer NOT NULL CHECK (width > 0),
+  height      integer NOT NULL CHECK (height > 0),
+  size_bytes  integer NOT NULL CHECK (size_bytes > 0),
+  -- הזווית שבה יושר העמוד, במעלות. 0 = לא נדרש יישור.
+  deskew_deg  real NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (file_id, page_no)
+);
+
 COMMIT;

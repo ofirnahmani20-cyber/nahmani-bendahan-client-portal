@@ -75,7 +75,11 @@ def rescan(limit=200):
 
 def _known_keys():
     with cursor() as cur:
-        cur.execute("select storage_key from document_files")
+        # 23.10: גם העמודים הנקיים (worker.store_clean_pages). בלעדיהם
+        # הניקוי היה מוחק אותם כ"יתומים" שעה אחרי שנוצרו.
+        cur.execute("""select storage_key from document_files
+                       union all
+                       select storage_key from document_clean_pages""")
         return {r["storage_key"] for r in cur.fetchall()}
 
 
@@ -101,7 +105,9 @@ def orphan_report():
     import datetime
 
     with cursor() as cur:
-        cur.execute("select storage_key from document_files")
+        cur.execute("""select storage_key from document_files
+                       union all
+                       select storage_key from document_clean_pages""")
         known = {r["storage_key"] for r in cur.fetchall()}
 
     rows = []

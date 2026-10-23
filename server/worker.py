@@ -65,6 +65,62 @@ POLL_SECONDS = 5
 _PASS_THROUGH = ("PATH", "SYSTEMROOT", "WINDIR", "LANG")
 
 
+def clean_env(pages):
+    """אצוות עמודים לניקוי (sandbox task clean). אותן מגבלות כמו extract."""
+    return {"SANDBOX_TASK": "clean",
+            "SANDBOX_PAGES": ",".join(str(p) for p in pages)}
+
+
+def store_clean_pages(job, storage_key, data, page_numbers):
+    """
+    עמודים נקיים (cleanpage.py) - נגזרת של הקובץ, לא חלק מהעיבוד
+    עצמו: כישלון כאן אינו מכשיל את העבודה, והקובץ פשוט יסומן בקלסר
+    כ"אין עותק נקי". מחזיר כמה עמודים נשמרו.
+
+    המפתח נגזר ממפתח המקור, כך שהמחיקה והמפתחות של המשרד זהים.
+    """
+    import base64
+
+    pages = []
+    for i in range(0, len(page_numbers), BATCH_PAGES):
+        batch = page_numbers[i:i + BATCH_PAGES]
+        outcome, result = run_sandbox(data, extra_env=clean_env(batch))
+        if outcome != "ok":
+            return 0
+        pages += result["pages"]
+
+    stored = []
+    try:
+        for p in pages:
+            jpeg = base64.b64decode(p["jpeg"])
+            key = "%s.clean.%d" % (storage_key, p["page"])
+            storage.store_encrypted(jpeg, key)
+            stored.append((p, key, len(jpeg)))
+    except Exception:                                    # noqa: BLE001
+        for _, key, _ in stored:
+            storage.delete(key)
+        return 0
+
+    with cursor(commit=True) as cur:
+        cur.execute("select storage_key from document_clean_pages where file_id = %s",
+                    (job["file_id"],))
+        old = [r["storage_key"] for r in cur.fetchall()]
+        cur.execute("delete from document_clean_pages where file_id = %s", (job["file_id"],))
+        for p, key, size in stored:
+            cur.execute(
+                """insert into document_clean_pages
+                     (firm_id, file_id, page_no, storage_key, width, height,
+                      size_bytes, deskew_deg)
+                   values (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (job["firm_id"], job["file_id"], p["page"], key, p["width"],
+                 p["height"], size, p["deskew"]))
+    # עיבוד חוזר: הגרסה הקודמת נמחקת רק אחרי שהחדשה נרשמה.
+    for key in old:
+        if key not in {k for _, k, _ in stored}:
+            storage.delete(key)
+    return len(stored)
+
+
 def sandbox_env(extra=None):
     env = {k: os.environ[k] for k in _PASS_THROUGH if k in os.environ}
     env.update({"PYTHONIOENCODING": "utf-8", "SANDBOX_MEMORY_MB": str(MEMORY_MB)})
@@ -158,6 +214,9 @@ def process_one(worker_id: str, file_ids=None) -> bool:
                 break
             extracted += result["pages"]
             payload["engine"].update(result["engine"])
+    clean_count = 0
+    if outcome == "ok":
+        clean_count = store_clean_pages(job, row["storage_key"], data, page_numbers)
     del data
 
     if outcome == "ok":
@@ -181,6 +240,7 @@ def process_one(worker_id: str, file_ids=None) -> bool:
                        metadata={"file_id": str(job["file_id"]), "to_status": status,
                                  "outcome": code or "ok", "page_count": len(pages),
                                  "ocr_page_count": sum(1 for p in pages if p["needs_ocr"]),
+                                 "clean_page_count": clean_count,
                                  "duration_ms": elapsed()})
     return True
 

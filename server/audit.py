@@ -45,6 +45,11 @@ SAFE_METADATA_KEYS = frozenset({
     # סיווג (שלב 4): קוד סוג מרשימה סגורה - לא טקסט. ואישור מפורש של
     # מסמך שאינו תואם לדרישה.
     "mismatch_acknowledged",
+    # 23.10 (docs/10): אימות דו-שלבי, פתיחת תיק ועריכה, החלטה
+    # אוטומטית, עותק נקי וקלסר. שוב: ספירות, דגלים ושמות עמודות -
+    # לא ערכים. "fields" הוא *אילו* שדות השתנו (phone), לא למה.
+    "purpose", "mfa", "found", "client_new", "documents", "fields",
+    "enabled", "pages", "missing_clean_copy", "clean_page_count",
 })
 
 

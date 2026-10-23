@@ -164,7 +164,9 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
         # אבל היא אינה מה שעומד לבדיקה.
         cur.execute(
             """select f.id, f.document_id, f.original_filename, f.mime_type,
-                      f.size_bytes, f.scan_status, f.uploaded_at
+                      f.size_bytes, f.scan_status, f.uploaded_at,
+                      exists (select 1 from document_clean_pages p
+                               where p.file_id = f.id) as has_clean
                  from document_files f
                  join case_documents d on d.id = f.document_id
                                       and d.firm_id = f.firm_id
@@ -184,6 +186,8 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
                 "scan": f["scan_status"],
                 "ready": scan.usable(f["scan_status"]),
                 "at": f["uploaded_at"].isoformat() if f["uploaded_at"] else None,
+                # עותק נקי (api_binder.py) - קיים אחרי עיבוד הקובץ
+                "clean": bool(f["has_clean"]),
             })
 
         cur.execute(

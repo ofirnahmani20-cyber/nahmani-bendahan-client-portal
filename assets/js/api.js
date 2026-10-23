@@ -241,6 +241,12 @@
       return '/api/office/documents/' + encodeURIComponent(documentId) +
              '/files/' + encodeURIComponent(fileId);
     },
+    officeCleanPdfUrl: function (documentId, fileId) {
+      return Api.officeFileUrl(documentId, fileId) + '/clean.pdf';
+    },
+    officeBinderUrl: function (caseId) {
+      return '/api/office/cases/' + encodeURIComponent(caseId) + '/binder.pdf';
+    },
 
     auditLog: function (caseId, limit) {
       var q = [];

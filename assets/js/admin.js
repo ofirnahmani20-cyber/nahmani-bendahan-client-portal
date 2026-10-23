@@ -483,6 +483,8 @@
     'staff.mfa_failed':             'קוד אימות שגוי',
     'staff.mfa_enrolled':           'הופעל אימות דו-שלבי',
     'system.document_auto_decided': 'המערכת החליטה על מסמך לבד',
+    'office.clean_pdf_downloaded':  'הורד עותק נקי של מסמך',
+    'office.binder_downloaded':     'הופק קלסר להגשה',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
@@ -1776,6 +1778,7 @@
       $('caseMeta').textContent = '';
 
       renderCaseMeta(file);
+      $('binderLink').href = Api.officeBinderUrl(file.id);
       renderStage(file);
       renderDecisionForm(file);
       renderCatalog(file);
@@ -2517,7 +2520,16 @@
       a.href = Api.officeFileUrl(documentId, f.id);
       a.setAttribute('download', f.name || '');
       a.setAttribute('aria-label', 'הורדת הקובץ ' + (f.name || 'שהלקוח העלה'));
-      return a;
+      if (!f.clean) return a;
+      /* 23.10: עותק נקי - מיושר, בגווני אפור, PDF אחד (api_binder.py) */
+      var wrap = el('span', 'file-links');
+      wrap.appendChild(a);
+      var c = el('a', 'btn btn-outline btn-sm', 'PDF נקי');
+      c.href = Api.officeCleanPdfUrl(documentId, f.id);
+      c.setAttribute('download', '');
+      c.setAttribute('aria-label', 'הורדת עותק נקי של ' + (f.name || 'הקובץ'));
+      wrap.appendChild(c);
+      return wrap;
     }
     var why = f.scan === 'infected'
       ? 'הקובץ נמצא נגוע בסריקה ואינו ניתן לפתיחה.'
