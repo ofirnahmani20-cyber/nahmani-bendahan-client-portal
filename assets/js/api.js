@@ -32,6 +32,12 @@
   function ApiError(status, message) {
     this.name = 'ApiError';
     this.status = status;
+    /* detail יכול להיות גם אובייקט {code, message} - למשל אזהרה שדורשת
+       אישור מפורש (classification_mismatch). */
+    if (message && typeof message === 'object') {
+      this.code = message.code || null;
+      message = message.message;
+    }
     this.message = message || 'הפעולה נכשלה.';
   }
   ApiError.prototype = Object.create(Error.prototype);
@@ -142,13 +148,26 @@
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/stage-events',
                       { stage_template_id: stageTemplateId, note: note || null });
     },
-    reviewDocument: function (documentId, decision, rejectReason) {
+    reviewDocument: function (documentId, decision, rejectReason, acknowledgeMismatch) {
       return Api.post('/api/office/documents/' + encodeURIComponent(documentId) + '/review',
-                      { decision: decision, reject_reason: rejectReason || null });
+                      { decision: decision, reject_reason: rejectReason || null,
+                        acknowledge_mismatch: !!acknowledgeMismatch });
     },
-    addDocument: function (caseId, name, guidance, isRequired) {
+    /* סיווג (שלב 4). השרת דורש can_view_medical. */
+    classification: function (documentId, fileId) {
+      return Api.get('/api/office/documents/' + encodeURIComponent(documentId) +
+                     '/files/' + encodeURIComponent(fileId) + '/classification');
+    },
+    reviewClassification: function (documentId, fileId, action, kind) {
+      return Api.post('/api/office/documents/' + encodeURIComponent(documentId) +
+                      '/files/' + encodeURIComponent(fileId) + '/classification/review',
+                      { action: action, kind: kind || null });
+    },
+    documentKinds: function () { return Api.get('/api/office/document-kinds'); },
+    addDocument: function (caseId, name, guidance, isRequired, templateId) {
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/documents',
-                      { name: name, guidance: guidance, is_required: !!isRequired });
+                      { name: name, guidance: guidance, is_required: !!isRequired,
+                        template_id: templateId || null });
     },
     sendMessage: function (caseId, title, body, important) {
       return Api.post('/api/office/cases/' + encodeURIComponent(caseId) + '/messages',
@@ -166,9 +185,56 @@
       return Api.get('/api/office/cases/' + encodeURIComponent(caseId) +
                      '/document-templates');
     },
-    auditLog: function (caseId) {
-      return Api.get('/api/office/audit-log' +
-                     (caseId ? '?case_id=' + encodeURIComponent(caseId) : ''));
+    /* limit נדרש כי כניסות למערכת נרשמות בתדירות גבוהה, ובלי
+       חלון גדול מספיק הן דוחקות את הפעולות המשמעותיות מחוץ
+       ל-N האחרונים. השרת מגביל ל-200 ממילא. */
+    /* שלב ו': לקוחות, קטלוגים ותיקים שהושלמו. קריאה בלבד. */
+    officeClients: function (q) {
+      return Api.get('/api/office/clients' +
+                     (q ? '?q=' + encodeURIComponent(q) : ''));
+    },
+    officeCatalogs: function () { return Api.get('/api/office/catalogs'); },
+    /* /closed-cases ולא /cases/closed: הנתיב השני נתפס על ידי
+       /api/office/cases/{case_id} שרשום לפניו. */
+    officeClosedCases: function () { return Api.get('/api/office/closed-cases'); },
+
+    /* קלסר המסמכים: מבט רוחבי, חוצה תיקים. */
+    officeDocuments: function (status, limit) {
+      var q = [];
+      if (status) q.push('status=' + encodeURIComponent(status));
+      if (limit)  q.push('limit=' + encodeURIComponent(limit));
+      return Api.get('/api/office/documents' + (q.length ? '?' + q.join('&') : ''));
+    },
+
+    /* כתובת הורדה, לא קריאה. הדפדפן ניגש אליה ישירות דרך
+       href, ולכן היא מחזירה מחרוזת ולא Promise. */
+    officeFileUrl: function (documentId, fileId) {
+      return '/api/office/documents/' + encodeURIComponent(documentId) +
+             '/files/' + encodeURIComponent(fileId);
+    },
+
+    auditLog: function (caseId, limit) {
+      var q = [];
+      if (caseId) q.push('case_id=' + encodeURIComponent(caseId));
+      if (limit)  q.push('limit=' + encodeURIComponent(limit));
+      return Api.get('/api/office/audit-log' + (q.length ? '?' + q.join('&') : ''));
+    },
+
+    // ---- חיפוש רוחבי ----
+    /* kinds הוא רשימה מופרדת בפסיקים לצמצום המקורות. הוא קיים
+       כבר עכשיו כדי ששכבת החיפוש בשפה טבעית, כשתגיע, תשתמש
+       באותה נקודת קצה ולא תצטרך נתיב משלה. */
+    search: function (q, kinds) {
+      var parts = ['q=' + encodeURIComponent(q)];
+      if (kinds) parts.push('kinds=' + encodeURIComponent(kinds));
+      return Api.get('/api/office/search?' + parts.join('&'));
+    },
+    /* allowUnauthorized חיוני: הקטלוג נטען בזמן אתחול המודול,
+       כלומר גם כשמסך הכניסה של הצוות מוצג. בלעדיו ה-401
+       מפעיל את onUnauthorized, והדף מועף ל-index.html -
+       כלומר אי אפשר להגיע כלל למסך הכניסה של הצוות. */
+    searchKinds: function () {
+      return Api.get('/api/office/search/kinds', { allowUnauthorized: true });
     },
 
     // ---- משימות ----

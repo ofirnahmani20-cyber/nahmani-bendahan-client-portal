@@ -496,29 +496,36 @@ p  { margin: 0 0 14px; }
 
 /* ---- פונטים: מאוחסנים מקומית ולא נטענים מצד שלישי ----
    העמודים מציגים מידע רפואי, ולכן אין מהם בקשות החוצה.
-   שני הפונטים ברישיון SIL OFL. ---- */
+   שני הפונטים ברישיון SIL OFL.
+
+   26.09: הטווח הורחב. שני הקבצים הם variable fonts אמיתיים
+   (fvar/gvar/avar/STAT), אבל ההצהרה הקודמת אמרה 400-700 וחתכה
+   בכך חצי מהציר. נמדד ברוחב גליפים בדפדפן: Frank Ruhl Libre
+   ממשיך לגדול 700 -> 800 -> 900, ו-Heebo נבדל בכל משקל מ-100.
+   המשקל 900 של הסריף הוא מה שנותן לכותרות נוכחות editorial.
+   אפס קבצים חדשים ואפס CDN - רק הצהרה נכונה. ---- */
 @font-face {
   font-family: 'Frank Ruhl Libre';
   src: url('../fonts/frankruhllibre-hebrew.woff2') format('woff2');
-  font-weight: 400 700; font-style: normal; font-display: swap;
+  font-weight: 300 900; font-style: normal; font-display: swap;
   unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
 }
 @font-face {
   font-family: 'Frank Ruhl Libre';
   src: url('../fonts/frankruhllibre-latin.woff2') format('woff2');
-  font-weight: 400 700; font-style: normal; font-display: swap;
+  font-weight: 300 900; font-style: normal; font-display: swap;
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122;
 }
 @font-face {
   font-family: 'Heebo';
   src: url('../fonts/heebo-hebrew.woff2') format('woff2');
-  font-weight: 400 700; font-style: normal; font-display: swap;
+  font-weight: 100 900; font-style: normal; font-display: swap;
   unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
 }
 @font-face {
   font-family: 'Heebo';
   src: url('../fonts/heebo-latin.woff2') format('woff2');
-  font-weight: 400 700; font-style: normal; font-display: swap;
+  font-weight: 100 900; font-style: normal; font-display: swap;
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122;
 }
 
@@ -922,24 +929,10 @@ html[dir="rtl"] .drawer-open .drawer { transform: translateX(0); }
 }
 .stat-note { font-size: calc(15px * var(--scale)); color: var(--text-soft); margin: 4px 0 0; }
 
-.compare { margin: 24px 0 0; padding: 20px 0 0; border-top: 1px solid var(--border); }
-.compare h3 { margin: 0 0 12px; }
-.compare-bar {
-  height: 10px; background: #e5e0d7; border-radius: 0; overflow: hidden;
-  display: flex; flex-direction: row-reverse;
-}
-.compare-bar > i { display: block; height: 100%; background: var(--accent); }
-.compare-note { margin: 12px 0 0; font-size: calc(17px * var(--scale)); color: var(--text-soft); }
+/* בלוק ההשוואה לממוצע הוסר ב-27.09. המקור לנתון
+   (durationEstimate ב-data.js) נמחק כשהמערכת עברה לשרת,
+   והבלוק לא רונדר מאז. ראה dashboard.js renderDuration. */
 
-/* הסייג על ההערכה - מוצג ללקוח, לא רק בקוד */
-.estimate-warning {
-  margin: 16px 0 0; padding: 14px 16px;
-  background: var(--warn-soft);
-  border: 1px solid var(--warn);
-  border-inline-start: 4px solid var(--warn);
-  border-radius: 0;
-  font-size: calc(17px * var(--scale)); line-height: 1.6;
-}
 
 /* ---- אנימציית הכניסה למפה ---- */
 .steps-in > li {
@@ -1233,14 +1226,9 @@ img.ph::after { content: none; }
   color: var(--on-bg); margin: 0;
 }
 
-/* מחוון מקוטע - אפשר לספור את השלבים בעין, בניגוד לסרגל רציף */
-.ticks { display: flex; gap: 6px; margin: 0 0 24px; }
-.tick {
-  flex: 1 1 0; height: 10px;
-  background: #4a4236;
-}
-.tick-done { background: var(--bronze-light); }
-.tick-now  { background: #fff; }
+/* סרגל השלבים עבר ל-ds-front.css כ-.stagebar. הכללים הישנים
+   (.ticks / .tick) הוסרו ולא נדרסו: המשבצות היו ריקות מטקסט,
+   והמבנה החדש נושא את שם כל שלב ולכן אינו אותו רכיב. */
 
 .sum-what {
   color: var(--on-bg); max-width: 60ch;
@@ -1283,7 +1271,6 @@ img.ph::after { content: none; }
   .sum-head { gap: 18px; margin: 20px 0; }
   .sum-num-now { font-size: calc(40px * var(--scale)); }
   .sum-stage { font-size: calc(24px * var(--scale)); }
-  .ticks { gap: 4px; }
 }
 
 /* ==========================================================

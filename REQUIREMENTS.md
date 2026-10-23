@@ -288,6 +288,24 @@
 - [ ] תוכן משפטי מאושר: `RIGHTS_EXPLAINER` · משכי טיפול · `ARTICLES`/`FAQ` · תמונות — FR-T-01, FR-T-03, FR-T-04, FR-T-05
 - [ ] ספי בדיקת האיכות כוילו מול צילומים אמיתיים — FR-C-17
 
+### 10.1 שער Linux — חובה לפני סביבת ייצור (החלטה מ-2026-10-02)
+
+הקוד נבנה ונבדק ב-Windows. החלקים הבאים **נכתבו אך לא הורצו** על Linux, ואין לעלות לייצור עד שכל אחד מהם רץ ועבר:
+
+- [ ] `deploy/docker-compose.yml` נבנה ועולה: app, worker, clamd, postgres — `docker compose build && up`
+- [ ] **`pytest` מלא בתוך קונטיינר ה-app**, כולל `PORTAL_TEST_CLAMD_ADDR` מול ה-clamd של ה-compose
+- [ ] מגבלות `limits.py` ב-POSIX: `RLIMIT_AS` עוצר את פצצת הדחיסה (`test_inflate_bomb_is_stopped_by_the_memory_cap_not_the_clock`), `RLIMIT_FSIZE=0` חוסם כתיבת קבצים, `RLIMIT_CORE=0`
+- [ ] `mem_limit` של קונטיינר ה-worker אוכף תקרה גם מבחוץ (OOM-kill → `crashed`, לא תקיעה)
+- [ ] `killpg` ב-timeout הורג גם צאצאים של ה-sandbox
+- [ ] הרשאות 600 על קבצי המפתח נאכפות (`crypto.FileKeyProvider` מסרב לקובץ פתוח)
+- [ ] ה-worker על רשת `internal` בלבד — אין יציאה לאינטרנט (`curl` מתוך הקונטיינר נכשל)
+- [ ] `read_only` + `tmpfs` על `/tmp`: העלאה ועיבוד עובדים בלי שום כתיבה מחוץ לתיקיית האחסון
+- [ ] swap מוצפן או כבוי, הצפנת הנפח של מסד וקבצים — אומת במארח
+- [ ] `scripts/dr_drill.py` עובר בתוך הקונטיינר
+- [ ] בדיקות ה-OCR ב-`tests/test_extraction.py` **רצות ולא מדולגות** בקונטיינר ה-worker (Tesseract מ-Debian + מודלים מקובעים), וספי ה-CER עוברים
+- [ ] `test_timeout_leaves_no_tesseract_behind` עובר עם `killpg`; ותקרת התהליכים של ה-sandbox נאכפת ב-`pids_limit` (ב-Windows היא נאכפת ב-Job Object ונבדקה)
+- [ ] `spikes/ocr/measure_stage3.py` רץ ב-Linux, והמדדים אינם גרועים מאלה שב-`spikes/ocr/STAGE3-QUALITY.md`
+
 ---
 
 ## 11. סדר בנייה מוצע

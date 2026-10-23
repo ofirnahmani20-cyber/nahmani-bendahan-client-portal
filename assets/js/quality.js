@@ -238,7 +238,7 @@ var DocQuality = (function () {
         reasons: [{
           level: 'unreadable',
           title: 'סוג הקובץ אינו נתמך',
-          fix: 'אפשר להעלות תמונה (JPG או PNG) או קובץ PDF בלבד.'
+          fix: 'אפשר להעלות תמונה (JPG, PNG או WebP) או קובץ PDF בלבד.'
         }],
         metrics: null
       });

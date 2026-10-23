@@ -196,7 +196,12 @@ def staff_login(body: StaffLogin, request: Request, response: Response):
     with cursor(commit=True) as cur:
         cur.execute("update users set last_login_at = now() where id = %s", (user["id"],))
 
-    audit.record_anonymous(user["firm_id"], "staff.login_success", request=request)
+    # 26.09: מיוחס ולא אנונימי. הסיסמה כבר אומתה, ולכן אנחנו
+    # יודעים מי נכנס - ודוח "כניסות למערכת" יכול סוף סוף לומר
+    # את זה. חל על התחברויות חדשות בלבד; 1963 השורות שנכתבו
+    # קודם נשארות בלי מזהה ואינן משתנות למפרע.
+    audit.record_actor(user["firm_id"], "user", user["id"],
+                       "staff.login_success", request=request)
     return {"ok": True, "name": user["full_name"], "role": user["role"]}
 
 
@@ -221,4 +226,7 @@ def me(request: Request):
         "type": identity.subject_type,
         "name": identity.display_name,
         "role": identity.role,
+        # אם להציג את מסך הסיווג. השרת אוכף בעצמו (require_medical);
+        # זה רק כדי לא להציג כפתור שיחזיר 403.
+        "canViewMedical": bool(identity.is_staff and identity.can_view_medical),
     }

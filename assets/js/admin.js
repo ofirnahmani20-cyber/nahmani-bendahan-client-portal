@@ -85,7 +85,7 @@
   var TOP_VIEWS = {
     dashboard: { el: 'view-dashboard', title: 'דשבורד' },
     tasks:     { el: 'view-tasks',     title: 'ניהול משימות' },
-    cases:     { el: 'view-cases',     title: 'התיקים בטיפולי' },
+    cases:     { el: 'view-cases',     title: 'תיקי המשרד' },
     closed:    { el: 'view-closed',    title: 'תיקים שהושלמו ושכר טרחה' },
     documents: { el: 'view-documents', title: 'מסמכים' },
     clients:   { el: 'view-clients',   title: 'לקוחות' },
@@ -113,7 +113,9 @@
     links: '.sitenav a[data-view], .drawer-link[data-view], #view-dashboard a[data-view]',
     announce: 'adminAnnounce',
     titleSel: '.view-title',
-    fallback: 'cases',
+    /* מרכז הפיקוד הוא מסך הפתיחה: כניסה בלי hash נוחתת בו
+       ולא ברשימת התיקים. */
+    fallback: 'dashboard',
     onLink: function () { drawer.close(false); },
     onShow: function (name) {
       /* תיק פתוח ובחרו אזור עליון - יוצאים מסביבת התיק. */
@@ -145,13 +147,43 @@
     }
   });
 
+  /* ---- הדשבורד ----
+     מודול נפרד שמקבל את תלויותיו במפורש, בדפוס של viewnav.
+     admin.js אינו חושף דבר ל-global בשבילו. */
+  DsDashboard.init({
+    Api: Api,
+    el: el,
+    describe: describe,
+    dayLabel: dayLabel,
+    clockOf: clockOf,
+    timeLeft: timeLeft,
+    announce: announce,
+    topNav: topNav,
+    openCase: function (id, tab) { return openCase(id, tab); },
+    staffInfo: function () { return staff; }
+  });
+
+  /** הקנבס הבהיר של שפת העיצוב חל רק על הדשבורד.
+      שבעת האזורים האחרים וסביבת התיק נשארים על הגרפיט,
+      ולכן כל הכללים שקובעים טקסט בהיר על כהה ממשיכים לחול
+      עליהם בדיוק כפי שחלו עד כה. */
+  function setGround(on) {
+    document.body.classList.toggle('ds-on', !!on);
+  }
+
   /** כל אזור טוען את מה ששייך לו, ורק כשנכנסים אליו.
       הבאנר הוא היוצא מן הכלל: הוא נטען בכל אזור, כי מועד
       קריטי לא אמור להיעלם רק כי עברת למסך אחר. */
   function loadTopView(name) {
+    setGround(name === 'dashboard');
     if (name !== 'tasks') loadBanner();
+    if (name === 'dashboard') return DsDashboard.load();
     if (name === 'cases')   return showList();
     if (name === 'tasks')   return loadAttention();
+    if (name === 'documents') return loadBinder();
+    if (name === 'clients')   return loadClients();
+    if (name === 'settings')  return loadCatalogs();
+    if (name === 'closed')    return loadClosed();
     if (name === 'reports') return renderLog(null, 'firmLogList');
     return Promise.resolve();
   }
@@ -173,7 +205,7 @@
       return openCase(parts[1], caseNav.has(parts[2]) ? parts[2] : 'state');
     }
 
-    var name = topNav.has(parts[0]) ? parts[0] : 'cases';
+    var name = topNav.has(parts[0]) ? parts[0] : 'dashboard';
     topNav.show(name, false);
     return loadTopView(name);
   }
@@ -281,8 +313,12 @@
     });
   }
 
+  /* התבנית שנבחרה. הדרישה יורשת ממנה את סוגי המסמכים המתקבלים - רק
+     אם השם לא נערך, כי דרישה שנערכה ידנית אינה בהכרח אותה דרישה. */
+  var pickedTemplate = null;
   $('reqPick').addEventListener('change', function () {
     var t = templates[parseInt(this.value, 10)];
+    pickedTemplate = t || null;
     if (!t) return;
     $('reqName').value = t.name;
     $('reqNote').value = t.guidance || '';
@@ -299,8 +335,15 @@
     'office.decision_recorded':  'נרשמה החלטה',
     'office.message_sent':       'נשלח עדכון',
     'office.case_viewed':        'צפייה בתיק',
+    'office.file_downloaded':    'הצוות פתח קובץ',
     'office.ai_invoked':         'הופעל ניתוח',
     'client.file_uploaded':      'הלקוח העלה מסמך',
+    'client.file_rejected':      'קובץ נחסם בסריקת אבטחה',
+    'system.file_rescanned':     'קובץ נסרק מחדש',
+    'system.document_processed': 'מסמך עובד אוטומטית',
+    'office.document_text_viewed': 'צפייה בטקסט שחולץ ממסמך',
+    'office.classification_viewed': 'צפייה בסיווג מסמך',
+    'office.classification_reviewed': 'נבדק סיווג מסמך',
     'client.document_replied':   'הלקוח הגיב',
     'client.case_viewed':        'הלקוח צפה בתיק',
     'client.file_downloaded':    'הלקוח הוריד מסמך',
@@ -395,17 +438,76 @@
       : pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
+  /* ---- שני צירים ביומן המשרד ----
+     1066 מתוך 1277 שורות האודיט הן התחברויות - 83%. ברשימה
+     אחת הן מציפות את הפעולות בתיקים, ובחלון של 200 שורות
+     נשארות מהן בודדות.
+
+     ACCESS הוא אירוע גישה: מי נכנס, מתי, והאם הצליח. זו
+     רשומת אבטחה אמיתית ולכן היא נשארת ומוצגת - אבל בציר
+     הצדדי ולא במרכז.
+
+     NOISE נרשם בכל פתיחת תיק ואינו פעילות כלל.
+
+     החלוקה היא בתצוגה בלבד. אין מחיקה, אין סינון בשרת,
+     ואין שינוי בסמנטיקת האודיט. הסטים זהים לאלה שב-
+     ds-dashboard.js - אותה הגדרה משמשת את שני המסכים. */
+  var ACCESS = {
+    'staff.login_success': true, 'staff.login_failed': true,
+    'staff.logout': true, 'client.logout': true,
+    'client.login_success': true, 'client.login_failed': true,
+    'client.otp_requested': true
+  };
+  var NOISE = {
+    'office.case_viewed': true, 'client.case_viewed': true
+  };
+
+  /* תווית לכל סוג אירוע גישה. משמשת רק כשאין שם - ראה
+     ההערה ב-renderAccess. */
+  var ACCESS_LABEL = {
+    'staff.login_success':  'כניסת צוות',
+    'staff.login_failed':   'כניסת צוות',
+    'staff.logout':         'יציאת צוות',
+    'client.login_success': 'כניסת לקוח',
+    'client.login_failed':  'כניסת לקוח',
+    'client.logout':        'יציאת לקוח',
+    'client.otp_requested': 'לקוח ביקש קוד'
+  };
+
   function renderLog(caseId, listId) {
     var list = $(listId || 'logList');
     if (!list) return Promise.resolve();
-    return Api.auditLog(caseId).then(function (data) {
+
+    /* הפיצול חל על יומן המשרד בלבד. בהיסטוריה של תיק בודד
+       אין אירועי גישה מלכתחילה, ואין מה לפצל. */
+    var isFirm = listId === 'firmLogList';
+
+    /* בברירת המחדל של 50 שורות נמדדו 46 התחברויות ושתי
+       פעולות בתיקים. כלומר היומן של המשרד הראה כמעט כלום.
+       200 היא תקרת השרת, ולא ערך שנבחר כאן. */
+    return Api.auditLog(caseId, isFirm ? 200 : undefined).then(function (data) {
       list.textContent = '';
-      if (!data.entries.length) {
+
+      var entries = data.entries;
+      if (isFirm) {
+        renderAccess(entries);
+        entries = entries.filter(function (e) {
+          return !ACCESS[e.action] && !NOISE[e.action];
+        });
+        var intro = $('firmLogIntro');
+        if (intro) {
+          intro.textContent = entries.length
+            ? entries.length + ' פעולות בתיקים. כניסות הצוות מופיעות בצד.'
+            : 'אין עדיין פעולות בתיקים.';
+        }
+      }
+
+      if (!entries.length) {
         list.appendChild(el('li', 'item-note', 'אין עדיין פעולות רשומות.'));
         return;
       }
       var lastDay = null;
-      data.entries.forEach(function (entry) {
+      entries.forEach(function (entry) {
         var day = dayLabel(entry.at);
         if (day !== lastDay) {
           list.appendChild(el('li', 'log-day', day));
@@ -415,7 +517,17 @@
         li.appendChild(el('span', 'log-clock num', clockOf(entry.at)));
         var body = el('div', 'log-body');
         body.appendChild(el('p', 'log-what', describe(entry)));
-        body.appendChild(el('p', 'item-note', entry.actor || 'המערכת'));
+        /* ביומן כלל-המשרד השורה לא אמרה על מי מדובר, ולכן
+           "הלקוח העלה מסמך" היה חסר ערך. שם הלקוח קודם, כי
+           הוא ההקשר; שם איש הצוות אחריו, כשיש. */
+        var who = [];
+        if (entry.client) who.push(entry.client);
+        /* מספר התיק מגיע מהשרת מ-27.09. בלעדיו שורה כמו
+           "נשלחה הודעה ללקוח" הצריכה לזכור בעל פה באיזה תיק
+           מדובר, כשללקוח יש יותר מאחד. */
+        if (entry.caseNumber) who.push(entry.caseNumber);
+        if (entry.actor)  who.push(entry.actor);
+        body.appendChild(el('p', 'item-note', who.join(' · ') || 'המערכת'));
         li.appendChild(body);
         list.appendChild(li);
       });
@@ -425,38 +537,205 @@
     });
   }
 
+  /* ---- הציר הצדדי: מי נכנס למערכת ----
+     מקובץ לפי איש צוות ולפי יום. עורך דין שנכנס אחת-עשרה
+     פעמים ביום הוא שורה אחת שאומרת אחת-עשרה, ולא אחת-עשרה
+     שורות זהות.
+
+     ניסיון כושל אינו מתאחד לעולם. הוא האירוע היחיד כאן
+     שדורש מבט, ולכן הוא יושב בראש עם השעה המדויקת. */
+  function renderAccess(entries) {
+    var list  = $('firmAccessList');
+    var intro = $('firmAccessIntro');
+    if (!list) return;
+
+    list.textContent = '';
+
+    var ok = [], failed = [];
+    entries.forEach(function (e) {
+      if (!ACCESS[e.action]) return;
+      (/_failed$/.test(e.action) ? failed : ok).push(e);
+    });
+
+    if (!ok.length && !failed.length) {
+      if (intro) intro.textContent = 'אין אירועי גישה בחלון הזה.';
+      list.appendChild(el('li', 'item-note', 'אין אירועי גישה.'));
+      return;
+    }
+
+    if (intro) {
+      intro.textContent = failed.length
+        ? (failed.length === 1 ? 'ניסיון כניסה אחד נכשל.'
+                               : failed.length + ' ניסיונות כניסה נכשלו.')
+        : 'כל הכניסות בחלון הזה הצליחו.';
+    }
+
+    /* הכישלונות קודם, כל אחד בנפרד */
+    failed.forEach(function (e) {
+      var li = el('li', 'access-row access-fail');
+      li.appendChild(el('span', 'access-when num',
+        dayLabel(e.at) + ' ' + clockOf(e.at)));
+      li.appendChild(el('span', 'access-who',
+        (e.actor || ACCESS_LABEL[e.action] || 'ניסיון כניסה') + ' - נכשל'));
+      list.appendChild(li);
+    });
+
+    /* ואז המוצלחות, מאוחדות לפי מי ומתי.
+
+       שם איש הצוות אינו זמין: api_auth.py רושם את
+       staff.login_success דרך record_anonymous, ולכן השורה
+       נשמרת עם actor_type='system' ו-actor_id ריק. נמדד על
+       המסד: 1963 שורות התחברות, כולן בלי מזהה משתמש.
+
+       במקום להמציא שם, השורה אומרת איזה סוג כניסה זו. ברגע
+       שהרישום יישא מזהה - e.actor יתמלא לבדו והשם יופיע כאן
+       בלי שינוי נוסף בקוד הזה. */
+    var seen = {}, order = [];
+    ok.forEach(function (e) {
+      var who = e.actor || ACCESS_LABEL[e.action] || 'כניסה למערכת';
+      var day = dayLabel(e.at);
+      var key = who + '|' + day;
+      if (!seen[key]) {
+        seen[key] = { who: who, day: day, n: 0, last: e.at };
+        order.push(key);
+      }
+      seen[key].n++;
+      if (e.at > seen[key].last) seen[key].last = e.at;
+    });
+
+    order.forEach(function (key) {
+      var g = seen[key];
+      var li = el('li', 'access-row');
+      li.appendChild(el('span', 'access-when num',
+        g.day + ' ' + clockOf(g.last)));
+      var who = el('span', 'access-who', g.who);
+      li.appendChild(who);
+      if (g.n > 1) {
+        li.appendChild(el('span', 'access-n', '×' + g.n));
+      }
+      list.appendChild(li);
+    });
+  }
+
 
   /* ================= רשימת התיקים ================= */
+
+  /* ---- סינון לפי אחראי ----
+     המסך נקרא עד 29.09 "התיקים בטיפולי" והציג את כל תיקי
+     המשרד. הכותרת תוקנה ל"תיקי המשרד", ו"שלי" הוא סינון
+     בתוכו - כי שתי השאלות אמיתיות: "מה מוטל עליי" ו"מה
+     קורה במשרד".
+
+     הסינון בצד הלקוח על רשימה שכבר נטענה, ולא קריאה
+     נוספת: שלושה עשר תיקים אינם מצדיקים סיבוב לשרת. */
+  var caseFilter = 'mine';
+
+  function caseInFilter(c) {
+    if (caseFilter === 'all')   return true;
+    if (caseFilter === 'mine')  return c.mine;
+    if (caseFilter === 'other') return !c.mine && !c.unassigned;
+    if (caseFilter === 'none')  return c.unassigned;
+    return true;
+  }
+
+  function renderCaseChips(cases) {
+    var wrap = $('caseChips');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    var n = {
+      all:   cases.length,
+      mine:  cases.filter(function (c) { return c.mine; }).length,
+      other: cases.filter(function (c) { return !c.mine && !c.unassigned; }).length,
+      none:  cases.filter(function (c) { return c.unassigned; }).length
+    };
+
+    [['mine', 'שלי'], ['other', 'של עורך דין אחר'],
+     ['none', 'לא שויכו'], ['all', 'כל תיקי המשרד']].forEach(function (pair) {
+      var key = pair[0];
+      var on  = caseFilter === key;
+      var b   = el('button', 'chip' + (n[key] ? '' : ' chip-zero'));
+      b.type  = 'button';
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.appendChild(el('span', null, pair[1]));
+      b.appendChild(el('span', 'chip-n', String(n[key])));
+      b.addEventListener('click', function () {
+        if (caseFilter === key) return;
+        caseFilter = key;
+        showList();
+      });
+      wrap.appendChild(b);
+    });
+  }
 
   function showList() {
     return Api.officeCases().then(function (data) {
       var cases   = data.cases;
+      /* שורת הפקודה מסננת את הרשימה שכבר נטענה, ולכן היא
+         מתעדכנת מכאן ואינה יורה קריאה משלה. */
+      DsDashboard.setCases(cases);
       var waiting = cases.reduce(function (n, c) { return n + c.awaitingReview; }, 0);
 
-      $('listSummary').textContent = waiting === 0
-        ? cases.length + ' תיקים פעילים. אין מסמכים שממתינים לבדיקה.'
-        : cases.length + ' תיקים פעילים · ' +
-          (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') +
-          ' לבדיקת המשרד.';
+      /* "פעילים" ו"מוקפאים" אינם אותו דבר, ומשפט אחד שסופר
+         את שניהם יחד אומר מספר שאינו נכון לאף אחד מהם. */
+      var frozen = cases.filter(function (c) { return c.status === 'frozen'; }).length;
+      var live   = cases.length - frozen;
+
+      var parts = [live === 1 ? 'תיק פעיל אחד' : live + ' תיקים פעילים'];
+      if (frozen) parts.push(frozen === 1 ? 'אחד מוקפא' : frozen + ' מוקפאים');
+      parts.push(waiting === 0
+        ? 'אין מסמכים שממתינים לבדיקה'
+        : (waiting === 1 ? 'מסמך אחד ממתין' : waiting + ' מסמכים ממתינים') +
+          ' לבדיקת המשרד');
+      var shown = cases.filter(caseInFilter).length;
+      if (caseFilter !== 'all') {
+        parts.unshift(shown === 1 ? 'תיק אחד מוצג' : shown + ' תיקים מוצגים');
+      }
+      $('listSummary').textContent = parts.join(' · ') + '.';
+
+      renderCaseChips(cases);
 
       var rows = $('caseRows');
       rows.textContent = '';
 
-      cases.forEach(function (c) {
+      cases.filter(caseInFilter).forEach(function (c) {
         var tr = document.createElement('tr');
 
         var who = document.createElement('td');
         who.appendChild(el('div', 'client', c.clientName));
-        who.appendChild(el('div', 'sub num', c.caseNumber));
+        var sub = el('div', 'sub num', c.caseNumber);
+        who.appendChild(sub);
+        if (c.status === 'frozen') {
+          who.appendChild(el('div', 'sub case-frozen-tag', 'מוקפא'));
+        }
         tr.appendChild(who);
 
         tr.appendChild(cell(c.caseNumber, 'num'));
+
+        /* מי אחראי. "אני" ולא השם שלי - השם מופיע בסרגל
+           העליון, וחזרה עליו בכל שורה אינה מוסיפה דבר.
+           תיק בלי אחראי הוא המצב שדורש פעולה, ולכן הוא
+           נאמר במילים ולא מושאר ריק. */
+        var own = document.createElement('td');
+        if (c.mine) {
+          own.appendChild(el('span', 'own-mine', 'אני'));
+        } else if (c.unassigned) {
+          own.appendChild(el('span', 'own-none', 'לא שויך'));
+        } else {
+          own.appendChild(el('span', 'own-other', c.assignee || '-'));
+        }
+        tr.appendChild(own);
+
         tr.appendChild(cell(c.claimType));
 
         var stage = document.createElement('td');
         stage.appendChild(el('div', null, (c.currentStage || '-') + ''));
         stage.appendChild(el('div', 'sub', c.stageTitle || ''));
         tr.appendChild(stage);
+
+        /* תיק מוקפא נשאר ברשימה - הוא באחריות עורך הדין -
+           אבל הוא אינו מתנהל, וזה חייב להיאמר בשורה עצמה. */
+        if (c.status === 'frozen') tr.className = 'case-frozen';
 
         tr.appendChild(countCell(c.awaitingReview, 'hot'));
         tr.appendChild(countCell(c.openForClient, 'calm'));
@@ -495,6 +774,9 @@
   function openCase(caseId, tab) {
     openId = caseId;
     wasNew = {};
+    /* סביבת התיק לא עוצבה מחדש בסבב הזה, ולכן היא חוזרת
+       לקנבס הגרפיט שכל הצבעים שלה מכוילים אליו. */
+    setGround(false);
 
     /* הניתוח שייך לתיק - אסור שיישאר על המסך כשעוברים לתיק אחר */
     assistHistory = [];
@@ -554,6 +836,69 @@
       wrap.appendChild(el('dt', null, f[0]));
       wrap.appendChild(el('dd', f[2] ? 'num' : null, f[1] || '-'));
       dl.appendChild(wrap);
+    });
+
+    renderRoad(file);
+  }
+
+  /* ---- מסלול התביעה ----
+     "שלב 4" לבדו אינו אומר איפה התיק עומד. הוא אומר את זה רק
+     מול המסלול כולו: מה כבר נסגר ומה עוד לפניו.
+
+     הנתונים כבר בתשובה - stageOptions נשלף ממילא עבור הבורר
+     בלשונית הוועדות, ו-currentStage כבר מוצג בכותרת. אין כאן
+     קריאה נוספת, שדה חדש או שינוי חוזה.
+
+     המסלול יושב בכותרת הקבועה ולכן נראה בכל שש הלשוניות.
+     הוא מחוון ולא פקד: מעבר שלב נעשה בלשונית "ועדות, החלטות
+     ומועדים" בלבד, שם יש אישור ורישום אודיט.
+
+     המצב אינו נשען על צבע: הקו משנה גם עובי, ולקורא המסך
+     נאמר במילים. */
+  function renderRoad(file) {
+    var road = $('caseRoad');
+    if (!road) return;
+
+    road.textContent = '';
+
+    var stages = file.stageOptions || [];
+    var now    = file.currentStage || 0;
+
+    /* תיק שטרם נרשם לו שלב הוא מצב חוקי, לא תקלה. בלי הענף
+       הזה המסלול היה מציג שמונה שלבים "עתידיים" בלי עוגן,
+       וזה קורא כאילו לא קרה דבר. */
+    if (!stages.length) {
+      road.hidden = true;
+      return;
+    }
+    road.hidden = false;
+    road.setAttribute('aria-label', now
+      ? 'מסלול התביעה. התיק בשלב ' + now + ' מתוך ' + stages.length + '.'
+      : 'מסלול התביעה. טרם נרשם שלב לתיק.');
+
+    stages.forEach(function (st) {
+      var done = now && st.position <  now;
+      var here = now && st.position === now;
+
+      var cell = el('li', 'ds-road-step ' +
+        (done ? 'is-done' : here ? 'is-now' : 'is-next'));
+      if (here) cell.setAttribute('aria-current', 'step');
+
+      /* title נותן את השם המלא בריחוף גם כשהתא צר.
+         הוא תוספת ולא תחליף: השם עצמו נמצא בטקסט. */
+      cell.setAttribute('title', st.position + '. ' + st.title);
+
+      cell.appendChild(el('span', 'ds-road-rule', '', true));
+
+      var top = el('p', 'ds-road-head');
+      top.appendChild(el('span', 'ds-road-n',
+        (st.position < 10 ? '0' : '') + st.position));
+      top.appendChild(el('span', 'visually-hidden',
+        done ? ' הושלם: ' : here ? ' השלב הנוכחי: ' : ' טרם החל: '));
+      cell.appendChild(top);
+
+      cell.appendChild(el('p', 'ds-road-t', st.title));
+      road.appendChild(cell);
     });
   }
 
@@ -639,12 +984,136 @@
       ? r.deliveryCount + ' משלוחים · אחרון ' + stamp(r.lastDeliveryAt)
       : 'טרם נשלחה הודעה');
     if (r.activeReminders) bits.push('תזכורת פעילה');
+    /* מושהית נאמרת במפורש. "אין תזכורת" ו"יש תזכורת שאינה
+       רצה" נראו עד כה זהים, וההפרש ביניהם הוא אם הלקוח
+       נרדף בכלל. */
+    if (r.pausedReminders) bits.push(r.pausedReminders === 1
+      ? 'תזכורת מושהית' : r.pausedReminders + ' תזכורות מושהות');
     if (r.completedAt) bits.push('הושלמה ' + stamp(r.completedAt) +
                                  ' בידי ' + (r.completedBy || '-'));
     meta.textContent = bits.join(' · ');
     li.appendChild(meta);
 
+    if (r.deliveryCount || r.activeReminders || r.pausedReminders) {
+      li.appendChild(deliveryLog(r));
+    }
+
     if (!closed) li.appendChild(requirementActions(r));
+    return li;
+  }
+
+  /* ---- היסטוריית המשלוח ----
+     הנקודה /deliveries קיימת מאז שכבת המשלוח נבנתה, והיא
+     מחזירה גם ערוץ, גם סטטוס וגם את סיבת הכישלון - אבל שום
+     מסך לא קרא לה. השורה אמרה "5 משלוחים" ותו לא, ולכן
+     הודעה שלא הגיעה ללקוח הייתה בלתי נראית לחלוטין.
+
+     זו בדיוק המידע שעורך דין חייב: לא כמה פעמים שלחנו,
+     אלא אם זה הגיע.
+
+     נטען בפתיחה ולא מראש - חמש דרישות בתיק היו חמש קריאות
+     שאיש לא ביקש. */
+  var DELIVERY_STATUS = {
+    'queued':    { tag: 'tag-wait', mark: '○', text: 'בהמתנה' },
+    'sent':      { tag: 'tag-warn', mark: '→', text: 'נשלח' },
+    'delivered': { tag: 'tag-ok',   mark: '✓', text: 'נמסר' },
+    'failed':    { tag: 'tag-stop', mark: '✗', text: 'נכשל' },
+    'skipped':   { tag: 'tag-wait', mark: '–', text: 'דולג' }
+  };
+
+  function deliveryLog(r) {
+    var box  = el('details', 'delivery-log');
+    var head = el('summary', null, r.deliveryCount
+      ? 'היסטוריית המשלוח והתזכורות (' + r.deliveryCount + ')'
+      : 'התזכורות');
+    box.appendChild(head);
+
+    var body = el('div', 'delivery-body');
+    body.appendChild(el('p', 'item-note', 'טוען...'));
+    box.appendChild(body);
+
+    var loaded = false;
+    box.addEventListener('toggle', function () {
+      if (!box.open || loaded) return;
+      loaded = true;
+      Api.requirementDeliveries(r.id).then(function (data) {
+        body.textContent = '';
+        var rows  = data.deliveries || [];
+        var rules = data.reminders || [];
+
+        if (rules.length) {
+          body.appendChild(el('h4', 'delivery-head', 'תזכורות'));
+          var rl = el('ul', 'plain-list');
+          rules.forEach(function (x) { rl.appendChild(reminderRow(x)); });
+          body.appendChild(rl);
+        }
+
+        if (!rows.length) {
+          body.appendChild(el('p', 'item-note', 'טרם נשלחה הודעה בדרישה הזאת.'));
+          return;
+        }
+        body.appendChild(el('h4', 'delivery-head', 'משלוחים'));
+        var ul = el('ul', 'plain-list');
+        rows.forEach(function (d) { ul.appendChild(deliveryRow(d)); });
+        body.appendChild(ul);
+      }).catch(function (err) {
+        body.textContent = '';
+        body.appendChild(el('p', 'item-note',
+          err.message || 'לא הצלחנו לטעון את היסטוריית המשלוח.'));
+      });
+    });
+    return box;
+  }
+
+  /** שורת תזכורת.
+
+      תזכורת מושהית היא המצב שחייב להיראות: הצוות מניח
+      שהלקוח נרדף, ובפועל לא נשלח אליו דבר. עד כה השורה
+      אמרה "תזכורת פעילה" רק כשהייתה פעילה, ומושהית לא
+      הופיעה כלל - כלומר היא נראתה כאילו אין תזכורת. */
+  function reminderRow(x) {
+    var li = el('li', 'delivery-row' + (x.isPaused ? ' delivery-paused' : ''));
+
+    li.appendChild(statusTag(x.isPaused
+      ? { tag: 'tag-wait', mark: '⏸', text: 'מושהית' }
+      : { tag: 'tag-ok',   mark: '↻', text: 'פעילה' }));
+
+    li.appendChild(el('span', 'delivery-chan',
+      CHANNEL_LABEL[x.channel] || x.channel));
+    li.appendChild(el('span', 'delivery-when',
+      'כל ' + (x.everyDays === 1 ? 'יום' : x.everyDays + ' ימים') +
+      ' · בין ' + x.hoursFrom + ':00 ל-' + x.hoursTo + ':00'));
+
+    if (x.isPaused) {
+      li.appendChild(el('p', 'delivery-error',
+        'התזכורת מושהית. הלקוח אינו מקבל תזכורות בדרישה הזאת.'));
+    }
+    return li;
+  }
+
+  function deliveryRow(d) {
+    var st = DELIVERY_STATUS[d.status] ||
+             { tag: 'tag-wait', mark: '?', text: d.status || 'לא ידוע' };
+    var li = el('li', 'delivery-row' + (d.status === 'failed' ? ' delivery-failed' : ''));
+
+    li.appendChild(statusTag(st));
+    li.appendChild(el('span', 'delivery-chan',
+      CHANNEL_LABEL[d.channel] || d.channel));
+    if (d.to) li.appendChild(el('span', 'delivery-to num', d.to));
+
+    var when = d.sentAt || d.createdAt;
+    if (when) li.appendChild(el('span', 'delivery-when', stamp(when)));
+
+    /* ההסבר בשורה משלה. זה מה שאומר לצוות מה לעשות עכשיו -
+       מספר שגוי הוא פעולה אחרת ממספר שאינו בוואטסאפ.
+
+       אוכמנית רק לכישלון אמיתי. גם "דולג" נושא הסבר, אבל
+       הוא תוצאה תקינה ("הלקוח כבר קרא בפורטל"), וצביעה
+       שלו באדום הייתה קוראת לתשומת לב שאינה נדרשת. */
+    if (d.error) {
+      li.appendChild(el('p', d.status === 'failed'
+        ? 'delivery-error' : 'delivery-why', d.error));
+    }
     return li;
   }
 
@@ -1152,12 +1621,14 @@
       return reqFail('המסמך "' + name + '" כבר קיים בתיק.', $('reqName'));
     }
 
-    Api.addDocument(openId, name, note, $('reqRequired').checked)
+    var templateId = pickedTemplate && pickedTemplate.name === name ? pickedTemplate.id : null;
+    Api.addDocument(openId, name, note, $('reqRequired').checked, templateId)
        .then(function () { return renderCase(); })
        .then(function () { toast('הדרישה נוספה והלקוח יראה אותה.'); })
        .catch(function (err) { toast(err.message || 'הוספת הדרישה נכשלה.'); });
 
     reqForm.reset();
+    pickedTemplate = null;
     $('reqRequired').checked = true;
   });
 
@@ -1183,6 +1654,475 @@
   function reviewStatus(value) {
     return REVIEW_STATUS[value] ||
            { tag: 'tag-wait', mark: '?', text: value || 'לא ידוע' };
+  }
+
+  /* ================= לקוחות =================
+     קריאה בלבד. תעודת הזהות אינה מוחזרת מהשרת כלל - היא
+     שמורה מוצפנת ומשמשת כמפתח ההתחברות של הלקוח, ואין לה
+     שום שימוש במסך רשימה. */
+
+  var clientQuery = '';
+  var clientTimer = null;
+
+  function loadClients() {
+    var list = $('clientList');
+    if (!list) return Promise.resolve();
+
+    return Api.officeClients(clientQuery).then(function (data) {
+      var rows  = data.clients;
+      var intro = $('clientsIntro');
+      if (intro) {
+        intro.textContent = !rows.length
+          ? (clientQuery ? 'אין לקוח שתואם את החיפוש.' : 'אין עדיין לקוחות במשרד.')
+          : (rows.length === 1 ? 'לקוח אחד' : rows.length + ' לקוחות') + '.';
+      }
+
+      list.textContent = '';
+      if (!rows.length) {
+        list.appendChild(el('li', 'item-note',
+          clientQuery ? 'אפשר לנקות את החיפוש כדי לראות את כולם.'
+                      : 'לקוח נוצר היום דרך פתיחת תיק.'));
+        return;
+      }
+      rows.forEach(function (c) { list.appendChild(clientRow(c)); });
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את רשימת הלקוחות.'));
+    });
+  }
+
+  /* חיפוש עם השהיה: הקלדה מלאה אינה שולחת בקשה לכל תו.
+
+     ההאזנה נרשמת בהגנה - #clientSearch הוא אלמנט חדש, ואם
+     הוא ייעלם מה-HTML בעתיד, הרישום ברמת המודול היה מפיל
+     את כל מה שמתחתיו ב-IIFE. */
+  var clientSearchBox = $('clientSearch');
+  if (clientSearchBox) {
+    clientSearchBox.addEventListener('input', function () {
+      var value = clientSearchBox.value.trim();
+      if (clientTimer) clearTimeout(clientTimer);
+      clientTimer = setTimeout(function () {
+        clientQuery = value.length >= 2 ? value : '';
+        loadClients();
+      }, 250);
+    });
+  }
+
+  function clientRow(c) {
+    var li = el('li', 'client-row');
+
+    li.appendChild(el('h3', 'client-name', c.name));
+
+    var meta = el('p', 'client-meta');
+    if (c.phone) meta.appendChild(el('span', 'num', c.phone));
+    if (c.email) meta.appendChild(el('span', null, c.email));
+    if (c.status !== 'active') meta.appendChild(el('span', 'client-off', 'מושבת'));
+    if (meta.childNodes.length) li.appendChild(meta);
+
+    /* שני מספרים ולא אחד: "שלושה תיקים" ו"אחד מהם פעיל"
+       הם שתי עובדות שונות, ואיחוד שלהן מסתיר את השנייה. */
+    var n = el('p', 'client-cases');
+    n.appendChild(el('span', null,
+      c.totalCases === 1 ? 'תיק אחד' : c.totalCases + ' תיקים'));
+    n.appendChild(el('span', null,
+      c.activeCases === 0 ? 'אין תיק פעיל'
+        : c.activeCases === 1 ? 'אחד פעיל' : c.activeCases + ' פעילים'));
+    li.appendChild(n);
+
+    return li;
+  }
+
+
+  /* ================= הקטלוגים =================
+     סוגי תביעה, מסלולי השלבים, קטלוג המסמכים וסוגי המשימות.
+
+     הם כבר מניעים התנהגות: המסלול קובע מה הלקוח רואה
+     ב"מפת ההליך", והקטלוג קובע מה נדרש ממנו. עד כה לא
+     הייתה שום דרך לראות אותם מהממשק, וכל שינוי חייב גישה
+     ישירה למסד. */
+
+  function loadCatalogs() {
+    var host = $('catalogBody');
+    if (!host) return Promise.resolve();
+
+    host.textContent = '';
+    host.appendChild(el('p', 'item-note', 'טוען...'));
+
+    return Api.officeCatalogs().then(function (data) {
+      host.textContent = '';
+
+      var intro = $('catalogIntro');
+      if (intro) {
+        intro.textContent = data.claimTypes.length +
+          ' סוגי תביעה · ' + data.taskTypes.length + ' סוגי משימה.';
+      }
+
+      data.claimTypes.forEach(function (t) {
+        host.appendChild(claimTypeBlock(t));
+      });
+
+      host.appendChild(taskTypesBlock(data.taskTypes));
+
+      if (!data.editable) host.appendChild(catalogGap());
+    }).catch(function (err) {
+      host.textContent = '';
+      host.appendChild(el('p', 'item-note',
+        err.message || 'לא הצלחנו לטעון את הקטלוגים.'));
+    });
+  }
+
+  function claimTypeBlock(t) {
+    var sec = el('section', 'block');
+
+    var head = el('div', 'catalog-head');
+    var h2 = el('h2', null, t.name);
+    head.appendChild(h2);
+    var meta = el('p', 'item-note');
+    meta.appendChild(el('span', null,
+      t.cases === 1 ? 'תיק אחד' : t.cases + ' תיקים'));
+    if (!t.active) meta.appendChild(el('span', 'client-off', 'לא פעיל'));
+    head.appendChild(meta);
+    sec.appendChild(head);
+
+    sec.appendChild(el('h3', null, 'מסלול השלבים'));
+    if (!t.stages.length) {
+      sec.appendChild(el('p', 'item-note', 'לא הוגדר מסלול לסוג הזה.'));
+    } else {
+      var ol = el('ol', 'catalog-stages');
+      t.stages.forEach(function (st) {
+        var li = el('li');
+        li.appendChild(el('span', 'catalog-n num', pad2(st.position)));
+        var body = el('div');
+        var title = el('p', 'catalog-title', st.title);
+        if (st.isTerminal) title.appendChild(el('span', 'catalog-flag', 'שלב סיום'));
+        body.appendChild(title);
+        if (st.desc) body.appendChild(el('p', 'item-note', st.desc));
+        li.appendChild(body);
+        ol.appendChild(li);
+      });
+      sec.appendChild(ol);
+    }
+
+    sec.appendChild(el('h3', null, 'קטלוג המסמכים'));
+    if (!t.documents.length) {
+      sec.appendChild(el('p', 'item-note',
+        'לא הוגדר קטלוג מסמכים לסוג הזה. תיק חדש ייפתח בלי דרישות.'));
+    } else {
+      var ul = el('ul', 'catalog-docs');
+      t.documents.forEach(function (d) {
+        var li = el('li');
+        li.appendChild(el('span', 'catalog-title',
+          d.name + (d.required ? '' : ' (לא חובה)')));
+        if (d.guidance) li.appendChild(el('span', 'item-note', d.guidance));
+        ul.appendChild(li);
+      });
+      sec.appendChild(ul);
+    }
+
+    return sec;
+  }
+
+  function taskTypesBlock(types) {
+    var sec = el('section', 'block');
+    sec.appendChild(el('h2', null, 'סוגי משימה'));
+    if (!types.length) {
+      sec.appendChild(el('p', 'item-note', 'לא הוגדרו סוגי משימה.'));
+      return sec;
+    }
+    var ul = el('ul', 'catalog-tasks');
+    types.forEach(function (t) {
+      var li = el('li');
+      li.appendChild(el('span', 'catalog-title', t.name));
+      if (!t.active) li.appendChild(el('span', 'client-off', 'לא פעיל'));
+      ul.appendChild(li);
+    });
+    sec.appendChild(ul);
+    return sec;
+  }
+
+  /** מה שאין: עריכה מהממשק. נאמר, ולא מוסתר מאחורי מסך
+      שנראה שלם. */
+  function catalogGap() {
+    var p = el('p', 'catalog-gap');
+    p.textContent = 'הקטלוגים מוצגים לקריאה בלבד. עריכה מהממשק ' +
+      'טרם נבנתה - שינוי משפיע על תיקים חיים, ולכן הוא דורש ' +
+      'החלטה על מה קורה לתיק שכבר רץ במסלול הישן. בינתיים ' +
+      'השינוי נעשה במסד.';
+    return p;
+  }
+
+
+  /* ================= תיקים שהושלמו =================
+     התוצאה מוצגת מההחלטה שכבר רשומה. שכר טרחה אינו קיים
+     במסד - אין טבלה, אין עמודה, ואין דרך לגזור אותו - ולכן
+     הוא נאמר כחסר ואינו מומצא. */
+
+  /* התוויות נגזרות מ-OUTCOMES ולא נכתבות מחדש. אוצר המילים
+     האמיתי הוא below-threshold / grant / pension / rejected -
+     אותו אחד שהסכמה אוכפת ושהטופס משתמש בו. מפה שנייה הייתה
+     יכולה להיפרד ממנו בשקט. */
+  function outcomeLabel(code) {
+    for (var i = 0; i < OUTCOMES.length; i++) {
+      if (OUTCOMES[i][0] === code) return OUTCOMES[i][1];
+    }
+    return 'התקבלה החלטה';
+  }
+
+  /* שני מצבי סגירה, והם נושאים את התוצאה גם בלי החלטה רשומה. */
+  var CLOSED_LABEL = {
+    'closed_accepted': 'הסתיים בקבלה',
+    'closed_rejected': 'הסתיים בדחייה'
+  };
+
+  function loadClosed() {
+    var list = $('closedList');
+    if (!list) return Promise.resolve();
+
+    return Api.officeClosedCases().then(function (data) {
+      var rows  = data.cases;
+      var intro = $('closedIntro');
+      if (intro) {
+        intro.textContent = !rows.length
+          ? 'אין עדיין תיק שהסתיים.'
+          : (rows.length === 1 ? 'תיק אחד הסתיים' : rows.length + ' תיקים הסתיימו') + '.';
+      }
+
+      list.textContent = '';
+      if (!rows.length) {
+        list.appendChild(el('li', 'item-note',
+          'תיק עובר למצב "סגור" כשהמשרד מסמן זאת. כרגע אין ' +
+          'במערכת נתיב לסגירת תיק מהממשק, ולכן הרשימה ריקה ' +
+          'גם אם בפועל הסתיימו תיקים.'));
+      } else {
+        rows.forEach(function (c) { list.appendChild(closedRow(c)); });
+      }
+
+      renderFeesGap(data.feesAvailable);
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את התיקים שהושלמו.'));
+    });
+  }
+
+  function closedRow(c) {
+    var li = el('li', 'closed-row');
+
+    li.appendChild(el('h3', 'closed-name', c.clientName));
+
+    var meta = el('p', 'closed-meta');
+    meta.appendChild(el('span', 'num', c.caseNumber));
+    if (c.claimType) meta.appendChild(el('span', null, c.claimType));
+    /* הסטטוס נאמר גם כשיש החלטה: הוא התשובה לשאלה "איך
+       התיק נסגר", וההחלטה היא התשובה ל"מה נקבע". */
+    if (CLOSED_LABEL[c.status]) {
+      meta.appendChild(el('span', 'closed-how', CLOSED_LABEL[c.status]));
+    }
+    li.appendChild(meta);
+
+    if (c.decision) {
+      var d = el('p', 'closed-outcome');
+      d.appendChild(el('span', null, outcomeLabel(c.decision.outcome)));
+      /* אחוזים רק כשיש להם מה לומר. בתביעה שנדחתה "0%" אינו
+         נתון אלא היעדר נתון, והוא קורא כאילו נקבע משהו. */
+      if (c.decision.percent != null && c.decision.outcome !== 'rejected') {
+        d.appendChild(el('span', 'num', c.decision.percent + '%'));
+      }
+      if (c.decision.permanent) d.appendChild(el('span', null, 'נכות קבועה'));
+      d.appendChild(el('span', 'num', formatDate(c.decision.date)));
+      li.appendChild(d);
+    } else {
+      li.appendChild(el('p', 'item-note',
+        'התיק סגור אך לא נרשמה לו החלטה.'));
+    }
+
+    var go = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק ←');
+    go.type = 'button';
+    go.setAttribute('aria-label', 'פתיחת התיק ' + c.caseNumber);
+    go.addEventListener('click', function () { openCase(c.id, 'state'); });
+    li.appendChild(go);
+
+    return li;
+  }
+
+  function renderFeesGap(available) {
+    var host = $('feesGap');
+    if (!host) return;
+    host.textContent = '';
+    if (available) return;
+
+    host.appendChild(el('h2', null, 'שכר טרחה'));
+    host.appendChild(el('p', 'catalog-gap',
+      'אין במערכת מודל שכר טרחה. לא טבלה, לא עמודה, ואין נתון ' +
+      'קיים שאפשר לגזור ממנו סכום. המסך אינו מציג מספר משוער ' +
+      'במכוון - נתון כספי שגוי גרוע מנתון חסר. הוספת המודל ' +
+      'דורשת החלטה על שיטת החישוב, על מע"מ ועל מה קורה בתיק ' +
+      'שנדחה.'));
+  }
+
+
+  /* ================= קלסר המסמכים =================
+     מבט רוחבי על כל מסמכי המשרד, חוצה תיקים.
+
+     עד כה מסמך היה נגיש דרך התיק בלבד, ולכן השאלה "מה
+     ממתין לבדיקה השבוע" חייבה לפתוח תיקים אחד אחד - ובפועל
+     איש לא שאל אותה.
+
+     המונים מגיעים מהשרת ולא מספירה של הדף שהוחזר. אחרת
+     השבב היה אומר "8 ממתינים" כשיש 40 והרשימה נחתכה. */
+
+  var BINDER_LABEL = {
+    'pending_review': 'ממתינים לבדיקה',
+    'missing':        'הלקוח טרם העלה',
+    'rejected':       'נדחו',
+    'approved':       'אושרו',
+    'cancelled':      'דרישות שנסגרו'
+  };
+  var BINDER_ORDER = ['pending_review', 'missing', 'rejected',
+                      'approved', 'cancelled'];
+
+  /* ברירת המחדל היא העבודה הפתוחה, ולא הכול. מסמך שאושר
+     אינו משימה, והוא מסתיר את מה שכן. */
+  var binderFilter = 'pending_review';
+
+  function loadBinder() {
+    var list  = $('binderList');
+    var intro = $('binderIntro');
+    if (!list) return Promise.resolve();
+
+    list.textContent = '';
+    list.appendChild(el('li', 'item-note', 'טוען...'));
+
+    return Api.officeDocuments(binderFilter, 300).then(function (data) {
+      renderBinderChips(data.counts, data.total);
+      renderBinderList(data, list, intro);
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('li', 'item-note',
+        err.message || 'לא הצלחנו לטעון את הקלסר.'));
+    });
+  }
+
+  function renderBinderChips(counts, total) {
+    var wrap = $('binderChips');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    /* "הכול" ראשון, ואז מצב אחד לכל שבב. אפס נשאר לחיץ
+       אבל שקט - הוא אומר "אין כאן כלום", לא "אין כזה דבר". */
+    addBinderChip(wrap, '', 'הכול', total);
+    BINDER_ORDER.forEach(function (st) {
+      addBinderChip(wrap, st, BINDER_LABEL[st], counts[st] || 0);
+    });
+  }
+
+  function addBinderChip(wrap, value, label, n) {
+    var on  = binderFilter === value;
+    var b   = el('button', 'chip' + (n ? '' : ' chip-zero'));
+    b.type  = 'button';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.appendChild(el('span', null, label));
+    b.appendChild(el('span', 'chip-n', String(n)));
+    b.addEventListener('click', function () {
+      if (binderFilter === value) return;
+      binderFilter = value;
+      loadBinder();
+    });
+    wrap.appendChild(b);
+  }
+
+  function renderBinderList(data, list, intro) {
+    var docs = data.documents;
+
+    if (intro) {
+      intro.textContent = !docs.length
+        ? 'אין מסמכים במצב הזה.'
+        : (docs.length === 1 ? 'מסמך אחד' : docs.length + ' מסמכים') +
+          (data.truncated ? ' (מוצגים הראשונים)' : '') + '.';
+    }
+
+    list.textContent = '';
+    if (!docs.length) {
+      list.appendChild(el('li', 'item-note',
+        'אין מסמכים במצב הזה. אפשר לעבור לשבב אחר.'));
+      return;
+    }
+
+    docs.forEach(function (doc) { list.appendChild(binderRow(doc)); });
+  }
+
+  /** שורת מסמך בקלסר.
+      שלוש רמות: מה המסמך · של מי ובאיזה תיק · מה אפשר לעשות. */
+  function binderRow(doc) {
+    var s  = reviewStatus(doc.status);
+    var li = el('li', 'binder-row');
+
+    var tag = el('span', 'tag ' + s.tag);
+    tag.appendChild(el('span', null, s.mark, true));
+    tag.appendChild(document.createTextNode(s.text));
+    li.appendChild(tag);
+
+    li.appendChild(el('h3', 'binder-name',
+      doc.name + (doc.required ? '' : ' (לא חובה)')));
+
+    var who = el('p', 'binder-who');
+    who.appendChild(el('span', null, doc.clientName));
+    who.appendChild(el('span', 'num', doc.caseNumber));
+    if (doc.claimType) who.appendChild(el('span', null, doc.claimType));
+    li.appendChild(who);
+
+    if (doc.status === 'rejected' && doc.rejectReason) {
+      li.appendChild(el('p', 'reject-note',
+        'סיבת הדחייה שנמסרה ללקוח: ' + doc.rejectReason));
+    }
+
+    var acts = el('div', 'binder-acts');
+    if (doc.file) acts.appendChild(fileLink(doc.id, doc.file));
+
+    /* פתיחת התיק בלשונית המסמכים. שם יושבים כפתורי האישור
+       והדחייה - הם לא משוכפלים לכאן, כדי שלא יהיו שני
+       מקומות שמבצעים את אותה פעולה. */
+    var go = el('button', 'btn btn-outline btn-sm', 'פתיחת התיק ←');
+    go.type = 'button';
+    go.setAttribute('aria-label', 'פתיחת התיק ' + doc.caseNumber +
+                                  ' בלשונית המסמכים');
+    go.addEventListener('click', function () { openCase(doc.caseId, 'docs'); });
+    acts.appendChild(go);
+
+    li.appendChild(acts);
+    return li;
+  }
+
+  /** קישור לקובץ, או אמירה מפורשת למה אי אפשר לפתוח אותו.
+
+      סריקה שטרם הסתיימה אינה כישלון ואינה הדבקה, ושלושתם
+      אינם אותו מצב. שורה שאומרת רק "לא זמין" שולחת את הצוות
+      לנחש. */
+  function fileLink(documentId, f) {
+    if (f.ready) {
+      var a = el('a', 'btn btn-outline btn-sm', 'פתיחת הקובץ');
+      a.href = Api.officeFileUrl(documentId, f.id);
+      a.setAttribute('download', f.name || '');
+      a.setAttribute('aria-label', 'הורדת הקובץ ' + (f.name || 'שהלקוח העלה'));
+      return a;
+    }
+    var why = f.scan === 'infected'
+      ? 'הקובץ נמצא נגוע בסריקה ואינו ניתן לפתיחה.'
+      : f.scan === 'failed'
+        ? 'סריקת האבטחה נכשלה. הקובץ אינו ניתן לפתיחה.'
+        : 'הקובץ ממתין לסריקת אבטחה ויהיה זמין בסיומה.';
+    return el('span', 'file-blocked', why);
+  }
+
+
+  /** גודל קובץ בשפה של אדם. */
+  function fileSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' בייט';
+    var kb = bytes / 1024;
+    if (kb < 1024) return Math.round(kb) + ' KB';
+    return (Math.round(kb / 102.4) / 10) + ' MB';
   }
 
   function renderReview(file) {
@@ -1213,10 +2153,26 @@
       li.appendChild(el('h3', null, doc.name + (doc.required ? '' : ' (לא חובה)')));
       li.appendChild(el('p', 'item-note', doc.note));
 
-      if (doc.file) {
-        li.appendChild(el('span', 'file-name',
-          'הקובץ שהלקוח העלה: ' + doc.file + ' · ' + formatDate(doc.date)));
-      }
+      /* הקבצים שהלקוח העלה.
+
+         עד 27.09 השורה כאן בדקה doc.file - שדה שהשרת מעולם
+         לא החזיר. כלומר עורך הדין התבקש לאשר או לדחות מסמך
+         בלי לראות את שם הקובץ ובלי שום דרך לפתוח אותו.
+         הביקורת הייתה עיוורת. */
+      (doc.files || []).forEach(function (f) {
+        var row = el('div', 'doc-file');
+        var name = el('span', 'file-name', f.name || 'קובץ ללא שם');
+        row.appendChild(name);
+        if (f.at) row.appendChild(el('span', 'file-when num', formatDate(f.at)));
+        if (f.size) row.appendChild(el('span', 'file-size', fileSize(f.size)));
+        row.appendChild(fileLink(doc.id, f));
+        li.appendChild(row);
+        /* סיווג אוטומטי (שלב 4): רק למי שמורשה לתוכן רפואי, ורק לקובץ
+           שעבר סריקה. השרת אוכף את שניהם בעצמו. */
+        if (staff && staff.canViewMedical && f.ready) {
+          li.appendChild(classificationPanel(doc, f));
+        }
+      });
       if (doc.status === 'rejected' && doc.rejectReason) {
         li.appendChild(el('p', 'reject-note', 'סיבת הדחייה שנמסרה ללקוח: ' + doc.rejectReason));
       }
@@ -1248,6 +2204,175 @@
     });
   }
 
+  /* ================= סיווג אוטומטי (שלב 4) =================
+     ההצעה, הנימוק שלה, וההתאמה לדרישה - ושלוש פעולות: אישור הסיווג,
+     בחירת סוג אחר, דחיית ההצעה. אף אחת מהן אינה מאשרת את המסמך או
+     משלימה את הדרישה; זה נשאר בכפתורי הבדיקה הרגילים.
+     אין כאן טקסט מהמסמך - רק ביטויים מהמילון, מיקום ומשקל. */
+
+  var DECISION_TEXT = {
+    'clear':      { tag: 'tag-wait', text: 'הוצע סוג' },
+    'ambiguous':  { tag: 'tag-warn', text: 'נדרשת הכרעה' },
+    'unknown':    { tag: 'tag-warn', text: 'לא זוהה סוג' },
+    'unreadable': { tag: 'tag-warn', text: 'לא ניתן לסווג' },
+    'mixed':      { tag: 'tag-warn', text: 'הקובץ מכיל כמה מסמכים' }
+  };
+  var MATCH_TEXT = {
+    'match':        'תואם לדרישה',
+    'mismatch':     'אינו תואם לדרישה',
+    'undetermined': 'לא ניתן לקבוע התאמה - נדרשת בדיקה',
+    'unmapped':     'לדרישה הזו לא הוגדרו סוגי מסמכים - ההתאמה לא נבדקה'
+  };
+  var kindsCache = null;
+
+  /* תפקיד הסימן, ולא רק האזור: ביטוי תומך בשורה 3 אינו "כותרת", וביטוי
+     כותרת באמצע שורה הוא אזכור. (נמצא בבדיקה החזותית של שלב 4.) */
+  function reasonRole(r) {
+    var role = (r.rule || '').split(':')[1];
+    if (role === 'title') return r.zone === 'header' ? 'כותרת' : 'אזכור, לא ככותרת';
+    if (role === 'negative') return 'ביטוי שולל';
+    if (role === 'number') return 'מספר טופס (תומך בלבד)';
+    return 'ביטוי תומך';
+  }
+
+  function classificationPanel(doc, f) {
+    var box = el('section', 'classify-panel');
+    box.setAttribute('aria-label', 'סיווג אוטומטי של הקובץ ' + (f.name || ''));
+    box.appendChild(el('h4', null, 'סיווג אוטומטי - הצעה בלבד'));
+    var body = el('div', 'classify-body', 'טוען…');
+    box.appendChild(body);
+
+    function load() {
+      return Api.classification(doc.id, f.id).then(function (c) { draw(c); })
+        .catch(function (err) { body.textContent = err.message || 'טעינת הסיווג נכשלה.'; });
+    }
+
+    function draw(c) {
+      body.textContent = '';
+      if (c.status === 'none') {
+        body.appendChild(el('p', 'item-note', 'הקובץ טרם עובד. הסיווג יופיע בסיום העיבוד.'));
+        return;
+      }
+      var d = DECISION_TEXT[c.decision] || DECISION_TEXT.unknown;
+      var tag = el('span', 'tag ' + (c.status === 'confirmed' ? 'tag-ok' : d.tag),
+                   c.status === 'confirmed' ? 'סיווג אושר' :
+                   c.status === 'rejected' ? 'ההצעה נדחתה' : d.text);
+      body.appendChild(tag);
+
+      if (c.status === 'confirmed' && c.confirmed) {
+        body.appendChild(el('p', 'classify-kind', 'סוג המסמך: ' + c.confirmed.label));
+        if (c.differsFromConfirmed) {
+          body.appendChild(el('p', 'classify-note',
+            'עיבוד חוזר הציע סוג אחר. הסיווג המאושר לא שונה - כדאי לבדוק שוב.'));
+        }
+      } else if (c.decision === 'clear' && c.suggested) {
+        body.appendChild(el('p', 'classify-kind', 'הוצע: ' + c.suggested.label));
+      } else if (c.decision === 'ambiguous') {
+        body.appendChild(el('p', 'classify-kind', 'שני סוגים קרובים: ' +
+          c.candidates.slice(0, 2).map(function (k) { return k.label; }).join(' או ') +
+          '. המערכת אינה בוחרת ביניהם.'));
+      } else if (c.decision === 'mixed') {
+        var pages = el('ul', 'classify-pages');
+        c.pages.forEach(function (p) {
+          pages.appendChild(el('li', null, 'עמוד ' + p.page + ': ' +
+            (p.kind ? p.kind.label + (p.decision === 'continuation' ? ' (המשך)' : '')
+                    : (DECISION_TEXT[p.decision] || DECISION_TEXT.unknown).text)));
+        });
+        body.appendChild(pages);
+        body.appendChild(el('p', 'classify-note',
+          'הקובץ לא פוצל. כל עמוד מוצג עם הסוג המוצע שלו.'));
+      } else if (c.decision === 'unreadable') {
+        body.appendChild(el('p', 'classify-kind', 'הטקסט שחולץ קצר מדי או לא ודאי - ' +
+          'כנראה בעיית קריאות. כדאי לפתוח את הקובץ.'));
+      }
+
+      var req = c.requirement || {};
+      var match = el('p', 'classify-match match-' + req.match,
+        MATCH_TEXT[req.match] || '');
+      if (req.match === 'mismatch' && req.accepted && req.accepted.length) {
+        match.textContent += ' - הדרישה: ' +
+          req.accepted.map(function (k) { return k.label; }).join(' / ');
+      }
+      body.appendChild(match);
+
+      if (c.reasons && c.reasons.length) {
+        var why = el('details', 'classify-why');
+        why.appendChild(el('summary', null, 'מדוע?'));
+        var list = el('ul');
+        c.reasons.forEach(function (r) {
+          list.appendChild(el('li', null,
+            '"' + r.phrase + '" → ' + r.kindLabel +
+            ' · ' + reasonRole(r) +
+            ' · עמוד ' + r.page + ', שורה ' + r.line +
+            ' · משקל ' + (r.weight > 0 ? '+' : '') + r.weight +
+            (r.approximate ? ' · התאמה חלקית (OCR)' : '')));
+        });
+        why.appendChild(list);
+        why.appendChild(el('p', 'item-note', 'כללים בגרסה ' + c.rulesVersion + '.'));
+        body.appendChild(why);
+      }
+
+      body.appendChild(actionsFor(c));
+    }
+
+    function actionsFor(c) {
+      var act = el('div', 'classify-actions');
+      act.appendChild(el('p', 'item-note',
+        'אישור הסיווג אינו מאשר את המסמך ואינו משלים את הדרישה.'));
+
+      function send(action, kind) {
+        return Api.reviewClassification(doc.id, f.id, action, kind)
+          .then(function () { toast('הסיווג עודכן.'); return load(); })
+          .catch(function (err) { toast(err.message || 'עדכון הסיווג נכשל.'); });
+      }
+
+      if (c.decision === 'clear' && c.status !== 'confirmed') {
+        var yes = el('button', 'btn btn-ok btn-sm', 'אישור הסיווג');
+        yes.type = 'button';
+        yes.addEventListener('click', function () { send('confirm'); });
+        act.appendChild(yes);
+      }
+
+      var pickId = 'kind-' + f.id;
+      var pickLabel = el('label', null, 'סוג אחר:');
+      pickLabel.setAttribute('for', pickId);
+      var pick = document.createElement('select');
+      pick.id = pickId;
+      pick.appendChild(new Option('בחירה מהרשימה…', ''));
+      var choose = el('button', 'btn btn-outline btn-sm', 'קביעת הסוג');
+      choose.type = 'button';
+      choose.addEventListener('click', function () {
+        if (!pick.value) { pick.focus(); return toast('יש לבחור סוג מהרשימה.'); }
+        send('choose', pick.value);
+      });
+      (kindsCache ? Promise.resolve(kindsCache) : Api.documentKinds())
+        .then(function (k) {
+          kindsCache = k;
+          k.categories.forEach(function (cat) {
+            var group = document.createElement('optgroup');
+            group.label = cat.label;
+            k.kinds.filter(function (x) { return x.category === cat.label; })
+                   .forEach(function (x) { group.appendChild(new Option(x.label, x.code)); });
+            pick.appendChild(group);
+          });
+        });
+      act.appendChild(pickLabel);
+      act.appendChild(pick);
+      act.appendChild(choose);
+
+      if (c.status !== 'rejected') {
+        var reject = el('button', 'btn btn-outline btn-sm', 'דחיית ההצעה');
+        reject.type = 'button';
+        reject.addEventListener('click', function () { send('reject'); });
+        act.appendChild(reject);
+      }
+      return act;
+    }
+
+    load();
+    return box;
+  }
+
   /** כפתורי אישור/דחייה + טופס סיבת הדחייה שנפתח מתחתיהם */
   function reviewControls(doc) {
     var wrap    = el('div');
@@ -1256,12 +2381,33 @@
     var ok = el('button', 'btn btn-ok btn-sm', 'אישור המסמך');
     ok.type = 'button';
     ok.setAttribute('aria-label', 'אישור המסמך ' + doc.name);
-    ok.addEventListener('click', function () {
-      Api.reviewDocument(doc.id, 'approve', null)
+    /* אזהרת אי-התאמה בין סיווג המסמך לדרישה. אינה חוסמת - עורך הדין
+       רשאי לאשר - אבל האישור הוא פעולה נפרדת ומפורשת, ולא אותה לחיצה. */
+    var warn = el('div', 'mismatch-warning');
+    warn.hidden = true;
+    warn.setAttribute('role', 'alert');
+
+    function approve(acknowledge) {
+      return Api.reviewDocument(doc.id, 'approve', null, acknowledge)
          .then(function () { return renderCase(); })
          .then(function () { toast('המסמך "' + doc.name + '" אושר.'); })
-         .catch(function (err) { toast(err.message || 'האישור נכשל.'); });
-    });
+         .catch(function (err) {
+           if (err.status === 409 && err.code === 'classification_mismatch') {
+             warn.textContent = '';
+             warn.appendChild(el('p', null, err.message));
+             var anyway = el('button', 'btn btn-outline btn-sm',
+                             'אישור המסמך למרות אי-ההתאמה');
+             anyway.type = 'button';
+             anyway.addEventListener('click', function () { approve(true); });
+             warn.appendChild(anyway);
+             warn.hidden = false;
+             anyway.focus();
+             return;
+           }
+           toast(err.message || 'האישור נכשל.');
+         });
+    }
+    ok.addEventListener('click', function () { approve(false); });
 
     var no = el('button', 'btn btn-stop btn-sm', 'דחייה');
     no.type = 'button';
@@ -1271,6 +2417,7 @@
     actions.appendChild(ok);
     actions.appendChild(no);
     wrap.appendChild(actions);
+    wrap.appendChild(warn);
 
     // הדחייה מחייבת סיבה - הלקוח צריך לדעת מה לתקן
     var form = el('div', 'reject-form');
@@ -2184,7 +3331,9 @@
   /** ממיר 2026-09-22 ל-22.09.2026 */
   function formatDate(iso) {
     if (!iso) return '';
-    var p = iso.split('-');
+    /* רק החלק של התאריך. זמן העלאת קובץ מגיע כחותמת ISO מלאה, ועד
+       2026-10-02 הוא הוצג כ-"02T13:12:22...+03:00.10.2026". */
+    var p = String(iso).slice(0, 10).split('-');
     return p[2] + '.' + p[1] + '.' + p[0];
   }
 

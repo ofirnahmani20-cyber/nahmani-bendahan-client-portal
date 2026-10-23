@@ -707,4 +707,283 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+
+-- -------------------------------------------------------------
+--  10. Document Intelligence (Layer 2) - תשתית העיבוד
+--
+--  שלושה כללים, וכולם נאכפים כאן ולא רק בקוד:
+--    א. אין עיבוד לקובץ שלא נסרק נקי. טריגר מסרב להכניס לתור
+--       או להריץ עבודה כזו, וקובץ שהפסיק להיות clean מאבד את
+--       כל מה שנגזר ממנו.
+--    ב. אין תוכן רפואי גלוי במסד. טקסט עמוד וערך עובדה הם
+--       צופן (crypto.py), ו-CHECK מסרב לכל ערך שאינו מתחיל
+--       בכותרת ההצפנה.
+--    ג. המכונה מציעה, אדם מאשר. עובדה מאושרת חייבת מאשר.
+--  הכול נמחק יחד עם הקובץ (CASCADE) - השמירה כמו מסמך המקור.
+-- -------------------------------------------------------------
+
+-- הרשאה מפורשת לצפייה בתוכן רפואי מחולץ. ברירת מחדל: לא.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'users' AND column_name = 'can_view_medical') THEN
+    ALTER TABLE users ADD COLUMN can_view_medical boolean NOT NULL DEFAULT false;
+  END IF;
+END $$;
+
+-- יעד למפתחות זרים מורכבים (קובץ + משרד), כמו cases_id_firm_key.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conname = 'document_files_id_firm_key') THEN
+    ALTER TABLE document_files ADD CONSTRAINT document_files_id_firm_key UNIQUE (id, firm_id);
+  END IF;
+END $$;
+
+-- תור העבודה. שורה אחת לכל קובץ; ה-worker לוקח עבודה ב-
+-- FOR UPDATE SKIP LOCKED, ולכן כמה workers אינם מתנגשים.
+CREATE TABLE IF NOT EXISTS document_processing (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id          uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  file_id          uuid NOT NULL UNIQUE,
+  status           text NOT NULL DEFAULT 'queued'
+                   CHECK (status IN ('queued', 'running', 'done', 'rejected', 'failed')),
+  attempts         integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  max_attempts     integer NOT NULL DEFAULT 3 CHECK (max_attempts BETWEEN 1 AND 10),
+  next_attempt_at  timestamptz NOT NULL DEFAULT now(),
+  locked_by        text,
+  locked_at        timestamptz,
+  -- קוד בלבד. הודעת שגיאה של parser עלולה לצטט תוכן מהקובץ.
+  error_code       text CHECK (error_code ~ '^[a-z_]{1,40}$'),
+  page_count       integer CHECK (page_count >= 0),
+  text_layer_pages integer CHECK (text_layer_pages >= 0),
+  ocr_needed_pages integer CHECK (ocr_needed_pages >= 0),
+  engine           jsonb NOT NULL DEFAULT '{}'::jsonb,
+  duration_ms      integer CHECK (duration_ms >= 0),
+  queued_at        timestamptz NOT NULL DEFAULT now(),
+  started_at       timestamptz,
+  finished_at      timestamptz,
+  FOREIGN KEY (file_id, firm_id)
+    REFERENCES document_files(id, firm_id) ON DELETE CASCADE,
+  CONSTRAINT running_is_locked
+    CHECK (status <> 'running' OR (locked_by IS NOT NULL AND locked_at IS NOT NULL)),
+  CONSTRAINT terminal_is_finished
+    CHECK (status NOT IN ('done', 'rejected', 'failed') OR finished_at IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_processing_ready
+  ON document_processing (next_attempt_at) WHERE status = 'queued';
+CREATE INDEX IF NOT EXISTS idx_processing_running
+  ON document_processing (locked_at) WHERE status = 'running';
+
+-- טקסט לכל עמוד. אין עמודת טקסט גלוי - רק צופן.
+CREATE TABLE IF NOT EXISTS document_pages (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id        uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  file_id        uuid NOT NULL,
+  page_no        integer NOT NULL CHECK (page_no >= 1),
+  source         text NOT NULL CHECK (source IN ('layer', 'ocr')),
+  ocr_confidence numeric(5, 2) CHECK (ocr_confidence BETWEEN 0 AND 100),
+  char_count     integer NOT NULL CHECK (char_count >= 0),
+  text_enc       bytea NOT NULL
+                 CHECK (substring(text_enc FROM 1 FOR 6) = '\x4e42454e4331'::bytea),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (file_id, page_no),
+  FOREIGN KEY (file_id, firm_id)
+    REFERENCES document_files(id, firm_id) ON DELETE CASCADE
+);
+
+-- שלב 3: איזה מנוע הפיק את העמוד, והפריסה שלו - לכל שורה היסט
+-- בטקסט, תיבה בעמוד וביטחון. הקישור מכל קטע טקסט למקום שממנו
+-- נקרא. מוצפן גם הוא: יחד עם הטקסט הוא משחזר את המסמך.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'document_pages' AND column_name = 'model') THEN
+    ALTER TABLE document_pages
+      ADD COLUMN model text NOT NULL DEFAULT 'layer'
+        CHECK (model IN ('layer', 'fast', 'best', 'fast+best')),
+      ADD COLUMN layout_enc bytea
+        CHECK (layout_enc IS NULL
+               OR substring(layout_enc FROM 1 FOR 6) = '\x4e42454e4331'::bytea);
+  END IF;
+END $$;
+
+-- סיווג מוצע. code הוא מזהה מרשימה סגורה, לא טקסט חופשי.
+CREATE TABLE IF NOT EXISTS document_classifications (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id             uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  file_id             uuid NOT NULL UNIQUE,
+  suggested_type      text NOT NULL CHECK (suggested_type ~ '^[a-z0-9_]{1,40}$'),
+  score               integer NOT NULL CHECK (score >= 0),
+  margin              integer NOT NULL CHECK (margin >= 0),
+  matches_requirement boolean,
+  status              text NOT NULL DEFAULT 'suggested'
+                      CHECK (status IN ('suggested', 'confirmed', 'rejected')),
+  reviewed_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at         timestamptz,
+  engine              text NOT NULL,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (file_id, firm_id)
+    REFERENCES document_files(id, firm_id) ON DELETE CASCADE,
+  CONSTRAINT classification_review_has_reviewer
+    CHECK (status = 'suggested' OR (reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL))
+);
+
+-- עובדות מחולצות, כל אחת עם עוגן. kind ו-category הם מרשימה
+-- סגורה וגלויים לסינון; הערך עצמו (אבחנה, שם רופא, אחוז) מוצפן.
+CREATE TABLE IF NOT EXISTS document_facts (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id             uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  file_id             uuid NOT NULL,
+  page_no             integer NOT NULL CHECK (page_no >= 1),
+  kind                text NOT NULL
+                      CHECK (kind IN ('date', 'icd10', 'percent', 'physician',
+                                      'institution', 'test_type')),
+  category            text CHECK (category ~ '^[A-Za-z0-9_.-]{1,20}$'),
+  value_date          date,
+  value_enc           bytea NOT NULL
+                      CHECK (substring(value_enc FROM 1 FOR 6) = '\x4e42454e4331'::bytea),
+  offset_start        integer NOT NULL CHECK (offset_start >= 0),
+  offset_end          integer NOT NULL,
+  source              text NOT NULL CHECK (source IN ('layer', 'ocr')),
+  confidence          numeric(4, 3) CHECK (confidence BETWEEN 0 AND 1),
+  status              text NOT NULL DEFAULT 'suggested'
+                      CHECK (status IN ('suggested', 'confirmed', 'rejected')),
+  reviewed_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at         timestamptz,
+  engine              text NOT NULL,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (file_id, firm_id)
+    REFERENCES document_files(id, firm_id) ON DELETE CASCADE,
+  CONSTRAINT fact_anchor_is_a_range CHECK (offset_end > offset_start),
+  -- ממצא 1 של ה-spike: OCR קורא 25% כ-75%. עובדה לא מאושרת
+  -- בלי שאדם מזוהה עבר עליה.
+  CONSTRAINT fact_review_has_reviewer
+    CHECK (status = 'suggested' OR (reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_facts_file ON document_facts (file_id);
+CREATE INDEX IF NOT EXISTS idx_facts_confirmed
+  ON document_facts (firm_id, kind, category) WHERE status = 'confirmed';
+
+-- א. אין תור ואין ריצה לקובץ שאינו clean.
+CREATE OR REPLACE FUNCTION processing_requires_clean_file() RETURNS trigger AS $$
+BEGIN
+  IF NEW.status IN ('queued', 'running') AND NOT EXISTS (
+       SELECT 1 FROM document_files f
+        WHERE f.id = NEW.file_id AND f.firm_id = NEW.firm_id
+          AND f.scan_status = 'clean') THEN
+    RAISE EXCEPTION 'document_processing: file % is not clean', NEW.file_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_processing_requires_clean ON document_processing;
+CREATE TRIGGER trg_processing_requires_clean
+  BEFORE INSERT OR UPDATE OF status ON document_processing
+  FOR EACH ROW EXECUTE FUNCTION processing_requires_clean_file();
+
+-- קובץ שהפסיק להיות clean (סריקה חוזרת מצאה משהו): כל מה שנגזר
+-- ממנו נמחק, והעבודה נסגרת כנדחית.
+CREATE OR REPLACE FUNCTION purge_derived_when_not_clean() RETURNS trigger AS $$
+BEGIN
+  IF OLD.scan_status = 'clean' AND NEW.scan_status <> 'clean' THEN
+    DELETE FROM document_pages           WHERE file_id = NEW.id;
+    DELETE FROM document_facts           WHERE file_id = NEW.id;
+    DELETE FROM document_classifications WHERE file_id = NEW.id;
+    UPDATE document_processing
+       SET status = 'rejected', error_code = 'not_clean',
+           locked_by = NULL, locked_at = NULL, finished_at = now()
+     WHERE file_id = NEW.id AND status NOT IN ('rejected', 'failed');
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_purge_derived_when_not_clean ON document_files;
+CREATE TRIGGER trg_purge_derived_when_not_clean
+  AFTER UPDATE OF scan_status ON document_files
+  FOR EACH ROW EXECUTE FUNCTION purge_derived_when_not_clean();
+
+
+-- -------------------------------------------------------------
+--  11. סיווג מסמכים (Layer 2, שלב 4)
+--
+--  סוג המסמך (מה הוא) נפרד מההתאמה לדרישה (האם הוא מה שביקשנו).
+--  שניהם הצעה עד שאדם מאשר, ואף אחד מהם אינו נוגע ב-case_documents.status.
+-- -------------------------------------------------------------
+
+-- הרשימה עצמה מגיעה מ-server/doc_taxonomy.py (sync ב-apply.py). כאן
+-- היא כדי שהמסד יוכל לאכוף שסוג מאושר הוא סוג קיים, ועבור ממשק
+-- מנהל עתידי. סוג שהוסר מסומן active=false ואינו נמחק.
+CREATE TABLE IF NOT EXISTS document_kinds (
+  code     text PRIMARY KEY CHECK (code ~ '^[a-z_]+(\.[a-z0-9_]+)?$'),
+  category text NOT NULL,
+  parent   text REFERENCES document_kinds(code),
+  label    text NOT NULL,
+  active   boolean NOT NULL DEFAULT true
+);
+
+-- אילו סוגים מתקבלים בכל דרישה. ריק = הדרישה לא מופתה, וההתאמה
+-- מוצגת "לא נבדקה" ולא "לא תואם".
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'required_document_templates'
+                    AND column_name = 'accepted_kinds') THEN
+    ALTER TABLE required_document_templates
+      ADD COLUMN accepted_kinds text[] NOT NULL DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'case_documents' AND column_name = 'accepted_kinds') THEN
+    ALTER TABLE case_documents ADD COLUMN accepted_kinds text[] NOT NULL DEFAULT '{}';
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION accepted_kinds_exist() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT k FROM unnest(NEW.accepted_kinds) AS k
+             EXCEPT SELECT code FROM document_kinds) THEN
+    RAISE EXCEPTION 'accepted_kinds: unknown document kind'
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_template_kinds ON required_document_templates;
+CREATE TRIGGER trg_template_kinds BEFORE INSERT OR UPDATE OF accepted_kinds
+  ON required_document_templates FOR EACH ROW EXECUTE FUNCTION accepted_kinds_exist();
+DROP TRIGGER IF EXISTS trg_document_kinds ON case_documents;
+CREATE TRIGGER trg_document_kinds BEFORE INSERT OR UPDATE OF accepted_kinds
+  ON case_documents FOR EACH ROW EXECUTE FUNCTION accepted_kinds_exist();
+
+-- document_classifications מסעיף 10 מורחבת. עד שלב 4 הטבלה ריקה,
+-- ולכן השינויים בטוחים; הם עטופים בבדיקת קטלוג כדי לרוץ שוב.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'document_classifications'
+                    AND column_name = 'decision') THEN
+    ALTER TABLE document_classifications
+      DROP CONSTRAINT IF EXISTS document_classifications_suggested_type_check,
+      ALTER COLUMN suggested_type DROP NOT NULL,
+      ADD CONSTRAINT classification_suggested_kind
+        FOREIGN KEY (suggested_type) REFERENCES document_kinds(code),
+      DROP COLUMN IF EXISTS matches_requirement,
+      ADD COLUMN decision text NOT NULL DEFAULT 'unknown'
+        CHECK (decision IN ('clear', 'ambiguous', 'unknown', 'unreadable', 'mixed')),
+      ADD COLUMN candidates jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN reasons jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN page_kinds jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN rules_version text NOT NULL DEFAULT '',
+      ADD COLUMN requirement_match text NOT NULL DEFAULT 'unmapped'
+        CHECK (requirement_match IN ('match', 'mismatch', 'undetermined', 'unmapped')),
+      ADD COLUMN confirmed_type text REFERENCES document_kinds(code),
+      -- סיווג מחדש שהגיע לתוצאה אחרת ממה שאדם כבר אישר
+      ADD COLUMN differs_from_confirmed boolean NOT NULL DEFAULT false,
+      ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now(),
+      -- אין בחירה שרירותית: סוג מוצע קיים רק כשההחלטה "ברור"
+      ADD CONSTRAINT classification_kind_only_when_clear
+        CHECK ((decision = 'clear') = (suggested_type IS NOT NULL)),
+      ADD CONSTRAINT classification_confirmed_has_type
+        CHECK (status <> 'confirmed' OR confirmed_type IS NOT NULL);
+  END IF;
+END $$;
+
 COMMIT;

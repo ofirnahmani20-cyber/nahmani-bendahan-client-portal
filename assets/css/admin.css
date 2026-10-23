@@ -1,4 +1,10 @@
-/* ==========================================================
+/* 26.09: נמחקו מכאן .wide, .cols, .gap-* ו-.reply-* של
+   האדמין. אף אחד מהם לא נפלט על ידי שום JS ואף אחד מהם לא
+   הופיע בשום markup - .gap-* היה 26 שורות שעיצבו "מצב טכני"
+   שמאז נבנה מחדש כ-.state-line ו-.next-card. ה-.reply-* כאן
+   היו עותק של הכללים שבפורטל, ורק שם הם חיים.
+
+   ==========================================================
    admin.css - ממשק הניהול הפנימי של המשרד
    ----------------------------------------------------------
    נטען אחרי style.css ומשתמש באותם טוקני צבע.
@@ -19,7 +25,6 @@ body.admin .block { padding: 20px 18px; margin: 0 0 18px; }
 /* מסך הכניסה של הצוות נשאר בגודל הרגיל וברוחב צר */
 body.admin .login { font-size: 17px; }
 
-.wide { max-width: 1100px; }
 
 /* ---- כפתור קומפקטי ---- */
 .btn-sm { min-height: 42px; padding: 9px 18px; font-size: 15px; }
@@ -68,9 +73,6 @@ table.cases .num { direction: ltr; text-align: start; unicode-bidi: plaintext; }
 .count.hot  { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
 .count.calm { background: var(--ok-soft);   border-color: var(--ok);   color: var(--ok); }
 
-/* ---- שתי עמודות במסך רחב ---- */
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; align-items: start; }
-@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
 
 /* ---- שדות טופס בממשק הניהול ---- */
 body.admin .field { margin: 0 0 16px; }
@@ -112,45 +114,7 @@ body.admin select { cursor: pointer; }
 /* ---- ריק ---- */
 .empty { color: var(--text-soft); font-style: italic; margin: 0; }
 
-/* ---- מצב טכני ---- */
-.gap-block { border-inline-start: 5px solid var(--border); }
-.gap-head { font-weight: 700; margin: 0 0 14px; }
-.gap-head.ok   { color: var(--ok); }
-.gap-head.stop { color: var(--stop); }
 
-.gap-group { margin: 0 0 16px; }
-.gap-group:last-child { margin-bottom: 0; }
-.gap-group h3 {
-  font-size: 14px; text-transform: none; letter-spacing: .3px;
-  color: var(--text-soft); margin: 0 0 8px;
-}
-.gap-items { list-style: none; margin: 0; padding: 0; }
-.gap-items > li {
-  padding: 10px 12px;
-  margin: 0 0 8px;
-  border-radius: 0;
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
-.gap-group.stop .gap-items > li { border-color: var(--stop); background: var(--stop-soft); }
-.gap-group.wait .gap-items > li { border-color: var(--warn); background: var(--warn-soft); }
-.gap-group.soon .gap-items > li { background: var(--wait-soft); }
-
-.gap-name { display: block; font-weight: 700; }
-.gap-why  { display: block; font-size: 13.5px; color: var(--text-soft); }
-.gap-req  { margin: 8px 0 0; }
-
-/* ---- פניות מהלקוח ---- */
-.reply.unread { background: var(--warn-soft); border-radius: 0; padding-inline: 12px; }
-.reply-text {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-inline-start: 4px solid var(--accent);
-  border-radius: 0;
-  padding: 10px 12px;
-  margin: 8px 0 0;
-  white-space: pre-wrap;
-}
 
 /* ---- ניתוח מקצועי ---- */
 .assist-block { border: 2px solid var(--accent); }

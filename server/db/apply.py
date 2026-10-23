@@ -24,6 +24,10 @@ def apply_schema(conn) -> None:
     sql = SCHEMA.read_text(encoding="utf-8")
     with conn.cursor() as cur:
         cur.execute(sql)
+        # רשימת סוגי המסמכים: מקורה בקוד (doc_taxonomy.py), והמסד
+        # מחזיק עותק כדי לאכוף אותה. כל החלת סכמה מסנכרנת.
+        from .. import doc_taxonomy
+        doc_taxonomy.sync(cur)
     conn.commit()
 
 

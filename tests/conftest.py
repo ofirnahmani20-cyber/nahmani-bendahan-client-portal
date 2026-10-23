@@ -14,6 +14,47 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("PORTAL_ID_HMAC_KEY", "test-hmac-key-not-secret")
 os.environ.setdefault("PORTAL_ID_ENC_KEY", "TESTKEYTESTKEYTESTKEYTESTKEYTESTKEYTESTKEY0=")
 
+# אחסון ומפתחות-על של הבדיקות: תיקיות זמניות משלהן, ולא אלה של
+# סביבת הפיתוח. השמה ישירה ולא setdefault - .env של המפתח לא
+# יגבר, כי connect.py טוען אותו ב-setdefault אחרי השורות האלה.
+# בלי זה, קבצי בדיקה היו נשמרים ב-var/uploads מוצפנים במפתח
+# שנזרק בסוף הריצה.
+import shutil as _shutil
+import tempfile as _tempfile
+
+_TEST_ROOT = pathlib.Path(_tempfile.mkdtemp(prefix="nb-tests-"))
+os.environ["PORTAL_STORAGE_DIR"] = str(_TEST_ROOT / "uploads")
+os.environ["PORTAL_SECRETS_DIR"] = str(_TEST_ROOT / "secrets")
+# סורק אמיתי רק בבדיקות שמבקשות אותו במפורש.
+os.environ["PORTAL_CLAMD_ADDR"] = ""
+
+from server import crypto as _crypto  # noqa: E402
+
+_crypto.generate_keys(os.environ["PORTAL_SECRETS_DIR"])
+
+
+import datetime as _dt
+
+_SESSION_START = _dt.datetime.now(_dt.timezone.utc)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    # עבודות עיבוד שהבדיקות יצרו מפנות לקבצים בתיקייה הזמנית, שנמחקת
+    # כאן. בלי הניקוי, worker של סביבת הפיתוח היה מוצא אותן בתור.
+    try:
+        from server.db.pool import cursor as _cursor
+        with _cursor(commit=True) as cur:
+            cur.execute("delete from document_processing where queued_at >= %s",
+                        (_SESSION_START,))
+            # שורות קובץ שהבדיקות העלו למסמכי הזרע. הקבצים עצמם בתיקייה
+            # הזמנית; בלי הניקוי נשארו במסד הפיתוח 130 שורות בלי קובץ
+            # (נמצא ב-2026-10-02). CASCADE מוחק גם את הנגזרות.
+            cur.execute("delete from document_files where uploaded_at >= %s",
+                        (_SESSION_START,))
+    except Exception:
+        pass
+    _shutil.rmtree(_TEST_ROOT, ignore_errors=True)
+
 
 @pytest.fixture
 def client():

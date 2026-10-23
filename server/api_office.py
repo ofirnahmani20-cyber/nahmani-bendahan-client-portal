@@ -11,10 +11,12 @@ api_office.py - ממשק הניהול.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import audit
+from . import audit, processing, scan, storage
 from .auth import require_csrf, require_staff
 from .db.pool import cursor
 
@@ -50,10 +52,34 @@ def _owned_document(cur, document_id, identity):
 
 @router.get("/api/office/cases")
 def list_cases(request: Request, identity=Depends(require_staff)):
+    """
+    התיקים שבטיפול המשרד.
+
+    27.09: נוסף סינון סטטוס. עד כה השאילתה החזירה כל תיק
+    במשרד, כולל סגורים - וכשהיו שני תיקים פעילים בלבד זה
+    היה בלתי נראה. ברגע שנוצרו תיקים סגורים, המסך אמר
+    "16 תיקים פעילים" כשארבעה מהם אינם.
+
+    תיק מוקפא כן נשאר: הוא עדיין באחריות עורך הדין ואינו
+    אמור להיעלם בשקט. הוא מסומן, ולא מוסתר.
+
+    תיק סגור יצא מכאן והוא באזור "תיקים שהושלמו".
+
+    29.09: נוסף mine. עד כה המסך נקרא "התיקים בטיפולי"
+    והציג את כל תיקי המשרד בלי לומר מי אחראי על מה - כלומר
+    הכותרת הבטיחה דבר אחד והרשימה הראתה אחר.
+    """
     with cursor() as cur:
         cur.execute(
-            """select c.id, c.case_number, cl.full_name as client_name,
+            """select c.id, c.case_number, c.status, cl.full_name as client_name,
                       ct.name as claim_type, st.stage_position, st.stage_title,
+                      u.full_name as assignee,
+                      -- ההחלטה "שלי או של אחר" נעשית בשרת, שיודע מי
+                      -- שואל. החלופה הייתה להחזיר assigned_user_id
+                      -- ולהשוות בדפדפן - כלומר לחשוף מזהי משתמשים
+                      -- לכל קריאה, בשביל השוואה אחת.
+                      (c.assigned_user_id = %(me)s) as mine,
+                      (c.assigned_user_id is null) as unassigned,
                       (select count(*) from case_documents d
                         where d.case_id = c.id and d.status = 'pending_review')
                         as awaiting_review,
@@ -64,14 +90,28 @@ def list_cases(request: Request, identity=Depends(require_staff)):
                  join clients cl on cl.id = c.client_id
                  join claim_types ct on ct.id = c.claim_type_id
                  left join case_current_stage st on st.case_id = c.id
-                where c.firm_id = %s
-                order by c.opened_at desc""",
-            (identity.firm_id,),
+                 left join users u on u.id = c.assigned_user_id
+                                  and u.firm_id = c.firm_id
+                where c.firm_id = %(firm)s
+                  and c.status in ('active', 'frozen')
+                -- התיקים שלי קודם. זה המסך שאיש הצוות פותח
+                -- בבוקר, והשאלה הראשונה שלו היא מה מוטל עליו.
+                -- nulls last חיוני: בפוסטגרס NULL = value הוא
+                -- NULL ולא false, ו-DESC מציב NULL ראשון. בלעדיו
+                -- דווקא התיקים שאינם משויכים לאיש קפצו לראש
+                -- הרשימה במקום התיקים שלי.
+                order by (c.assigned_user_id = %(me)s) desc nulls last,
+                         c.status, c.opened_at desc""",
+            {"firm": identity.firm_id, "me": identity.subject_id},
         )
         rows = cur.fetchall()
     return {"cases": [{
         "id": str(r["id"]), "caseNumber": r["case_number"],
         "clientName": r["client_name"], "claimType": r["claim_type"],
+        "status": r["status"],
+        "assignee": r["assignee"],
+        "mine": bool(r["mine"]),
+        "unassigned": bool(r["unassigned"]),
         "currentStage": r["stage_position"], "stageTitle": r["stage_title"],
         "awaitingReview": r["awaiting_review"],
         "openForClient": r["open_for_client"],
@@ -108,6 +148,38 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
             (case_id, identity.firm_id),
         )
         docs = cur.fetchall()
+
+        # ---- הקבצים שהלקוח העלה ----
+        # עד 27.09 תשובת התיק לא נשאה אותם כלל. admin.js בדק
+        # doc.file, השדה מעולם לא הגיע, ולכן עורך הדין התבקש
+        # לאשר או לדחות מסמך בלי לראות את שם הקובץ ובלי שום
+        # דרך לפתוח אותו. הביקורת הייתה עיוורת.
+        #
+        # is_current בלבד: גרסה שהוחלפה נשמרת במסד ואינה נמחקת,
+        # אבל היא אינה מה שעומד לבדיקה.
+        cur.execute(
+            """select f.id, f.document_id, f.original_filename, f.mime_type,
+                      f.size_bytes, f.scan_status, f.uploaded_at
+                 from document_files f
+                 join case_documents d on d.id = f.document_id
+                                      and d.firm_id = f.firm_id
+                where d.case_id = %s and f.firm_id = %s and f.is_current
+                order by f.uploaded_at desc""",
+            (case_id, identity.firm_id),
+        )
+        files_by_doc = {}
+        for f in cur.fetchall():
+            files_by_doc.setdefault(str(f["document_id"]), []).append({
+                "id": str(f["id"]),
+                "name": f["original_filename"],
+                "mime": f["mime_type"],
+                "size": f["size_bytes"],
+                # הצוות צריך לדעת למה קובץ אינו ניתן לפתיחה.
+                # "ממתין לסריקה" ו"נדבק" אינם אותו דבר.
+                "scan": f["scan_status"],
+                "ready": scan.usable(f["scan_status"]),
+                "at": f["uploaded_at"].isoformat() if f["uploaded_at"] else None,
+            })
 
         cur.execute(
             """select s.id, s.position, s.title
@@ -155,6 +227,7 @@ def get_case(case_id: str, request: Request, identity=Depends(require_staff)):
             "id": str(d["id"]), "name": d["name"], "note": d["guidance"],
             "required": d["is_required"], "status": d["status"],
             "rejectReason": d["reject_reason"],
+            "files": files_by_doc.get(str(d["id"]), []),
         } for d in docs],
         "stageOptions": [{
             "id": str(s["id"]), "position": s["position"], "title": s["title"],
@@ -217,6 +290,28 @@ def add_stage_event(case_id: str, body: StageEvent, request: Request,
 class DocumentReview(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     reject_reason: str | None = Field(default=None, max_length=1000)
+    # אישור מפורש של מסמך שהסיווג שלו אינו תואם לדרישה (שלב 4)
+    acknowledge_mismatch: bool = False
+
+
+def _classification_mismatch(cur, document_id, firm_id):
+    """
+    האם הקובץ הנוכחי של הדרישה סווג לסוג שהדרישה אינה מקבלת.
+    הסוג האפקטיבי: המאושר אם יש, אחרת המוצע. דרישה שלא מופתה, או
+    סיווג לא ברור - אינם "אי-התאמה".
+    """
+    cur.execute(
+        """select d.accepted_kinds, c.status, c.confirmed_type, c.suggested_type
+             from case_documents d
+             join document_files f on f.document_id = d.id and f.firm_id = d.firm_id
+                                  and f.is_current
+             join document_classifications c on c.file_id = f.id and c.firm_id = f.firm_id
+            where d.id = %s and d.firm_id = %s""", (document_id, firm_id))
+    row = cur.fetchone()
+    if row is None:
+        return False
+    kind = row["confirmed_type"] if row["status"] == "confirmed" else row["suggested_type"]
+    return processing.requirement_match(list(row["accepted_kinds"]), kind) == "mismatch"
 
 
 @router.post("/api/office/documents/{document_id}/review")
@@ -233,6 +328,15 @@ def review_document(document_id: str, body: DocumentReview, request: Request,
 
     with cursor(commit=True) as cur:
         doc = _owned_document(cur, document_id, identity)
+        mismatch = (body.decision == "approve"
+                    and _classification_mismatch(cur, document_id, identity.firm_id))
+        if mismatch and not body.acknowledge_mismatch:
+            # אזהרה, לא חסימה: עורך הדין רשאי לאשר - אבל במפורש.
+            raise HTTPException(status_code=409, detail={
+                "code": "classification_mismatch",
+                "message": "המסמך שהועלה סווג כסוג שאינו תואם לדרישה. "
+                           "אם בדקת ואתה מאשר בכל זאת - אשר במפורש.",
+            })
         new_status = "approved" if body.decision == "approve" else "rejected"
         cur.execute(
             """update case_documents
@@ -249,7 +353,8 @@ def review_document(document_id: str, body: DocumentReview, request: Request,
     audit.record(identity, "office.document_reviewed", entity_type="document",
                  entity_id=document_id, case_id=str(doc["case_id"]), request=request,
                  metadata={"decision": body.decision,
-                           "reason_given": bool(body.reject_reason)})
+                           "reason_given": bool(body.reject_reason),
+                           "mismatch_acknowledged": bool(mismatch)})
     return {"ok": True, "status": new_status}
 
 
@@ -257,6 +362,8 @@ class NewDocument(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     guidance: str = Field(min_length=1, max_length=2000)
     is_required: bool = True
+    # דרישה מהקטלוג יורשת ממנו אילו סוגי מסמכים מתקבלים בה (שלב 4).
+    template_id: UUID | None = None
 
 
 @router.post("/api/office/cases/{case_id}/documents")
@@ -270,12 +377,21 @@ def add_document(case_id: str, body: NewDocument, request: Request,
             (case_id,),
         )
         position = cur.fetchone()["next"]
+        accepted = []
+        if body.template_id:
+            cur.execute("""select accepted_kinds from required_document_templates
+                            where id = %s and firm_id = %s""",
+                        (str(body.template_id), identity.firm_id))
+            template = cur.fetchone()
+            if template is None:
+                raise HTTPException(status_code=404, detail="התבנית לא נמצאה.")
+            accepted = list(template["accepted_kinds"])
         cur.execute(
             """insert into case_documents
-                 (firm_id, case_id, name, guidance, is_required, position)
-               values (%s, %s, %s, %s, %s, %s) returning id""",
+                 (firm_id, case_id, name, guidance, is_required, position, accepted_kinds)
+               values (%s, %s, %s, %s, %s, %s, %s) returning id""",
             (identity.firm_id, case_id, body.name, body.guidance,
-             body.is_required, position),
+             body.is_required, position, accepted),
         )
         document_id = cur.fetchone()["id"]
 
@@ -438,10 +554,19 @@ def audit_log(request: Request, case_id: str | None = None,
             _owned_case(cur, case_id, identity)
             cur.execute(
                 """select a.action, a.entity_type, a.created_at, a.metadata,
+                          a.case_id,
+                          coalesce(c.case_number, '') as case_number,
+                          coalesce(ct.name, '') as claim_type,
+                          coalesce(cl.full_name, '') as client_name,
                           coalesce(u.full_name, '') as actor_name
                      from audit_log a
                      left join users u on u.id = a.actor_id
                                       and a.actor_type = 'user'
+                     left join cases c on c.id = a.case_id
+                                     and c.firm_id = a.firm_id
+                     left join clients cl on cl.id = c.client_id
+                                        and cl.firm_id = a.firm_id
+                     left join claim_types ct on ct.id = c.claim_type_id
                     where a.firm_id = %s and a.case_id = %s
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, case_id, limit),
@@ -449,22 +574,432 @@ def audit_log(request: Request, case_id: str | None = None,
         else:
             cur.execute(
                 """select a.action, a.entity_type, a.created_at, a.metadata,
+                          a.case_id,
+                          coalesce(c.case_number, '') as case_number,
+                          coalesce(ct.name, '') as claim_type,
+                          coalesce(cl.full_name, '') as client_name,
                           coalesce(u.full_name, '') as actor_name
                      from audit_log a
                      left join users u on u.id = a.actor_id
                                       and a.actor_type = 'user'
+                     left join cases c on c.id = a.case_id
+                                     and c.firm_id = a.firm_id
+                     left join clients cl on cl.id = c.client_id
+                                        and cl.firm_id = a.firm_id
+                     left join claim_types ct on ct.id = c.claim_type_id
                     where a.firm_id = %s
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, limit),
             )
         rows = cur.fetchall()
+    # caseId ו-client נוספו כדי שיומן כלל-המשרד יוכל לומר על מי
+    # מדובר. עד כה שורה כמו "הלקוח העלה מסמך" לא אמרה איזה לקוח,
+    # ולכן היומן היה כמעט חסר ערך מחוץ להקשר של תיק בודד.
+    #
+    # caseNumber ו-claimType נוספו ב-27.09. עד אז הדשבורד חיבר את
+    # מספר התיק בצד הלקוח, מול רשימת התיקים שכבר נטענה - ולכן שורת
+    # אודיט של תיק שאינו ברשימה (סגור, או מעבר לחלון הטעינה) הוצגה
+    # בלי מספר. החיבור עבר לשרת, שם הוא תמיד נכון.
+    #
+    # תוספת קריאה בלבד: אין שדה חדש במסד, הסינון לפי firm_id לא
+    # השתנה, ושלוש ההצטרפויות נושאות את אותו firm_id.
     return {"entries": [{
         "action": r["action"],
         "actor": r["actor_name"],
+        "client": r["client_name"],
+        "caseId": str(r["case_id"]) if r["case_id"] else None,
+        "caseNumber": r["case_number"],
+        "claimType": r["claim_type"],
         "entity": r["entity_type"],
         "at": r["created_at"].isoformat(),
         "metadata": r["metadata"],
     } for r in rows]}
+
+
+# ================================================================
+#  הורדת קובץ בצד המשרד
+#
+#  הצד הלקוחי החזיק נקודת הורדה מאז שלב ד' של ההעלאות; הצד
+#  המשרדי מעולם לא. כלומר עורך הדין ראה "ממתין לבדיקה" ולחץ
+#  "אישור" או "דחייה" בלי לפתוח את הקובץ - כי לא הייתה דרך.
+#
+#  אותן שתי בדיקות של הצד הלקוחי, ובאותו סדר: בעלות ואז
+#  סטטוס סריקה. ההבדל היחיד הוא מי הבעלים - כאן firm_id של
+#  הסשן, ושם client_id.
+# ================================================================
+
+@router.get("/api/office/documents/{document_id}/files/{file_id}")
+def office_download_file(document_id: str, file_id: str, request: Request,
+                         identity=Depends(require_staff)):
+    with cursor() as cur:
+        cur.execute(
+            """select f.storage_key, f.original_filename, f.mime_type,
+                      f.scan_status, d.case_id
+                 from document_files f
+                 join case_documents d on d.id = f.document_id
+                                      and d.firm_id = f.firm_id
+                where f.id = %s and f.document_id = %s and f.firm_id = %s""",
+            (file_id, document_id, identity.firm_id),
+        )
+        row = cur.fetchone()
+
+    # 404 ולא 403 על קובץ של משרד אחר: תשובה שמבדילה ביניהם
+    # מאשרת שהמזהה קיים.
+    if row is None:
+        raise HTTPException(status_code=404, detail="הקובץ לא נמצא.")
+
+    if not scan.usable(row["scan_status"]):
+        # 409 ולא 403: ההרשאה תקינה, הקובץ פשוט עדיין לא נסרק.
+        raise HTTPException(
+            status_code=409,
+            detail="הקובץ טרם עבר סריקת אבטחה ואינו זמין להורדה.",
+        )
+
+    # מי מהצוות פתח איזה קובץ ומתי. זו בדיוק השאלה שיומן
+    # ביקורת אמור לענות עליה.
+    audit.record(identity, "office.file_downloaded", entity_type="document",
+                 entity_id=document_id, case_id=str(row["case_id"]),
+                 request=request)
+
+    return Response(
+        content=storage.read(row["storage_key"]),
+        media_type=row["mime_type"],
+        headers={
+            # attachment + nosniff: הדפדפן לא ינחש סוג ולא יריץ
+            # תוכן שהועלה כאילו הוא חלק מהאתר.
+            "Content-Disposition": storage.content_disposition(
+                row["original_filename"]),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+# ================================================================
+#  קלסר המסמכים - מבט רוחבי על כל מסמכי המשרד
+#
+#  עד כה מסמך היה נגיש דרך התיק בלבד. השאלה "מה ממתין
+#  לבדיקה השבוע" חייבה לפתוח תיקים אחד אחד, ולכן בפועל
+#  איש לא שאל אותה.
+#
+#  המונים מגיעים מאותה שאילתה ולא מחישוב בדפדפן, כדי
+#  שהשבבים והרשימה לא יוכלו לסתור זה את זה.
+# ================================================================
+
+DOC_STATUSES = ["pending_review", "missing", "rejected", "approved", "cancelled"]
+
+# הסדר שבו מסמך נכנס לרשימה. מה שדורש פעולה מהמשרד קודם.
+_DOC_ORDER = """
+    case d.status when 'pending_review' then 0
+                  when 'rejected'       then 1
+                  when 'missing'        then 2
+                  when 'approved'       then 3
+                  else 4 end
+"""
+
+
+@router.get("/api/office/documents")
+def office_documents(request: Request, status: str | None = None,
+                     limit: int = 100, identity=Depends(require_staff)):
+    """
+    כל מסמכי המשרד, חוצה תיקים.
+
+    status  רשימה מופרדת בפסיקים. ריק = הכול.
+    limit   תקרה, עד 300.
+    """
+    limit = max(1, min(limit, 300))
+
+    wanted = [s for s in DOC_STATUSES]
+    if status:
+        asked = {x.strip() for x in status.split(",") if x.strip()}
+        wanted = [s for s in wanted if s in asked]
+    if not wanted:
+        return {"documents": [], "counts": {}, "total": 0, "truncated": False}
+
+    with cursor() as cur:
+        # המונים על כל המשרד ולא על הדף שהוחזר, אחרת השבב
+        # היה אומר "8 ממתינים" כשיש 40.
+        cur.execute(
+            """select d.status, count(*) as n
+                 from case_documents d
+                where d.firm_id = %s
+                group by d.status""",
+            (identity.firm_id,),
+        )
+        counts = {r["status"]: r["n"] for r in cur.fetchall()}
+
+        cur.execute(
+            """select d.id, d.name, d.status, d.is_required, d.reject_reason,
+                      d.case_id, c.case_number, c.status as case_status,
+                      cl.full_name as client_name,
+                      coalesce(ct.name, '') as claim_type,
+                      f.id as file_id, f.original_filename, f.scan_status,
+                      f.uploaded_at
+                 from case_documents d
+                 join cases c on c.id = d.case_id and c.firm_id = d.firm_id
+                 join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
+                 left join claim_types ct on ct.id = c.claim_type_id
+                 left join document_files f on f.document_id = d.id
+                                           and f.firm_id = d.firm_id
+                                           and f.is_current
+                where d.firm_id = %s and d.status = any(%s)
+                order by """ + _DOC_ORDER + """,
+                         f.uploaded_at desc nulls last,
+                         c.case_number, d.position
+                limit %s""",
+            (identity.firm_id, wanted, limit + 1),
+        )
+        rows = cur.fetchall()
+
+    truncated = len(rows) > limit
+    rows = rows[:limit]
+
+    return {
+        "documents": [{
+            "id": str(r["id"]),
+            "name": r["name"],
+            "status": r["status"],
+            "required": r["is_required"],
+            "rejectReason": r["reject_reason"],
+            "caseId": str(r["case_id"]),
+            "caseNumber": r["case_number"],
+            "caseStatus": r["case_status"],
+            "clientName": r["client_name"],
+            "claimType": r["claim_type"],
+            # קובץ נוכחי, אם הועלה. ready אומר אם מותר לפתוח
+            # אותו - סריקה שטרם הסתיימה אינה כישלון.
+            "file": ({
+                "id": str(r["file_id"]),
+                "name": r["original_filename"],
+                "scan": r["scan_status"],
+                "ready": scan.usable(r["scan_status"]),
+                "at": r["uploaded_at"].isoformat() if r["uploaded_at"] else None,
+            } if r["file_id"] else None),
+        } for r in rows],
+        "counts": {s: counts.get(s, 0) for s in DOC_STATUSES},
+        "total": sum(counts.values()),
+        "truncated": truncated,
+    }
+
+
+# ================================================================
+#  שלב ו' - לקוחות, קטלוגים ותיקים שהושלמו
+#
+#  שלושת האזורים האחרונים שהציגו "ייבנה בשלב ו'". כולם
+#  קריאה בלבד: אין כאן יצירה, עריכה או מחיקה.
+#
+#  למה קריאה בלבד, ובמפורש
+#  ------------------------
+#  יצירת לקוח כותבת תעודת זהות - שדה מוצפן שמשמש גם כמפתח
+#  ההתחברות. עריכת קטלוג משנה את המסלול של תיקים חיים.
+#  שתי הפעולות דורשות החלטת מוצר ולא רק נקודת קצה, ולכן
+#  הן אינן כאן. מה שכן קיים היום נחשף, ומה שאין - נאמר.
+# ================================================================
+
+@router.get("/api/office/clients")
+def office_clients(request: Request, q: str | None = None,
+                   identity=Depends(require_staff)):
+    """
+    לקוחות המשרד, עם ספירת התיקים של כל אחד.
+
+    תעודת הזהות אינה מוחזרת בשום צורה. היא שמורה מוצפנת
+    ומשמשת כמפתח ההתחברות של הלקוח, ואין לה שום שימוש
+    במסך רשימה.
+    """
+    like = None
+    if q and len(q.strip()) >= 2:
+        raw = q.strip()
+        safe = raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = "%" + safe + "%"
+
+    with cursor() as cur:
+        cur.execute(
+            """select cl.id, cl.full_name, cl.phone, cl.email, cl.status,
+                      cl.created_at,
+                      count(c.id) filter (where c.status = 'active') as active_cases,
+                      count(c.id) as total_cases,
+                      max(c.opened_at) as last_opened
+                 from clients cl
+                 left join cases c on c.client_id = cl.id
+                                  and c.firm_id = cl.firm_id
+                where cl.firm_id = %(firm)s
+                  -- ::text מפורש: בלי הטלת הטיפוס postgres
+                  -- אינו יכול להסיק את סוג הפרמטר כשהוא null,
+                  -- והשאילתה נופלת ב-AmbiguousParameter.
+                  and (%(like)s::text is null
+                       or cl.full_name ilike %(like)s::text escape '\\'
+                       or coalesce(cl.phone, '') ilike %(like)s::text escape '\\')
+                group by cl.id, cl.full_name, cl.phone, cl.email,
+                         cl.status, cl.created_at
+                order by cl.full_name""",
+            {"firm": identity.firm_id, "like": like},
+        )
+        rows = cur.fetchall()
+
+    return {"clients": [{
+        "id": str(r["id"]),
+        "name": r["full_name"],
+        "phone": r["phone"],
+        "email": r["email"],
+        "status": r["status"],
+        "activeCases": r["active_cases"],
+        "totalCases": r["total_cases"],
+        "lastOpened": r["last_opened"].isoformat() if r["last_opened"] else None,
+    } for r in rows]}
+
+
+@router.get("/api/office/catalogs")
+def office_catalogs(request: Request, identity=Depends(require_staff)):
+    """
+    הקטלוגים שמניעים את המערכת: סוגי תביעה, מסלולי השלבים,
+    קטלוג המסמכים וסוגי המשימות.
+
+    כולם כבר יושבים במסד ומניעים התנהגות - מסלול השלבים
+    קובע מה הלקוח רואה ב"מפת ההליך", וקטלוג המסמכים קובע
+    מה נדרש ממנו. עד כה לא הייתה שום דרך לראות אותם מהממשק,
+    וכל שינוי חייב גישה ישירה למסד.
+
+    החשיפה כאן היא הצעד הראשון: קודם רואים, אחר כך עורכים.
+    """
+    with cursor() as cur:
+        cur.execute(
+            """select id, name, code, is_active, position
+                 from claim_types where firm_id = %s
+                order by position, name""",
+            (identity.firm_id,),
+        )
+        types = cur.fetchall()
+
+        cur.execute(
+            """select id, claim_type_id, position, title, description,
+                      is_terminal, typical_duration_days
+                 from stage_templates where firm_id = %s
+                order by claim_type_id, position""",
+            (identity.firm_id,),
+        )
+        stages = cur.fetchall()
+
+        cur.execute(
+            """select id, claim_type_id, name, guidance, is_required, position
+                 from required_document_templates where firm_id = %s
+                order by claim_type_id, position""",
+            (identity.firm_id,),
+        )
+        docs = cur.fetchall()
+
+        cur.execute(
+            """select id, name, code, is_active, position
+                 from task_types where firm_id = %s
+                order by position, name""",
+            (identity.firm_id,),
+        )
+        tasks = cur.fetchall()
+
+        # כמה תיקים חיים תלויים בכל סוג. זה מה שהופך את
+        # המסך לשימושי: עריכה של מסלול אינה שאלה תיאורטית
+        # כשיש עליו 40 תיקים פתוחים.
+        cur.execute(
+            """select claim_type_id, count(*) as n
+                 from cases where firm_id = %s group by claim_type_id""",
+            (identity.firm_id,),
+        )
+        case_counts = {str(r["claim_type_id"]): r["n"] for r in cur.fetchall()}
+
+    by_type_stages = {}
+    for s in stages:
+        by_type_stages.setdefault(str(s["claim_type_id"]), []).append({
+            "id": str(s["id"]), "position": s["position"], "title": s["title"],
+            "desc": s["description"], "isTerminal": s["is_terminal"],
+            "days": s["typical_duration_days"],
+        })
+
+    by_type_docs = {}
+    for d in docs:
+        by_type_docs.setdefault(str(d["claim_type_id"]), []).append({
+            "id": str(d["id"]), "name": d["name"], "guidance": d["guidance"],
+            "required": d["is_required"], "position": d["position"],
+        })
+
+    return {
+        "claimTypes": [{
+            "id": str(t["id"]), "name": t["name"], "code": t["code"],
+            "active": t["is_active"], "position": t["position"],
+            "cases": case_counts.get(str(t["id"]), 0),
+            "stages": by_type_stages.get(str(t["id"]), []),
+            "documents": by_type_docs.get(str(t["id"]), []),
+        } for t in types],
+        "taskTypes": [{
+            "id": str(t["id"]), "name": t["name"], "code": t["code"],
+            "active": t["is_active"], "position": t["position"],
+        } for t in tasks],
+        # מה שאין, ונאמר במפורש במקום להשאיר מסך שנראה שלם:
+        # עריכה מהממשק טרם נבנתה.
+        "editable": False,
+    }
+
+
+# הנתיב הוא /closed-cases ולא /cases/closed במכוון:
+# /api/office/cases/{case_id} רשום לפניו, ולכן "closed"
+# היה נתפס כמזהה תיק ונופל על המרת uuid.
+@router.get("/api/office/closed-cases")
+def office_closed_cases(request: Request, identity=Depends(require_staff)):
+    """
+    תיקים שהושלמו.
+
+    מה שקיים: סטטוס התיק, ההחלטה האחרונה (תאריך, תוצאה,
+    אחוזים, קביעות) ומשך ההליך.
+
+    שני מצבי סגירה ולא אחד: closed_accepted ו-closed_rejected.
+    הסכמה מחזיקה את התוצאה בסטטוס עצמו, ולכן תיק שנסגר בלי
+    שנרשמה לו החלטה עדיין אומר משהו.
+
+    מה שאין במסד, ולכן אינו מוצג ואינו מומצא: שכר טרחה,
+    מודל גבייה, חשבוניות ותשלומים. אין טבלה, אין עמודה,
+    ואין דרך לגזור אותם מנתון קיים. התשובה מצהירה על כך
+    ב-feesAvailable כדי שהממשק יאמר זאת ולא ימלא מספר.
+    """
+    with cursor() as cur:
+        cur.execute(
+            """select c.id, c.case_number, c.status, c.opened_at,
+                      cl.full_name as client_name,
+                      coalesce(ct.name, '') as claim_type,
+                      d.decided_at, d.outcome, d.percent, d.is_permanent
+                 from cases c
+                 join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
+                 left join claim_types ct on ct.id = c.claim_type_id
+                 left join lateral (
+                      select decided_at, outcome, percent, is_permanent
+                        from case_decisions
+                       where case_id = c.id and firm_id = c.firm_id
+                       order by decided_at desc, created_at desc
+                       limit 1
+                 ) d on true
+                where c.firm_id = %s
+                  and c.status in ('closed_accepted', 'closed_rejected')
+                order by d.decided_at desc nulls last, c.case_number""",
+            (identity.firm_id,),
+        )
+        rows = cur.fetchall()
+
+    return {
+        "cases": [{
+            "id": str(r["id"]),
+            "caseNumber": r["case_number"],
+            "clientName": r["client_name"],
+            "claimType": r["claim_type"],
+            # הסטטוס עצמו נושא את התוצאה: closed_accepted מול
+            # closed_rejected. זו אינה כפילות של ההחלטה - תיק
+            # יכול להיסגר בלי שנרשמה לו החלטה, ואז זה כל מה שיש.
+            "status": r["status"],
+            "openedAt": r["opened_at"].isoformat() if r["opened_at"] else None,
+            "decision": ({
+                "date": r["decided_at"].isoformat(),
+                "outcome": r["outcome"],
+                "percent": r["percent"],
+                "permanent": r["is_permanent"],
+            } if r["decided_at"] else None),
+        } for r in rows],
+        "feesAvailable": False,
+    }
 
 
 # ================================================================

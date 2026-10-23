@@ -84,7 +84,14 @@ REQUIREMENT_SELECT = """
            (select max(created_at) from message_deliveries m
              where m.requirement_id = r.id) as last_delivery_at,
            (select count(*) from reminder_rules rr
-             where rr.requirement_id = r.id and not rr.is_paused) as active_reminders
+             where rr.requirement_id = r.id and not rr.is_paused) as active_reminders,
+           -- 27.09: נוסף המונה של המושהות.
+           -- activeReminders לבדו אמר "אין תזכורת" גם כשהייתה
+           -- תזכורת מושהית, ולכן המצב המסוכן - הצוות מניח
+           -- שהלקוח נרדף ובפועל לא נשלח אליו דבר - היה
+           -- בלתי נראה לגמרי בשורת הדרישה.
+           (select count(*) from reminder_rules rr
+             where rr.requirement_id = r.id and rr.is_paused) as paused_reminders
       from case_requirements r
       left join case_documents d on d.id = r.document_id
       left join users crt on crt.id = r.created_by_user_id
@@ -113,6 +120,7 @@ def _requirement_out(r):
         "lastDeliveryAt": (r["last_delivery_at"].isoformat()
                            if r["last_delivery_at"] else None),
         "activeReminders": r["active_reminders"],
+        "pausedReminders": r["paused_reminders"],
     }
 
 

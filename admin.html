@@ -6,8 +6,14 @@
 <title>ניהול תיקים | משרד עורכי הדין Nahmani Ben-Dahan</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="assets/css/style.css?v=20260925120500">
-<link rel="stylesheet" href="assets/css/admin.css?v=20260925120500">
+<!-- tokens מצהיר בלבד ואינו דורס דבר; ds מעצב, והכול בתוכו
+     תחת body.admin. שלושת הדפים האחרים אינם טוענים אותם. -->
+<link rel="stylesheet" href="assets/css/tokens.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/style.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/admin.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/ds.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/ds-admin.css?v=20261002150000">
+<link rel="stylesheet" href="assets/css/ds-case.css?v=20261002150000">
 </head>
 <body class="admin">
 
@@ -112,7 +118,7 @@
         <ul>
           <li><a href="#dashboard" data-view="dashboard">דשבורד</a></li>
           <li><a href="#tasks" data-view="tasks">ניהול משימות</a></li>
-          <li><a href="#cases" data-view="cases">התיקים בטיפולי</a></li>
+          <li><a href="#cases" data-view="cases">תיקי המשרד</a></li>
           <li><a href="#closed" data-view="closed">הושלמו ושכר טרחה</a></li>
           <li><a href="#documents" data-view="documents">מסמכים</a></li>
           <li><a href="#clients" data-view="clients">לקוחות</a></li>
@@ -125,6 +131,49 @@
         <button type="button" class="btn btn-quiet" id="backBtn" hidden>חזרה לתיקים</button>
         <button type="button" class="btn btn-quiet" id="staffLogout">יציאה</button>
       </div>
+    </div>
+  </header>
+
+  <!-- ===== שורת הפקודה =====
+       עובדת רק מול יכולות שכבר קיימות: סינון רשימת התיקים
+       שכבר נטענה, וניווט לאזורים. אין כאן AI ואין פעולות
+       משפטיות. combobox לפי דפוס ARIA, ולכן היא נגישה
+       למקלדת ולקורא מסך מהרגע הראשון. -->
+  <div class="ds-cmd" id="cmdBar">
+    <div class="ds-cmd-in">
+      <label class="visually-hidden" for="cmdInput">חיפוש וניווט במערכת</label>
+      <div class="ds-cmd-field">
+        <input type="text" id="cmdInput" class="ds-cmd-input"
+               autocomplete="off" spellcheck="false"
+               placeholder="חפש תיק, לקוח או אזור במערכת…"
+               role="combobox" aria-expanded="false"
+               aria-controls="cmdPanel" aria-autocomplete="list">
+        <span class="ds-cmd-hint" id="cmdHint" aria-hidden="true">/</span>
+      </div>
+      <div class="ds-cmd-panel" id="cmdPanel" role="listbox"
+           aria-label="תוצאות" hidden></div>
+    </div>
+  </div>
+
+
+  <!-- ===== Hero =====
+       יושב כאן ולא בתוך התצוגה, כדי שהסרגל, שורת החיפוש
+       וה-Hero ייקראו כקומפוזיציה כהה אחת רציפה - כמו
+       ב-reference - ולא כשני מלבנים שנפגשים.
+
+       מוצג רק כשהדשבורד פעיל (body.ds-on). שאר מסכי העבודה
+       נשארים נקיים ואינם מאבדים גובה.
+
+       התמונה מגיעה מ---ds-hero-image. עד שתסופק, ה-fallback
+       הוא קומפוזיציה מכוונת של אור וצל על אבן - לא משטח ריק
+       שממתין לקובץ. -->
+  <header class="ds-hero ds-hero-dash" id="dashHero">
+    <!-- המותג אינו חוזר כאן: הצילום כבר נושא את ה-NB, את
+         NAHMANI - BEN-DAHAN ואת "משרד עורכי דין" על קיר האבן,
+         ושכפול שלו ב-HTML היה מיתוג כפול על אותו מסך.
+         הסלוגן נשאר טקסט חי ולא חלק מהתמונה. -->
+    <div class="ds-hero-in">
+      <p class="ds-slogan">אנשים.<br>זכויות.<br>תוצאות.</p>
     </div>
   </header>
 
@@ -144,7 +193,7 @@
     <ul class="drawer-list">
       <li><button type="button" class="drawer-link" data-view="dashboard"><span>דשבורד</span></button></li>
       <li><button type="button" class="drawer-link" data-view="tasks"><span>ניהול משימות</span></button></li>
-      <li><button type="button" class="drawer-link" data-view="cases"><span>התיקים בטיפולי</span></button></li>
+      <li><button type="button" class="drawer-link" data-view="cases"><span>תיקי המשרד</span></button></li>
       <li><button type="button" class="drawer-link" data-view="closed"><span>תיקים שהושלמו ושכר טרחה</span></button></li>
       <li><button type="button" class="drawer-link" data-view="documents"><span>מסמכים</span></button></li>
       <li><button type="button" class="drawer-link" data-view="clients"><span>לקוחות</span></button></li>
@@ -187,17 +236,82 @@
          ריק מנוסח בשלב א' - הם ייבנו בשלבים ב'-ו'. -->
     <div id="topLevel">
 
-      <!-- ---- דשבורד ---- -->
-      <div class="view" id="view-dashboard" hidden>
-        <h1 class="view-title" tabindex="-1">דשבורד</h1>
-        <p class="lead">תמונת מצב של העבודה, התיקים והגבייה.</p>
-        <div class="block">
-          <p class="item-note">
-            הדשבורד יציג תקציר של שלושת האזורים המרכזיים, וייבנה
-            אחרי שהם יושלמו. בינתיים אפשר לעבור ישירות ל<a href="#tasks" data-view="tasks">ניהול משימות</a>
-            או ל<a href="#cases" data-view="cases">תיקים בטיפולי</a>.
-          </p>
+      <!-- ---- דשבורד ----
+           מרכז פיקוד, לא לוח מחוונים. הקומפוזיציה עריכותית:
+           פתיחה רחבה, ואז שני טורים לא שווים - אזור תשומת הלב
+           תופס את הטור הרחב, וסדר היום ותמונת המצב את הצר.
+           הפעילות האוטומטית יושבת בפס כהה בתחתית, כדי שהמסך
+           ייחתך בבלוק צבע ולא ברצף רשימות.
+
+           סדר ה-HTML הוא סדר החשיבות והמיקוד גם בטלפון, ולכן
+           אין כאן order שמנתק קריאה ממיקוד.
+
+           אין כאן שום נתון מומצא: הכול משלוש קריאות קיימות
+           ברמת המשרד, ומה שאין לו מקור נאמר ב-#dashGaps. -->
+      <div class="view ds-dash" id="view-dashboard" hidden>
+
+        <!-- הברכה יורדת מה-Hero אל הקנבס. ה-Hero נושא זהות,
+             והעבודה מתחילה כאן. #dashGreeting ו-#dashDate
+             שומרים על המזהים, וה-h1 על .view-title ועל
+             tabindex כי viewnav ממקד אותו. -->
+        <header class="ds-greet-block">
+          <p class="ds-greet-date" id="dashDate"></p>
+          <h1 class="ds-greet-h view-title" id="dashGreeting" tabindex="-1">שלום</h1>
+          <p class="ds-dash-context" id="dashContext">טוען את תמונת היום…</p>
+        </header>
+
+        <!-- KPI: תא לכל מדד בתוך כרטיס אחד, מופרדים בקו שיער. -->
+        <dl class="ds-card ds-kpi" id="dashStats"></dl>
+
+        <div class="ds-cols">
+
+          <!-- ב. לב המסך -->
+          <main class="ds-col-main">
+            <section class="ds-card ds-attn" aria-labelledby="dashAttnH">
+              <div class="ds-section-head">
+                <h2 class="ds-section-title" id="dashAttnH">דורש את תשומת לבי</h2>
+                <p class="ds-section-meta" id="dashAttnCount"></p>
+              </div>
+              <ol class="ds-feed" id="dashAttnList"></ol>
+              <p class="ds-loading" id="dashAttnState">טוען…</p>
+              <div id="dashAttnMore"></div>
+            </section>
+          </main>
+
+          <!-- ג. הטור המשני -->
+          <aside class="ds-col-side">
+            <section class="ds-card" aria-labelledby="dashTodayH">
+              <div class="ds-section-head">
+                <h2 class="ds-section-title" id="dashTodayH">סדר היום שלי</h2>
+                <p class="ds-section-meta" id="dashTodayCount"></p>
+              </div>
+              <ol class="ds-feed" id="dashTodayList"></ol>
+              <p class="ds-loading" id="dashTodayState">טוען…</p>
+            </section>
+
+            <!-- ד. פעילות אחרונה. משנית לאזור תשומת הלב, אבל
+                 לא זניחה - ולכן היא יושבת בטור ולא נדחקת לפס
+                 נפרד בתחתית העמוד. -->
+            <section class="ds-card" aria-labelledby="dashActH">
+              <div class="ds-section-head">
+                <h2 class="ds-section-title" id="dashActH">פעילות אחרונה</h2>
+              </div>
+              <ol class="ds-activity" id="dashActList"></ol>
+              <p class="ds-loading" id="dashActState">טוען…</p>
+
+              <!-- גישה למערכת. אירועי אמת, אבל הם אינם "מה קרה
+                   בתיק" - ולכן שורה שקטה אחת בתחתית הכרטיס ולא
+                   בלוק משלהם. האודיט עצמו אינו משתנה; זהו סיכום
+                   לתצוגה בלבד. -->
+              <div class="ds-access" id="dashSysList"></div>
+              <p class="ds-access-empty" id="dashSysState" hidden></p>
+
+              <p class="ds-note" id="dashGaps"></p>
+            </section>
+          </aside>
+
         </div>
+
       </div>
 
       <!-- ---- ניהול משימות ---- -->
@@ -231,10 +345,22 @@
         </div>
       </div>
 
-      <!-- ---- התיקים בטיפולי ---- -->
+      <!-- 29.09: הכותרת הייתה "התיקים בטיפולי" והרשימה הציגה
+           את כל תיקי המשרד בלי לומר מי אחראי על מה. הכותרת
+           הבטיחה דבר אחד והטבלה הראתה אחר.
+
+           עכשיו האזור הוא "תיקי המשרד", ו"בטיפולי" הוא סינון
+           בתוכו. עמודת האחראי אומרת בכל שורה של מי התיק. -->
       <div class="view" id="view-cases" hidden>
-        <h1 class="view-title" tabindex="-1">התיקים בטיפולי</h1>
+        <h1 class="view-title" tabindex="-1">תיקי המשרד</h1>
         <p class="lead" id="listSummary"></p>
+
+        <!-- השבבים מחוץ ל-.table-block במכוון: על הבלוק הזה
+             יש overflow-x: auto שמציל את הטבלה מגלישה, ושבב
+             שיושב בתוכו היה נגלל אופקית יחד איתה ונעלם מהמסך
+             בדיוק כשהטבלה רחבה - כלומר כשהסינון הכי נחוץ. -->
+        <div class="chips" id="caseChips" role="group"
+             aria-label="סינון לפי אחראי"></div>
 
         <div class="block table-block">
           <table class="cases">
@@ -243,6 +369,7 @@
               <tr>
                 <th scope="col">לקוח</th>
                 <th scope="col">תיק</th>
+                <th scope="col">אחראי</th>
                 <th scope="col">סוג התביעה</th>
                 <th scope="col">שלב נוכחי</th>
                 <th scope="col">ממתין לבדיקה</th>
@@ -255,39 +382,49 @@
         </div>
       </div>
 
-      <!-- ---- תיקים שהושלמו ושכר טרחה ---- -->
+      <!-- ---- תיקים שהושלמו ----
+           התוצאה מוצגת מההחלטה שכבר רשומה. שכר טרחה אינו
+           קיים במסד - אין טבלה, אין עמודה, ואין דרך לגזור
+           אותו מנתון קיים - ולכן הוא נאמר כחסר ואינו מומצא. -->
       <div class="view" id="view-closed" hidden>
-        <h1 class="view-title" tabindex="-1">תיקים שהושלמו ושכר טרחה</h1>
-        <p class="lead">תוצאת ההליך והמצב הכספי של כל תיק שהסתיים.</p>
+        <h1 class="view-title" tabindex="-1">תיקים שהושלמו</h1>
+        <p class="lead" id="closedIntro">תוצאת ההליך של כל תיק שהסתיים.</p>
         <div class="block">
-          <p class="item-note">
-            האזור הזה דורש מנגנון סגירת תיק ומודל תוצאה ושכר טרחה,
-            והוא ייבנה בשלב ו'. כרגע אין במערכת נתיב לסגירת תיק.
-          </p>
+          <ul class="plain-list closed-list" id="closedList"></ul>
         </div>
+        <div class="block" id="feesGap"></div>
       </div>
 
-      <!-- ---- מסמכים ---- -->
+      <!-- ---- מסמכים: הקלסר ----
+           מבט רוחבי על כל מסמכי המשרד. עד כה מסמך היה נגיש
+           דרך התיק בלבד, ולכן "מה ממתין לבדיקה השבוע" חייב
+           לפתוח תיקים אחד אחד. -->
       <div class="view" id="view-documents" hidden>
         <h1 class="view-title" tabindex="-1">מסמכים</h1>
-        <p class="lead">מבט רוחבי על מסמכי המשרד.</p>
+        <p class="lead" id="binderIntro">מבט רוחבי על מסמכי המשרד.</p>
+
         <div class="block">
-          <p class="item-note">
-            הקלסר נבנה בשלב ד'. מסמכי תיק בודד זמינים כבר עכשיו
-            בתוך התיק, בלשונית "מסמכי התיק".
-          </p>
+          <div class="chips" id="binderChips" role="group"
+               aria-label="סינון לפי מצב המסמך"></div>
+          <ul class="plain-list doc-binder" id="binderList"></ul>
         </div>
       </div>
 
-      <!-- ---- לקוחות ---- -->
+      <!-- ---- לקוחות ----
+           קריאה בלבד. יצירה ועריכה כותבות תעודת זהות - שדה
+           מוצפן שמשמש גם כמפתח ההתחברות של הלקוח - וזו
+           החלטת מוצר ולא רק נקודת קצה. -->
       <div class="view" id="view-clients" hidden>
         <h1 class="view-title" tabindex="-1">לקוחות</h1>
-        <p class="lead">רשימת הלקוחות של המשרד.</p>
+        <p class="lead" id="clientsIntro">רשימת הלקוחות של המשרד.</p>
+
         <div class="block">
-          <p class="item-note">
-            ניהול לקוחות דורש נקודות קצה שטרם נבנו (יצירה, עריכה
-            ושינוי טלפון). נכנס בשלב ו'.
-          </p>
+          <div class="field">
+            <label for="clientSearch">חיפוש לפי שם או טלפון</label>
+            <input type="search" id="clientSearch" autocomplete="off"
+                   placeholder="שתי אותיות ומעלה">
+          </div>
+          <ul class="plain-list client-list" id="clientList"></ul>
         </div>
       </div>
 
@@ -296,23 +433,45 @@
         <h1 class="view-title" tabindex="-1">דוחות</h1>
         <p class="lead">יומן הפעולות של כל המשרד.</p>
 
-        <section class="block" aria-labelledby="h-firmlog">
-          <h2 id="h-firmlog">יומן פעולות הצוות</h2>
-          <p class="item-note" id="firmLogIntro"></p>
-          <ul class="plain-list" id="firmLogList"></ul>
-        </section>
+        <!-- שני צירים, ובמכוון לא רשימה אחת.
+             1066 מתוך 1277 שורות האודיט הן התחברויות (83%).
+             ברשימה אחת הן מציפות את הפעולות בתיקים ואי אפשר
+             לראות מה באמת קרה במשרד.
+
+             הציר המרכזי: מה נעשה בתיקים.
+             הציר הצדדי: מי נכנס למערכת ומתי - רשומת אבטחה
+             אמיתית, אבל לא פעילות מקצועית.
+
+             החלוקה היא בתצוגה בלבד. שום שורת אודיט אינה
+             נמחקת, אינה מסוננת בשרת, ואינה משנה סמנטיקה. -->
+        <div class="ds-cols">
+          <div class="ds-col-main">
+            <section class="block" aria-labelledby="h-firmlog">
+              <h2 id="h-firmlog">יומן פעולות הצוות</h2>
+              <p class="item-note" id="firmLogIntro"></p>
+              <ul class="plain-list" id="firmLogList"></ul>
+            </section>
+          </div>
+
+          <aside class="ds-col-side">
+            <section class="block ds-quiet" aria-labelledby="h-firmaccess">
+              <h2 id="h-firmaccess">כניסות למערכת</h2>
+              <p class="item-note" id="firmAccessIntro"></p>
+              <ul class="plain-list access-list" id="firmAccessList"></ul>
+            </section>
+          </aside>
+        </div>
       </div>
 
-      <!-- ---- הגדרות ---- -->
+      <!-- ---- הגדרות: הקטלוגים ----
+           הם כבר מניעים את המערכת - מסלול השלבים קובע מה
+           הלקוח רואה ב"מפת ההליך", וקטלוג המסמכים קובע מה
+           נדרש ממנו. עד כה לא הייתה שום דרך לראות אותם
+           מהממשק. קודם רואים, אחר כך עורכים. -->
       <div class="view" id="view-settings" hidden>
         <h1 class="view-title" tabindex="-1">הגדרות</h1>
-        <p class="lead">קטלוגים והגדרות המשרד.</p>
-        <div class="block">
-          <p class="item-note">
-            עריכת סוגי תביעה, מסלולי שלבים, קטלוג המסמכים וסוגי
-            המשימות - כולם יושבים כבר במסד וייחשפו כאן בשלב ו'.
-          </p>
-        </div>
+        <p class="lead" id="catalogIntro">הקטלוגים שמניעים את המערכת.</p>
+        <div id="catalogBody"></div>
       </div>
 
     </div>
@@ -326,6 +485,14 @@
         <h1 id="caseClient" tabindex="-1"></h1>
         <dl class="case-facts" id="caseFacts"></dl>
       </div>
+
+      <!-- מסלול התביעה. נבנה מ-stageOptions ו-currentStage
+           שכבר חוזרים מ-GET /api/office/cases/{id} - אין כאן
+           קריאה נוספת, שדה חדש או שינוי חוזה.
+
+           הוא יושב בכותרת הקבועה ולכן נראה בכל שש הלשוניות:
+           זה עמוד השדרה של התיק, ולא תוכן של לשונית אחת. -->
+      <ol class="ds-road" id="caseRoad"></ol>
 
       <nav class="case-tabs" id="caseTabs" aria-label="ניווט בתוך התיק">
         <ul>
@@ -554,11 +721,15 @@
             </form>
           </section>
 
-          <!-- פניות מהלקוח -->
-          <section class="block" aria-labelledby="h-replies">
-            <h3 id="h-replies">פניות מהלקוח</h3>
-            <ul class="plain-list" id="replyList"></ul>
-          </section>
+          <!-- 27.09: המקטעים "פניות מהלקוח" ו"עדכונים שנשלחו"
+               הוסרו. אף שורת JavaScript לא מילאה אותם - נבדק
+               בחיפוש מלא על assets/js - ולכן הם היו רשימות
+               ריקות לתמיד. השיחה הדו-כיוונית שנבנתה בשלב ג'
+               (#chatList מעל) היא מה שמחליף אותם בפועל.
+
+               עד שלב 4 הם היו בלתי נראים כמעט; מרגע ש-.block
+               הפך לכרטיס לבן ממוסגר, שתי הרשימות הריקות הפכו
+               לשני כרטיסים ריקים על המסך. -->
 
           <!-- שליחת עדכון -->
           <section class="block" aria-labelledby="h-send">
@@ -581,11 +752,6 @@
             </form>
           </section>
 
-          <!-- עדכונים קיימים -->
-          <section class="block" aria-labelledby="h-sent">
-            <h3 id="h-sent">עדכונים שנשלחו</h3>
-            <ul class="plain-list" id="sentList"></ul>
-          </section>
       </div>
 
       <!-- ============ 3. מסמכי התיק ============ -->
@@ -727,8 +893,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/api.js?v=20260925120500"></script>
-<script src="assets/js/viewnav.js?v=20260925120500"></script>
-<script src="assets/js/admin.js?v=20260925120500"></script>
+<script src="assets/js/api.js?v=20261002150000"></script>
+<script src="assets/js/viewnav.js?v=20261002150000"></script>
+<script src="assets/js/ds-dashboard.js?v=20261002150000"></script>
+<script src="assets/js/admin.js?v=20261002150000"></script>
 </body>
 </html>

@@ -27,8 +27,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import (api_auth, api_client, api_conversation, api_office,
-               api_requirements, audit)
+from . import (api_auth, api_client, api_conversation, api_medical, api_office,
+               api_requirements, api_search, audit, crypto, maintenance, scan)
 from .auth import require_csrf, require_staff
 from .db.pool import healthy as db_healthy
 from .policy import POLICY_MODE, assert_clean, build_context
@@ -99,6 +99,8 @@ app.include_router(api_client.router)
 app.include_router(api_office.router)
 app.include_router(api_requirements.router)
 app.include_router(api_conversation.router)
+app.include_router(api_search.router)
+app.include_router(api_medical.router)
 
 
 # ============================================================
@@ -184,6 +186,16 @@ def _assert_production_ready():
     if not os.environ.get("PORTAL_ALLOWED_ORIGINS"):
         problems.append("PORTAL_ALLOWED_ORIGINS חסר - בדיקת CSRF תחסום הכול")
 
+    # הצפנה במנוחה: בלי מפתח קבצים אין שמירה, ומוטב לא לעלות
+    # מאשר לעלות ולסרב לכל העלאה.
+    try:
+        crypto.provider().active("files")
+    except crypto.KeysUnavailable as exc:
+        problems.append("הצפנה במנוחה: %s" % exc)
+
+    # סורק קבצים: מוגדר, מגיב, ועם חתימות עדכניות.
+    problems.extend(scan.production_problems())
+
     try:
         from .db.pool import cursor as _cur
         with _cur() as cur:
@@ -208,6 +220,13 @@ async def _lifespan(_app):
     """נבדק בעלייה, לפני שהשרת מקבל בקשה ראשונה."""
     if IS_PRODUCTION:
         _assert_production_ready()
+    # שאריות .part מכתיבה שנקטעה בקריסה הקודמת. צופן ולא טקסט
+    # גלוי, אבל אין סיבה להשאיר אותו. יתומים שלמים - דרך
+    # maintenance sweep, שבודק מול המסד.
+    try:
+        maintenance.sweep_parts_only()
+    except Exception as exc:                       # pragma: no cover
+        print("[storage] ניקוי .part נכשל: %s" % exc)
     yield
 
 

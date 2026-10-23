@@ -347,3 +347,47 @@ def test_missing_requirement_returns_404(api):
     ghost = "00000000-0000-0000-0000-000000000000"
     assert api.post("/api/office/requirements/%s/complete" % ghost,
                     headers={"X-CSRF-Token": csrf}).status_code == 404
+
+def test_a_paused_reminder_is_visible_in_the_requirement(api, temp_case):
+    """
+    27.09: השורה נשענה על activeReminders בלבד, שסופר תזכורות
+    שאינן מושהות. לכן דרישה שיש לה רק תזכורת מושהית נראתה
+    בדיוק כמו דרישה בלי תזכורת כלל.
+
+    ההפרש בין השתיים הוא אם הלקוח נרדף. הצוות שרואה "אין
+    תזכורת" יוצר אחת חדשה; הצוות שאינו רואה דבר מניח שהכול
+    רץ, ובפועל לא נשלח שום דבר.
+    """
+    csrf = staff_login(api)
+    case_id = str(temp_case["case_id"])
+
+    r = api.post("/api/office/cases/%s/requirements" % case_id,
+                 json={"kind": "info", "title": "פרט לבדיקה",
+                       "guidance": "בדיקת תזכורת מושהית"},
+                 headers={"X-CSRF-Token": csrf})
+    assert r.status_code in (200, 201), r.text
+    req_id = r.json()["requirementId"]
+
+    rr = api.post("/api/office/requirements/%s/reminders" % req_id,
+                  json={"every_days": 3, "channel": "sms"},
+                  headers={"X-CSRF-Token": csrf})
+    assert rr.status_code in (200, 201), rr.text
+    rule_id = rr.json()["reminderId"]
+
+    def row():
+        items = api.get("/api/office/cases/%s/requirements"
+                        % case_id).json()["requirements"]
+        return [x for x in items if x["id"] == str(req_id)][0]
+
+    live = row()
+    assert live["activeReminders"] == 1
+    assert live["pausedReminders"] == 0
+
+    p = api.post("/api/office/reminders/%s/state" % rule_id,
+                 json={"is_paused": True}, headers={"X-CSRF-Token": csrf})
+    assert p.status_code == 200, p.text
+
+    paused = row()
+    assert paused["activeReminders"] == 0
+    assert paused["pausedReminders"] == 1, (
+        "תזכורת מושהית אינה מדווחת - השורה תיראה כאילו אין תזכורת")

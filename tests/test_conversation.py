@@ -16,6 +16,10 @@ from starlette.testclient import TestClient
 from server.app import app
 from server.db.pool import cursor
 
+# ה-fixture חי ב-test_firm_isolation ולא ב-conftest. הייבוא
+# הוא מה שהופך אותו לזמין כאן, ולכן הוא אינו מיותר.
+from .test_firm_isolation import second_firm  # noqa: F401
+
 LOCAL = ("127.0.0.1", 45123)
 
 STAFF_EMAIL = "nahmani@nahmani-bendahan.co.il"
@@ -292,3 +296,142 @@ def test_a_case_with_no_stage_still_returns_requirements_and_stages(api, temp_ca
     for key in ["stages", "documents", "requirements", "messages"]:
         assert key in data, "המפתח %s נעלם מתשובת הלקוח" % key
     assert len(data["stages"]) == 8, "קטלוג השלבים נחתך יחד עם השלב הנוכחי"
+
+# ================================================================
+#  6. פרטי עורך הדין שה-API אינו מחזיר
+# ================================================================
+
+def test_the_client_case_declares_no_lawyer(api, temp_case):
+    """
+    רגרסיה ל-26.09: תשובת הלקוח אינה כוללת lawyer, ולכן
+    normalise ב-dashboard.js קובע אותו ל-null במפורש.
+
+    renderDecision קרא caseFile.lawyer.phone בלי הגנה וזרק.
+    הוא השלישי ב-paint, ולכן תשעת הרינדורים שמתחתיו - מה
+    נדרש, מסמכים, דרישות, שיחה, שלבים, הודעות וקשר - לא רצו
+    כלל, והמסך נראה ריק בלי הודעת שגיאה. זו בדיוק אותה
+    תבנית של currentStage שלמעלה: שדה שה-API מצהיר עליו
+    כריק, ונקודת קריאה אחת ששכחה להגן.
+
+    הבדיקה נועלת את החוזה. אם השדה יתווסף בעתיד - היא תיפול,
+    וזו התזכורת לבדוק שכל נקודות הקריאה מטפלות בשתי הצורות.
+    """
+    case_id = temp_case["case_id"]
+
+    api.cookies.clear()
+    client_login(api, client_of(case_id))
+    data = api.get("/api/client/cases/%s" % case_id).json()
+
+    assert data.get("lawyer") is None, (
+        "ה-API התחיל להחזיר lawyer - צריך לוודא שכל נקודות "
+        "הקריאה ב-dashboard.js מטפלות גם במקרה שהוא חסר")
+
+# ================================================================
+#  7. התחברות מוצלחת נושאת את מי שנכנס
+# ================================================================
+
+def test_a_successful_staff_login_records_who_logged_in(api):
+    """
+    26.09: עד היום staff.login_success נכתב דרך record_anonymous,
+    ולכן נשמר עם actor_type='system' ו-actor_id ריק. נמדד על
+    המסד: 1963 שורות התחברות, כולן בלי מזהה.
+
+    התוצאה בממשק: דוח "כניסות למערכת" יכול היה לומר כמה כניסות
+    היו, אבל לא מי נכנס - וזה בדיוק מה שהופך אותו לרשומת אבטחה
+    שאפשר להשתמש בה.
+
+    הבדיקה נועלת את הייחוס. היא גם נועלת את ההפך עבור כישלון:
+    שם אין זהות מאומתת, ולייחס שורה למשתמש על סמך אימייל
+    שהוקלד היה רישום של טענה ולא של עובדה.
+    """
+    before = _last_login_row()
+
+    r = api.post("/api/office/auth/login",
+                 json={"email": STAFF_EMAIL, "password": STAFF_PASSWORD})
+    assert r.status_code == 200, r.text
+
+    row = _last_login_row()
+    assert row is not None and row != before, "לא נכתבה שורת התחברות"
+    assert row["actor_type"] == "user", "ההתחברות עדיין נרשמת כ-system"
+    assert row["actor_id"] is not None, "ההתחברות נרשמה בלי מזהה משתמש"
+    assert row["actor_name"], "שם איש הצוות אינו נשלף מהשורה"
+
+
+def test_a_failed_staff_login_stays_anonymous(api):
+    """
+    ההפך של הבדיקה שמעליה, ובמכוון: כשל התחברות נשאר אנונימי.
+    """
+    api.post("/api/office/auth/login",
+             json={"email": STAFF_EMAIL, "password": "definitely-not-it"})
+
+    with cursor() as cur:
+        cur.execute("""select actor_type, actor_id from audit_log
+                        where action = 'staff.login_failed'
+                        order by created_at desc limit 1""")
+        row = cur.fetchone()
+
+    assert row is not None, "כשל ההתחברות לא נרשם כלל"
+    assert row["actor_type"] == "system"
+    assert row["actor_id"] is None, (
+        "כשל התחברות יוחס למשתמש - זה רישום של טענה ולא של עובדה")
+
+
+def _last_login_row():
+    with cursor() as cur:
+        cur.execute("""select a.id, a.actor_type, a.actor_id,
+                              coalesce(u.full_name, '') as actor_name
+                         from audit_log a
+                         left join users u on u.id = a.actor_id
+                        where a.action = 'staff.login_success'
+                        order by a.created_at desc limit 1""")
+        return cur.fetchone()
+
+# ================================================================
+#  8. יומן האודיט נושא את הקשר התיק מהשרת
+# ================================================================
+
+def test_the_audit_log_carries_the_case_number(api, temp_case):
+    """
+    27.09: עד היום התשובה נשאה caseId בלבד, והדשבורד חיבר את
+    מספר התיק בצד הלקוח מול רשימת התיקים שכבר נטענה. זה עבד
+    רק לתיקים שברשימה - שורת אודיט של תיק סגור, או של תיק
+    מעבר לחלון הטעינה, הוצגה בלי מספר ובלי סוג תביעה.
+
+    הבדיקה נועלת את שני השדות ואת הבידוד: הם נשלפים
+    בהצטרפות שנושאת firm_id, בדיוק כמו שאר השאילתה.
+    """
+    staff_login(api)
+    case_id = str(temp_case["case_id"])
+
+    r = api.get("/api/office/audit-log?limit=200")
+    assert r.status_code == 200, r.text
+    entries = r.json()["entries"]
+
+    with_case = [e for e in entries if e.get("caseId")]
+    assert with_case, "אין שורת אודיט משויכת לתיק - אין מה לבדוק"
+
+    for e in with_case:
+        assert "caseNumber" in e, "השדה caseNumber נעלם מהתשובה"
+        assert "claimType" in e, "השדה claimType נעלם מהתשובה"
+
+    numbered = [e for e in with_case if e["caseNumber"]]
+    assert numbered, "אף שורה משויכת לתיק לא קיבלה מספר תיק"
+
+
+def test_the_audit_log_case_number_never_crosses_firms(api, second_firm):
+    """
+    השדה החדש נשלף בהצטרפות. די בהצטרפות אחת ששוכחת firm_id
+    כדי שמשרד אחד יראה מספרי תיק של אחר.
+    """
+    staff_login(api)
+
+    with cursor() as cur:
+        cur.execute("select case_number from cases where firm_id = %s",
+                    (second_firm["firm_id"],))
+        theirs = {r["case_number"] for r in cur.fetchall()}
+
+    entries = api.get("/api/office/audit-log?limit=200").json()["entries"]
+    mine = {e.get("caseNumber") for e in entries if e.get("caseNumber")}
+
+    leaked = mine & theirs
+    assert not leaked, "מספרי תיק של משרד אחר דלפו ליומן: %s" % leaked

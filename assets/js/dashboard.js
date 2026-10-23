@@ -231,14 +231,44 @@
     head.appendChild(title);
     host.appendChild(head);
 
-    /* מחוון מקוטע - שמונה משבצות שאפשר לספור בעין */
-    var track = el('div', 'ticks');
-    track.setAttribute('role', 'img');
-    track.setAttribute('aria-label',
-      'שלב ' + n + ' מתוך ' + total + ' בתביעה');
+    /* ---- סרגל השלבים ----
+       הגרסה הקודמת הייתה שמונה משבצות ריקות עם aria-label.
+       קורא מסך שמע "שלב 4 מתוך 8", אבל מי שהסתכל במסך ראה
+       שמונה קווים ולא ידע מה כל אחד מהם אומר - לא מה כבר
+       נעשה, לא מה קורה עכשיו ולא מה מגיע אחר כך.
+
+       עכשיו כל משבצת נושאת את שם השלב. השמות כבר קיימים
+       ב-stage_templates ומגיעים ב-API, ולכן אין כאן שום
+       נתון חדש ושום המצאה - רק הצגה שלהם.
+
+       הסימון אינו נשען על צבע בלבד: הקו מעל כל שלב משנה גם
+       עובי, והמצב נאמר במילים מוסתרות לקורא המסך. */
+    var track = el('ol', 'stagebar');
+    track.setAttribute('aria-label', 'שלבי התביעה. אתה נמצא בשלב ' +
+      n + ' מתוך ' + total + '.');
+
     for (var i = 1; i <= total; i++) {
-      var cls = 'tick' + (i < n ? ' tick-done' : i === n ? ' tick-now' : '');
-      track.appendChild(el('span', cls, '', true));
+      var st   = CLAIM_STAGES[i - 1];
+      var done = i < n;
+      var now  = i === n;
+
+      var step = el('li', 'stage-step ' +
+        (done ? 'stage-done' : now ? 'stage-now' : 'stage-next'));
+      if (now) step.setAttribute('aria-current', 'step');
+
+      /* הקו הוא הסרגל עצמו. aria-hidden כי המצב נאמר בטקסט. */
+      step.appendChild(el('span', 'stage-rule', '', true));
+
+      /* שם אחר מ-head שלמעלה: var אינו מוגבל לבלוק, ושימוש
+         חוזר באותו שם היה דורס את כותרת הסיכום. */
+      var line = el('p', 'stage-head');
+      line.appendChild(el('span', 'stage-n', pad2(i)));
+      line.appendChild(el('span', 'visually-hidden',
+        done ? ' הושלם: ' : now ? ' השלב הנוכחי: ' : ' טרם החל: '));
+      step.appendChild(line);
+
+      step.appendChild(el('p', 'stage-t', st ? st.title : 'שלב ' + i));
+      track.appendChild(step);
     }
     host.appendChild(track);
 
@@ -310,11 +340,25 @@
     block.hidden = false;
     body.textContent = '';
 
-    // מה נקבע - בשורה אחת גדולה וברורה
-    var head = el('p', 'decision-headline',
-      d.percent != null
-        ? 'הוועדה קבעה ' + d.percent + '% נכות' + (d.permanent ? ' צמיתה' : ' זמנית')
-        : 'התקבלה החלטה בעניינך');
+    /* מה נקבע - בשורה אחת גדולה וברורה.
+
+       התוצאה קודמת לאחוזים, ולא להפך. הניסוח הקודם הסתמך
+       על percent בלבד, ולכן תביעה שנדחתה עם 0% הוצגה
+       ללקוח כ"הוועדה קבעה 0% נכות זמנית" - משפט שנשמע
+       כאילו נקבעה לו נכות. במסך שאדם קורא כדי להבין מה
+       קרה לו, זה הפרש גדול. */
+    var headline;
+    if (d.outcome === 'rejected') {
+      headline = 'התביעה נדחתה';
+    } else if (d.outcome === 'below-threshold' && d.percent != null) {
+      headline = 'נקבעו ' + d.percent + '% - מתחת לסף הזכאות';
+    } else if (d.percent != null) {
+      headline = 'הוועדה קבעה ' + d.percent + '% נכות' +
+                 (d.permanent ? ' צמיתה' : ' זמנית');
+    } else {
+      headline = 'התקבלה החלטה בעניינך';
+    }
+    var head = el('p', 'decision-headline', headline);
     body.appendChild(head);
     body.appendChild(el('p', 'decision-when', 'ההחלטה התקבלה ב-' + formatDate(d.date)));
 
@@ -375,9 +419,18 @@
       body.appendChild(dl);
     }
 
+    /* caseFile.lawyer הוא null בכל תיק היום, ולכן הקריאה
+       הישירה ל---lawyer.phone זרקה כאן. renderDecision הוא
+       השלישי ב-paint, ומכאן שתשעת הרינדורים שמתחתיו - מה
+       נדרש, מסמכים, דרישות, שיחה, שלבים, הודעות וקשר -
+       לא רצו כלל. המסך נראה ריק בלי שום הודעת שגיאה.
+
+       אותה תקלה בדיוק כמו CLAIM_STAGES[null-1]: שדה שה-API
+       מצהיר עליו כריק, ונקודת קריאה אחת ששכחה להגן. */
+    var c = contactInfo();
     var call = el('a', 'btn btn-primary decision-call',
-      'התקשרות למשרד: ' + caseFile.lawyer.phone);
-    call.href = 'tel:' + caseFile.lawyer.phone.replace(/[^0-9+]/g, '');
+      'התקשרות למשרד: ' + c.phone);
+    call.href = telHref(c.phone);
     body.appendChild(call);
 
     body.appendChild(el('p', 'decision-legal',
@@ -555,6 +608,93 @@
 
   /* ---- 5. כל שלבי התביעה ---- */
 
+  /* ==========================================================
+     אירועים קרובים
+
+     המערכת מחזיקה שני מועדים עתידיים ולא יותר:
+     next_hearing_at (תאריך בלבד - api_client חותך את השעה
+     ב-.date()) ו-appeal_deadline מתוך ההחלטה.
+
+     מה שאין במסד ולכן אינו מוצג כאן: שעת הדיון, מיקום
+     הוועדה, מה להביא, וועדות או פגישות עתידיות כישויות
+     בפני עצמן. המקטע אומר את זה במפורש במקום למלא את
+     החסר בטקסט כללי - לקוח שיגיע לוועדה לפי שעה מומצאת
+     יפספס אותה.
+     ========================================================== */
+
+  function renderEvents() {
+    var host = $('eventsBody');
+    if (!host) return;
+    host.textContent = '';
+
+    var events = [];
+
+    if (caseFile.nextHearing) {
+      events.push({
+        title: 'ועדה רפואית',
+        date:  caseFile.nextHearing,
+        left:  daysUntil(caseFile.nextHearing),
+        note:  'המשרד יצור אתך קשר לפני המועד ויתאם הכנה.'
+      });
+    }
+
+    var d = caseFile.decision;
+    if (d && d.appealDeadline) {
+      events.push({
+        title: 'המועד האחרון להגשת ערר',
+        date:  d.appealDeadline,
+        left:  daysUntil(d.appealDeadline),
+        note:  'זהו מועד מחייב. אחריו לא ניתן להגיש ערר.',
+        hard:  true
+      });
+    }
+
+    if (!events.length) {
+      host.appendChild(el('p', 'measure',
+        'אין כרגע מועד עתידי רשום בתיק. ברגע שייקבע דיון או ' +
+        'ועדה, הם יופיעו כאן והמשרד גם יצור אתך קשר.'));
+      return;
+    }
+
+    /* מה שלפנינו קודם, ומה שחלף אחריו. המקטע נקרא "אירועים
+       קרובים", ומועד שכבר עבר בראשו דוחף את הדיון הקרוב
+       מתחת לקו הקיפול. הוא נשאר מוצג - זה מידע, והלקוח
+       צריך לדעת שחלון הערר נסגר - אבל לא ראשון. */
+    events.sort(function (a, b) {
+      var ap = a.left != null && a.left < 0;
+      var bp = b.left != null && b.left < 0;
+      if (ap !== bp) return ap ? 1 : -1;
+      return a.date < b.date ? -1 : 1;
+    });
+
+    var list = el('ul', 'events');
+    events.forEach(function (e) {
+      var li = el('li', 'event' + (e.hard ? ' event-hard' : '') +
+                        (e.left != null && e.left < 0 ? ' event-passed' : ''));
+
+      li.appendChild(el('p', 'event-when num', formatDate(e.date)));
+      li.appendChild(el('p', 'event-title', e.title));
+
+      var left = e.left;
+      var rel  = left == null ? ''
+               : left < 0  ? 'המועד חלף'
+               : left === 0 ? 'היום'
+               : left === 1 ? 'מחר'
+               : 'בעוד ' + left + ' ימים';
+      if (rel) li.appendChild(el('p', 'event-left', rel));
+
+      li.appendChild(el('p', 'event-note', e.note));
+      list.appendChild(li);
+    });
+    host.appendChild(list);
+
+    /* מה שאיננו יודעים נאמר, ולא מושלם בניחוש. */
+    host.appendChild(el('p', 'event-gap measure',
+      'המערכת מחזיקה את התאריך בלבד. שעת ההתייצבות, כתובת ' +
+      'הוועדה ומה להביא אתך אינם רשומים בה - הם יימסרו לך ' +
+      'מהמשרד ובזימון הרשמי מביטוח לאומי.'));
+  }
+
   function renderStages() {
     var list = $('stepsList');
     list.textContent = '';
@@ -607,27 +747,45 @@
 
   /* ---- 7. יצירת קשר ---- */
 
-  function renderContact() {
+  /* ---- פרטי הקשר של המשרד ----
+     ה-API טרם מחזיר את עורך הדין המטפל, ולכן caseFile.lawyer
+     הוא null בכל תיק. זה מצב חוקי ולא תקלה.
+
+     הפונקציה הזאת היא מקור האמת היחיד לנפילה-לאחור. קודם היו
+     שתי נקודות שקראו את caseFile.lawyer.phone, אחת מהן בלי
+     הגנה - ומספר המשרד היה כתוב פעם אחת בלבד, במקום שכן הגן.
+     עכשיו שתיהן עוברות כאן. */
+  var OFFICE = {
+    name:  'משרד עורכי הדין Nahmani Ben-Dahan',
+    role:  'הצוות המטפל בתיק',
+    phone: '03-5551234',
+    email: 'office@nahmani-bendahan.co.il'
+  };
+
+  function contactInfo() {
     var l = caseFile.lawyer;
-    if (!l) {
-      /* ה-API טרם מחזיר את פרטי עורך הדין המטפל. מציגים את
-         פרטי המשרד במקום להשאיר שדות ריקים. */
-      $('lawyerName').textContent = 'משרד עורכי הדין Nahmani Ben-Dahan';
-      $('lawyerRole').textContent = 'הצוות המטפל בתיק';
-      var p = $('lawyerPhone');
-      p.textContent = 'התקשרות למשרד: 03-5551234';
-      p.href = 'tel:035551234';
-      $('lawyerEmail').href = 'mailto:office@nahmani-bendahan.co.il';
-      return;
-    }
-    $('lawyerName').textContent = l.name;
-    $('lawyerRole').textContent = l.role;
+    if (!l || !l.phone) return OFFICE;
+    return {
+      name:  l.name  || OFFICE.name,
+      role:  l.role  || OFFICE.role,
+      phone: l.phone,
+      email: l.email || OFFICE.email
+    };
+  }
+
+  function telHref(phone) { return 'tel:' + phone.replace(/[^0-9+]/g, ''); }
+
+  function renderContact() {
+    var c = contactInfo();
+
+    $('lawyerName').textContent = c.name;
+    $('lawyerRole').textContent = c.role;
 
     var phone = $('lawyerPhone');
-    phone.textContent = 'התקשרות למשרד: ' + l.phone;
-    phone.href = 'tel:' + l.phone.replace(/[^0-9+]/g, '');
+    phone.textContent = 'התקשרות למשרד: ' + c.phone;
+    phone.href = telHref(c.phone);
 
-    $('lawyerEmail').href = 'mailto:' + l.email;
+    $('lawyerEmail').href = 'mailto:' + c.email;
   }
 
   /* ---- העלאת מסמכים ---- */
@@ -957,46 +1115,25 @@
     }
     host.appendChild(grid);
 
-    /* ---- השוואה לממוצע ---- */
+    /* ---- השוואה לממוצע: הוסרה ב-27.09 ----
+       הבלוק חישב "אתה ב-70% ממשך טיפול אופייני" מתוך
+       durationEstimate(), פונקציה שחיה ב-assets/js/data.js.
+       הקובץ הזה נמחק כשהמערכת עברה לשרת, ומאז הביטוי
+       typeof durationEstimate === 'function' החזיר false
+       והבלוק כולו לא רונדר. כלומר הוא היה מת מאז ההגירה.
 
-    var est = typeof durationEstimate === 'function'
-            ? durationEstimate(caseFile.claimType) : null;
-    if (!est || openedDays == null) return;
+       זו גם התוצאה הבטוחה: המספרים שהיו שם הם הערכה
+       שנכתבה לפי סדרי גודל כלליים, לא לפי נתוני המוסד
+       לביטוח לאומי ולא לפי תיקי המשרד. "ממוצע 9 חודשים"
+       בהקשר של תביעה משפטית עלול להיתפס כהתחייבות.
 
-    var estDays = Math.round(est.typicalMonths * 30.44);
-    var pct     = Math.min(100, Math.round((openedDays / estDays) * 100));
+       מסמך הצעדים הבאים מונה שלוש דרכים לסגור את החסם,
+       והשלישית היא בדיוק זו: למחוק את הבלוק. מסך משך
+       ההליך ממשיך לעבוד בלעדיו - הוא מציג תאריכים
+       אמיתיים מהתיק ולא הערכה.
 
-    var cmp = el('div', 'compare');
-    cmp.appendChild(el('h3', null,
-      'מול משך טיפול אופייני בתביעת ' + caseFile.claimType));
-
-    var bar = el('div', 'compare-bar');
-    bar.setAttribute('role', 'img');
-    bar.setAttribute('aria-label',
-      'התיק שלך נמצא בכ-' + pct + ' אחוז ממשך הטיפול האופייני');
-    var fill = el('i');
-    fill.style.width = pct + '%';
-    bar.appendChild(fill);
-    cmp.appendChild(bar);
-
-    cmp.appendChild(el('p', 'compare-note',
-      'טיפול אופייני בתביעה מסוג זה נמשך בערך ' + est.typicalMonths +
-      ' חודשים, ובדרך כלל בין ' + est.rangeMonths[0] + ' ל-' +
-      est.rangeMonths[1] + ' חודשים. ' + est.note));
-
-    /* הסייג מוצג ללקוח כל עוד המספרים לא אושרו על ידי המשרד.
-       זה מכוון: עדיף שהלקוח יידע שזו הערכה מאשר שיבנה עליה. */
-    if (!est.verified) {
-      var warn = el('p', 'estimate-warning');
-      warn.appendChild(el('strong', null, 'שימו לב: זו הערכה כללית בלבד. '));
-      warn.appendChild(document.createTextNode(
-        'המספרים כאן אינם נתונים רשמיים ואינם הבטחה לגבי התיק שלכם. ' +
-        'כל תיק מתנהל בקצב משלו. לשאלה על לוח הזמנים שלכם - דברו עם המשרד.'
-      ));
-      cmp.appendChild(warn);
-    }
-
-    host.appendChild(cmp);
+       להחזרת התכונה נדרש מקור נתונים אמיתי, ואז גם
+       הסייג חוזר יחד אתו. */
   }
 
   /* ---- אנימציית מפת הדרכים ----
@@ -1124,6 +1261,7 @@
     renderRequirements();
     renderChat();
     renderNextSteps();
+    renderEvents();
     renderStages();
     renderDuration();
     renderMessages();
