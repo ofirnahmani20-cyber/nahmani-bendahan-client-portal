@@ -215,7 +215,8 @@ def test_every_case_action_has_a_human_label():
         (root / "server" / name).read_text(encoding="utf-8")
         for name in ["api_office.py", "api_client.py", "app.py",
                      "api_intake.py", "api_auth.py", "doc_decision.py",
-                     "api_binder.py", "api_mailbox.py", "api_payments.py"]
+                     "api_binder.py", "api_mailbox.py", "api_payments.py",
+                     "api_benefits.py", "rates_watch.py"]
     )
     emitted = set(re.findall(r'audit\.record\([^,]+,\s*"([a-z_.]+)"', server_src))
     # record_actor: (firm_id, subject_type, subject_id, "action", ...)

@@ -1209,4 +1209,58 @@ CREATE TABLE IF NOT EXISTS fee_payments (
 );
 CREATE INDEX IF NOT EXISTS fee_payments_case ON fee_payments (case_id) WHERE cancelled_at IS NULL;
 
+-- -------------------------------------------------------------
+--  מחשבונים וזכויות (server/calculators.py, rates_watch.py) - docs/10, 23.10
+--
+--  calc_parameters - כל מספר שמחשבון צריך (סכום קצבה, אחוז, סף),
+--  עם תאריך תחולה ומקור. שינוי = שורה חדשה, לעולם לא דריסה: אפשר
+--  לדעת איזה מספר הוצג ללקוח בכל יום.
+--    status 'pending' - עדכון אוטומטי שנעצר (שינוי חריג, או שהדף
+--    לא נקרא) ומחכה לאדם. אינו משמש בחישוב עד שאושר.
+--
+--  אין כאן מספרים בזרע. מחשבון בלי פרמטרים מציג "טרם הוגדר" -
+--  מספר שגוי מול לקוח גרוע מהיעדר מספר.
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS calc_parameters (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id        uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  calculator     text NOT NULL,
+  key            text NOT NULL,
+  label          text,
+  value          numeric(14,4) NOT NULL,
+  effective_from date NOT NULL,
+  status         text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'pending', 'rejected')),
+  source_url     text,
+  -- ביטוי רגולרי שקבוצה 1 שלו היא המספר בדף המקור (rates_watch.py)
+  extract_pattern text,
+  origin         text NOT NULL DEFAULT 'manual' CHECK (origin IN ('manual', 'auto')),
+  created_by_user_id  uuid REFERENCES users(id) ON DELETE SET NULL,
+  approved_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  last_checked_at timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT source_is_https CHECK (source_url IS NULL OR source_url LIKE 'https://%%')
+);
+CREATE INDEX IF NOT EXISTS calc_parameters_lookup
+  ON calc_parameters (firm_id, calculator, key, effective_from DESC) WHERE status = 'active';
+
+-- זכויות מחוץ למשרד (פטור ממס, הנחות, תו נכה...). טקסט משפטי-מידעי,
+-- ולכן מוצג ללקוח רק אחרי שעורך דין אישר (status = published).
+CREATE TABLE IF NOT EXISTS rights_catalog (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  title       text NOT NULL,
+  summary     text NOT NULL,
+  provider    text,
+  link_url    text CHECK (link_url IS NULL OR link_url LIKE 'https://%%'),
+  -- תנאים: {"min_percent": 90, "claim_codes": ["general-disability"], "needs_monthly": true}
+  conditions  jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status      text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'retired')),
+  position    integer NOT NULL DEFAULT 100,
+  approved_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  approved_at timestamptz,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT published_needs_approver
+    CHECK (status <> 'published' OR (approved_by_user_id IS NOT NULL AND approved_at IS NOT NULL))
+);
+
 COMMIT;

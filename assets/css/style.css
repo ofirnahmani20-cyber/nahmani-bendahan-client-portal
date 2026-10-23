@@ -1431,3 +1431,10 @@ img.ph::after { content: none; }
 .pay-sum dd { margin: 0; font-weight: 600; }
 .pay-list li { padding: 4px 0; }
 @media (max-width: 480px) { .pay-sum { grid-template-columns: 1fr; gap: 2px; } .pay-sum dd { margin-bottom: 8px; } }
+
+/* ---- מה מגיע לי (23.10, benefits.js) ---- */
+.calc-card { margin: 0 0 28px; padding-bottom: 20px; border-bottom: 1px solid var(--line, #ddd); }
+.calc-card form { max-width: 26rem; }
+.calc-amount { font-size: 1.25em; font-weight: 600; margin: 14px 0 6px; }
+.calc-note { font-size: .9em; opacity: .85; margin: 4px 0; }
+.right-item { margin: 0 0 22px; }

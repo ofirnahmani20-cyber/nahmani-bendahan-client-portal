@@ -32,6 +32,7 @@
     roadmap:  { el: 'view-roadmap',  title: 'מפת ההליך' },
     updates:  { el: 'view-updates',  title: 'החלטות ועדכונים' },
     payments: { el: 'view-payments', title: 'התשלומים שלך' },
+    benefits: { el: 'view-benefits', title: 'מה מגיע לי' },
     contact:  { el: 'view-contact',  title: 'יצירת קשר' }
   };
 
@@ -66,6 +67,10 @@
       if (head) head.focus();
     }
     window.scrollTo(0, 0);
+
+    if (name === 'benefits' && typeof window.loadBenefits === 'function') {
+      window.loadBenefits();
+    }
 
     // התשלומים נטענים רק כשנכנסים אליהם (payments.js)
     if (name === 'payments' && typeof window.loadPayments === 'function') {

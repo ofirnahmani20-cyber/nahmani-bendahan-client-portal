@@ -388,10 +388,20 @@ def run_mail_intake():
         return {"error": type(exc).__name__}
 
 
+def run_rates_watch(now):
+    """פרמטרי המחשבונים מול דפי המקור (rates_watch.py). פעם ביממה לכל פרמטר."""
+    from . import rates_watch
+    try:
+        return rates_watch.run(now)
+    except Exception as exc:                             # noqa: BLE001
+        return {"error": type(exc).__name__}
+
+
 def run_once(now=None):
     now = now or datetime.now(timezone.utc)
     return {
         "mail": run_mail_intake(),
+        "rates": run_rates_watch(now),
         "reminders": run_reminders(now),
         "updates": run_client_updates(now),
         "hearings": run_hearing_reminders(now),

@@ -287,7 +287,10 @@
     if (name === 'tasks')   return loadAttention();
     if (name === 'documents') return loadBinder();
     if (name === 'clients')   return loadClients();
-    if (name === 'settings')  return loadCatalogs();
+    if (name === 'settings') {
+      if (window.AdminBenefits) window.AdminBenefits.load(staff);
+      return loadCatalogs();
+    }
     if (name === 'closed')    return loadClosed();
     if (name === 'reports') return renderLog(null, 'firmLogList');
     return Promise.resolve();
@@ -497,6 +500,13 @@
     'office.fee_payment_recorded':      'נרשם תשלום שכר טרחה',
     'office.fee_payment_cancelled':     'בוטל תשלום שכר טרחה',
     'client.payments_viewed':           'הלקוח צפה בתשלומים',
+    'client.calculator_used':           'הלקוח השתמש במחשבון',
+    'office.calc_parameter_set':        'עודכן נתון של מחשבון',
+    'office.calc_parameter_reviewed':   'נבדק עדכון אוטומטי של מחשבון',
+    'office.right_saved':               'נשמרה זכות בקטלוג',
+    'office.right_status_changed':      'שונה מצב של זכות בקטלוג',
+    'system.calc_parameter_auto':       'נתון מחשבון עודכן אוטומטית',
+    'system.calc_parameter_held':       'עדכון אוטומטי של מחשבון נעצר לבדיקה',
   };
 
   /** caseId=null מביא את יומן כל המשרד, לאזור "דוחות". */
