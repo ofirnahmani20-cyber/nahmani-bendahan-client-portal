@@ -1105,3 +1105,10 @@ body.admin .mismatch-warning {
   color: var(--ds-risk);
 }
 body.admin .classify-actions select { max-width: 22rem; width: auto; flex: 0 1 22rem; }
+
+/* ---- פתיחת תיק ועריכת לקוח (23.10) ---- */
+body.admin .intake fieldset { border: 0; padding: 0; margin: 0; }
+body.admin .intake legend { font-weight: 600; margin-bottom: 8px; }
+body.admin .intake .btn + .btn { margin-inline-start: 8px; }
+body.admin .client-edit { margin-top: 8px; }
+body.admin .client-edit-form { margin-top: 12px; max-width: 28rem; }

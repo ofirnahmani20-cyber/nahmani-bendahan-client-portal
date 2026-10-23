@@ -155,6 +155,18 @@
                       { allowUnauthorized: true });
     },
     staffLogout: function () { return Api.post('/api/office/auth/logout'); },
+
+    // ---- פתיחת תיק ועריכה (api_intake.py) ----
+    intakeLookup: function (nationalId) {
+      return Api.post('/api/office/intake/lookup', { national_id: nationalId });
+    },
+    createCase: function (body) { return Api.post('/api/office/cases', body); },
+    updateClient: function (id, body) {
+      return Api.post('/api/office/clients/' + encodeURIComponent(id) + '/update', body);
+    },
+    updateCase: function (id, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(id) + '/update', body);
+    },
     officeCases: function () { return Api.get('/api/office/cases'); },
     officeCase:  function (id) { return Api.get('/api/office/cases/' + encodeURIComponent(id)); },
 

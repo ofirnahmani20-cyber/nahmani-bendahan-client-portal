@@ -396,6 +396,57 @@
         <h1 class="view-title" tabindex="-1">תיקי המשרד</h1>
         <p class="lead" id="listSummary"></p>
 
+        <!-- פתיחת תיק (23.10). לקוח נוצר רק יחד עם תיק. -->
+        <p><button type="button" class="btn btn-primary" id="newCaseToggle"
+                   aria-expanded="false" aria-controls="newCaseBlock">פתיחת תיק חדש</button></p>
+        <section class="block intake" id="newCaseBlock" hidden aria-labelledby="newCaseH">
+          <h2 id="newCaseH">פתיחת תיק חדש</h2>
+          <div class="alert alert-error" id="newCaseError" role="alert" hidden></div>
+          <form id="newCaseForm" novalidate>
+            <div class="field">
+              <label for="ncId">תעודת זהות</label>
+              <input type="text" id="ncId" inputmode="numeric" maxlength="10"
+                     autocomplete="off" required aria-describedby="ncIdHint">
+              <p class="hint" id="ncIdHint" aria-live="polite">9 ספרות. נבדק מול לקוחות המשרד.</p>
+            </div>
+            <fieldset id="ncClientFields">
+              <legend>פרטי הלקוח</legend>
+              <div class="field">
+                <label for="ncName">שם מלא</label>
+                <input type="text" id="ncName" maxlength="200" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="ncPhone">טלפון נייד</label>
+                <input type="tel" id="ncPhone" maxlength="20" dir="ltr" autocomplete="off"
+                       aria-describedby="ncPhoneHint">
+                <p class="hint" id="ncPhoneHint">אליו יישלח ללקוח קוד הכניסה לאתר.</p>
+              </div>
+              <div class="field">
+                <label for="ncEmail">אימייל (לא חובה)</label>
+                <input type="email" id="ncEmail" maxlength="200" dir="ltr" autocomplete="off">
+              </div>
+            </fieldset>
+            <div class="field">
+              <label for="ncType">סוג התביעה</label>
+              <select id="ncType" required></select>
+            </div>
+            <div class="field" id="ncAssigneeField" hidden>
+              <label for="ncAssignee">עורך הדין האחראי</label>
+              <select id="ncAssignee"></select>
+            </div>
+            <div class="field">
+              <label for="ncBranch">סניף ביטוח לאומי (לא חובה)</label>
+              <input type="text" id="ncBranch" maxlength="100" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="ncOpened">תאריך פתיחה</label>
+              <input type="date" id="ncOpened">
+            </div>
+            <button type="submit" class="btn btn-primary">פתיחת התיק</button>
+            <button type="button" class="btn btn-quiet" id="newCaseCancel">ביטול</button>
+          </form>
+        </section>
+
         <!-- השבבים מחוץ ל-.table-block במכוון: על הבלוק הזה
              יש overflow-x: auto שמציל את הטבלה מגלישה, ושבב
              שיושב בתוכו היה נגלל אופקית יחד איתה ונעלם מהמסך
@@ -452,9 +503,8 @@
       </div>
 
       <!-- ---- לקוחות ----
-           קריאה בלבד. יצירה ועריכה כותבות תעודת זהות - שדה
-           מוצפן שמשמש גם כמפתח ההתחברות של הלקוח - וזו
-           החלטת מוצר ולא רק נקודת קצה. -->
+           רשימה ועריכת פרטי קשר. לקוח חדש נוצר רק דרך פתיחת
+           תיק (server/api_intake.py), ות"ז אינה ניתנת לעריכה. -->
       <div class="view" id="view-clients" hidden>
         <h1 class="view-title" tabindex="-1">לקוחות</h1>
         <p class="lead" id="clientsIntro">רשימת הלקוחות של המשרד.</p>
@@ -600,6 +650,37 @@
       <!-- ============ 4. ועדות, החלטות ומועדים ============ -->
       <div class="case-view" id="case-view-committees" hidden>
         <h2 class="view-title" tabindex="-1">ועדות, החלטות ומועדים</h2>
+
+        <!-- פרטי התיק (23.10): מועד הוועדה, סטטוס, סניף ואחראי -->
+        <section class="block" aria-labelledby="h-casemeta">
+          <h3 id="h-casemeta">פרטי התיק</h3>
+          <div class="alert alert-error" id="cmError" role="alert" hidden></div>
+          <form id="caseMetaForm" novalidate>
+            <div class="field">
+              <label for="cmHearing">מועד הוועדה הקרובה</label>
+              <input type="datetime-local" id="cmHearing" aria-describedby="cmHearingHint">
+              <p class="hint" id="cmHearingHint">מוצג ללקוח באתר. ריק = אין ועדה קבועה.</p>
+            </div>
+            <div class="field">
+              <label for="cmStatus">סטטוס התיק</label>
+              <select id="cmStatus">
+                <option value="active">פעיל</option>
+                <option value="frozen">מוקפא</option>
+                <option value="closed_accepted">הסתיים בקבלה</option>
+                <option value="closed_rejected">הסתיים בדחייה</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="cmBranch">סניף ביטוח לאומי</label>
+              <input type="text" id="cmBranch" maxlength="100" autocomplete="off">
+            </div>
+            <div class="field" id="cmAssigneeField" hidden>
+              <label for="cmAssignee">עורך הדין האחראי</label>
+              <select id="cmAssignee"></select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">שמירת פרטי התיק</button>
+          </form>
+        </section>
 
         <!-- שלב -->
         <section class="block" aria-labelledby="h-stage">

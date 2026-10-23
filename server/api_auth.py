@@ -424,6 +424,9 @@ def me(request: Request):
         "canViewMedical": bool(identity.is_staff and identity.can_view_medical),
         # האם להציע הפעלת אימות דו-שלבי. רלוונטי רק לצוות.
         "mfa": _mfa_enabled(identity) if identity.is_staff else None,
+        # לצוות בלבד: ברירת המחדל של "אחראי" בפתיחת תיק. אותו מזהה
+        # כבר גלוי לכל הצוות ב-/api/office/staff. ללקוח אינו מוחזר.
+        "id": str(identity.subject_id) if identity.is_staff else None,
     }
 
 
