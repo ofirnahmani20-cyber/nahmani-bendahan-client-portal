@@ -361,6 +361,23 @@ body.admin .demo-box {
   font-size: var(--ds-size-meta);
 }
 
+/* ---- אימות דו-שלבי בכניסה (23.10) ---- */
+body.admin .mfa-title {
+  font-size: var(--ds-size-label);
+  margin: 0 0 12px;
+}
+body.admin .mfa-steps { padding-inline-start: 1.2em; margin: 0 0 16px; }
+body.admin .mfa-steps li { margin-bottom: 10px; }
+/* ה-QR נשאר שחור על לבן גם במצב כהה: מצלמות לא סורקות קוד הפוך. */
+body.admin .mfa-qr { background: #fff; display: inline-block; margin: 8px 0 4px; line-height: 0; }
+body.admin .mfa-qr svg { width: 180px; height: 180px; }
+body.admin #mfaSecret { font-size: var(--ds-size-meta); word-break: break-all; }
+body.admin .mfa-codes {
+  list-style: none; padding: 0; margin: 12px 0 16px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
 /* ---- פאנלים פנימיים בתיק ----
    הסרת מסגרות ומילויים בלבד. הסדר, התוכן וההתנהגות שלהם
    נבדקו בשלבים א'-ג' ואינם משתנים כאן. */
@@ -1088,3 +1105,10 @@ body.admin .mismatch-warning {
   color: var(--ds-risk);
 }
 body.admin .classify-actions select { max-width: 22rem; width: auto; flex: 0 1 22rem; }
+
+/* ---- פתיחת תיק ועריכת לקוח (23.10) ---- */
+body.admin .intake fieldset { border: 0; padding: 0; margin: 0; }
+body.admin .intake legend { font-weight: 600; margin-bottom: 8px; }
+body.admin .intake .btn + .btn { margin-inline-start: 8px; }
+body.admin .client-edit { margin-top: 8px; }
+body.admin .client-edit-form { margin-top: 12px; max-width: 28rem; }

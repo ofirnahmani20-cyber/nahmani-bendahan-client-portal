@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from . import audit, processing, scan, storage
-from .auth import require_csrf, require_staff
+from .auth import case_scope, require_csrf, require_staff
 from .db.pool import cursor
 
 router = APIRouter()
@@ -25,7 +25,8 @@ router = APIRouter()
 
 def _owned_case(cur, case_id, identity):
     cur.execute(
-        "select id, firm_id, claim_type_id from cases where id = %s and firm_id = %s",
+        "select c.id, c.firm_id, c.claim_type_id from cases c"
+        " where c.id = %s and c.firm_id = %s and " + case_scope(identity),
         (case_id, identity.firm_id),
     )
     row = cur.fetchone()
@@ -36,8 +37,10 @@ def _owned_case(cur, case_id, identity):
 
 def _owned_document(cur, document_id, identity):
     cur.execute(
-        """select id, case_id, firm_id, name, status
-             from case_documents where id = %s and firm_id = %s""",
+        """select d.id, d.case_id, d.firm_id, d.name, d.status
+             from case_documents d
+             join cases c on c.id = d.case_id and c.firm_id = d.firm_id
+            where d.id = %s and d.firm_id = %s and """ + case_scope(identity),
         (document_id, identity.firm_id),
     )
     row = cur.fetchone()
@@ -94,6 +97,7 @@ def list_cases(request: Request, identity=Depends(require_staff)):
                                   and u.firm_id = c.firm_id
                 where c.firm_id = %(firm)s
                   and c.status in ('active', 'frozen')
+                  and """ + case_scope(identity) + """
                 -- התיקים שלי קודם. זה המסך שאיש הצוות פותח
                 -- בבוקר, והשאלה הראשונה שלו היא מה מוטל עליו.
                 -- nulls last חיוני: בפוסטגרס NULL = value הוא
@@ -588,6 +592,11 @@ def audit_log(request: Request, case_id: str | None = None,
                                         and cl.firm_id = a.firm_id
                      left join claim_types ct on ct.id = c.claim_type_id
                     where a.firm_id = %s
+                      -- מי שאינו מנהל רואה רק שורות של תיקים שלו.
+                      -- שורות בלי תיק (התחברויות, למשל) הן יומן
+                      -- המשרד, ושייכות למנהל.
+                      and (""" + ("true" if case_scope(identity) == "true" else
+                                  "c.id is not null and " + case_scope(identity)) + """)
                     order by a.created_at desc limit %s""",
                 (identity.firm_id, limit),
             )
@@ -638,7 +647,9 @@ def office_download_file(document_id: str, file_id: str, request: Request,
                  from document_files f
                  join case_documents d on d.id = f.document_id
                                       and d.firm_id = f.firm_id
-                where f.id = %s and f.document_id = %s and f.firm_id = %s""",
+                 join cases c on c.id = d.case_id and c.firm_id = d.firm_id
+                where f.id = %s and f.document_id = %s and f.firm_id = %s
+                  and """ + case_scope(identity),
             (file_id, document_id, identity.firm_id),
         )
         row = cur.fetchone()
@@ -721,7 +732,8 @@ def office_documents(request: Request, status: str | None = None,
         cur.execute(
             """select d.status, count(*) as n
                  from case_documents d
-                where d.firm_id = %s
+                 join cases c on c.id = d.case_id and c.firm_id = d.firm_id
+                where d.firm_id = %s and """ + case_scope(identity) + """
                 group by d.status""",
             (identity.firm_id,),
         )
@@ -742,6 +754,7 @@ def office_documents(request: Request, status: str | None = None,
                                            and f.firm_id = d.firm_id
                                            and f.is_current
                 where d.firm_id = %s and d.status = any(%s)
+                  and """ + case_scope(identity) + """
                 order by """ + _DOC_ORDER + """,
                          f.uploaded_at desc nulls last,
                          c.case_number, d.position
@@ -785,14 +798,11 @@ def office_documents(request: Request, status: str | None = None,
 #  שלב ו' - לקוחות, קטלוגים ותיקים שהושלמו
 #
 #  שלושת האזורים האחרונים שהציגו "ייבנה בשלב ו'". כולם
-#  קריאה בלבד: אין כאן יצירה, עריכה או מחיקה.
+#  קריאה בלבד כאן.
 #
-#  למה קריאה בלבד, ובמפורש
-#  ------------------------
-#  יצירת לקוח כותבת תעודת זהות - שדה מוצפן שמשמש גם כמפתח
-#  ההתחברות. עריכת קטלוג משנה את המסלול של תיקים חיים.
-#  שתי הפעולות דורשות החלטת מוצר ולא רק נקודת קצה, ולכן
-#  הן אינן כאן. מה שכן קיים היום נחשף, ומה שאין - נאמר.
+#  23.10: יצירת לקוח ותיק ועריכתם נבנו ב-api_intake.py, אחרי
+#  שהחלטת המוצר התקבלה (docs/10). עריכת קטלוג עדיין אינה
+#  קיימת: היא משנה את המסלול של תיקים חיים.
 # ================================================================
 
 @router.get("/api/office/clients")
@@ -821,7 +831,11 @@ def office_clients(request: Request, q: str | None = None,
                  from clients cl
                  left join cases c on c.client_id = cl.id
                                   and c.firm_id = cl.firm_id
+                                  and """ + case_scope(identity) + """
                 where cl.firm_id = %(firm)s
+                  -- לקוח גלוי למי שרואה לפחות תיק אחד שלו.
+                  and (""" + ("true" if case_scope(identity) == "true" else
+                              "c.id is not null") + """)
                   -- ::text מפורש: בלי הטלת הטיפוס postgres
                   -- אינו יכול להסיק את סוג הפרמטר כשהוא null,
                   -- והשאילתה נופלת ב-AmbiguousParameter.
@@ -975,6 +989,7 @@ def office_closed_cases(request: Request, identity=Depends(require_staff)):
                  ) d on true
                 where c.firm_id = %s
                   and c.status in ('closed_accepted', 'closed_rejected')
+                  and """ + case_scope(identity) + """
                 order by d.decided_at desc nulls last, c.case_number""",
             (identity.firm_id,),
         )
@@ -1048,9 +1063,12 @@ CRITICAL_WHERE = " and not g.is_closed and (t.priority = 'critical' or g.days_le
 
 def _owned_task(cur, task_id, identity):
     cur.execute(
-        """select id, case_id, firm_id, title, status, due_at, priority,
-                  assignee_user_id, is_legal_deadline, completed_at
-             from case_tasks where id = %s and firm_id = %s""",
+        """select t.id, t.case_id, t.firm_id, t.title, t.status, t.due_at,
+                  t.priority, t.assignee_user_id, t.is_legal_deadline,
+                  t.completed_at, c.assigned_user_id as case_assignee
+             from case_tasks t
+             join cases c on c.id = t.case_id and c.firm_id = t.firm_id
+            where t.id = %s and t.firm_id = %s and """ + case_scope(identity),
         (task_id, identity.firm_id),
     )
     row = cur.fetchone()
@@ -1103,20 +1121,31 @@ def _parse_due(value):
                             detail="מועד היעד אינו תאריך תקין.")
 
 
-def _assignee_in_firm(cur, assignee_user_id, identity):
+def _assignee_in_firm(cur, assignee_user_id, identity, case_id):
     """
     אחראי חייב להיות איש צוות של אותו משרד. 400 ולא 404, כי
     הבקשה שלך אך הערך בה אינו שמיש - כמו "השלב אינו שייך למסלול".
+
+    23.10: וגם מישהו שרואה את התיק - המנהל או האחראי על התיק.
+    אחרת משימה הייתה מוטלת על אדם שאינו יכול לפתוח את התיק שלה,
+    או גרוע מזה: הייתה הופכת לדרך לחשוף לו את התיק.
     """
     if not assignee_user_id:
         return None
     cur.execute(
-        "select id from users where id = %s and firm_id = %s and status = 'active'",
-        (assignee_user_id, identity.firm_id),
+        """select u.role, (c.assigned_user_id = u.id) as on_case
+             from users u
+             join cases c on c.id = %s and c.firm_id = u.firm_id
+            where u.id = %s and u.firm_id = %s and u.status = 'active'""",
+        (case_id, assignee_user_id, identity.firm_id),
     )
-    if cur.fetchone() is None:
+    row = cur.fetchone()
+    if row is None:
         raise HTTPException(status_code=400,
                             detail="האחראי שנבחר אינו איש צוות פעיל במשרד.")
+    if row["role"] != "admin" and not row["on_case"]:
+        raise HTTPException(status_code=400,
+                            detail="אפשר להטיל משימה רק על האחראי על התיק או על מנהל.")
     return assignee_user_id
 
 
@@ -1156,7 +1185,7 @@ def list_tasks(request: Request, assignee: str | None = None,
     הקריטיות לבאנר. הבאנר מחושב על כל המשרד ואינו מושפע
     מהסינון, כדי שמועד קריטי לא ייעלם בגלל שסוננה תצוגה.
     """
-    where = " where t.firm_id = %s "
+    where = " where t.firm_id = %s and " + case_scope(identity) + " "
     params = [identity.firm_id]
 
     if not include_done:
@@ -1176,7 +1205,8 @@ def list_tasks(request: Request, assignee: str | None = None,
         tasks = [_task_out(r) for r in cur.fetchall()]
 
         cur.execute(
-            TASK_SELECT + " where t.firm_id = %s " + CRITICAL_WHERE + TASK_ORDER,
+            TASK_SELECT + " where t.firm_id = %s and " + case_scope(identity)
+            + CRITICAL_WHERE + TASK_ORDER,
             (identity.firm_id,),
         )
         banner = [_task_out(r) for r in cur.fetchall()]
@@ -1195,7 +1225,8 @@ def list_tasks(request: Request, assignee: str | None = None,
                                                         as waiting_client
                  from case_tasks t
                  join case_task_urgency g on g.task_id = t.id
-                where t.firm_id = %s""",
+                 join cases c on c.id = t.case_id and c.firm_id = t.firm_id
+                where t.firm_id = %s and """ + case_scope(identity),
             (identity.firm_id,),
         )
         c = cur.fetchone()
@@ -1284,7 +1315,7 @@ def create_task(case_id: str, body: NewTask, request: Request,
 
     with cursor(commit=True) as cur:
         _owned_case(cur, case_id, identity)
-        assignee = _assignee_in_firm(cur, body.assignee_user_id, identity)
+        assignee = _assignee_in_firm(cur, body.assignee_user_id, identity, case_id)
 
         cur.execute(
             "select id from task_types where id = %s and firm_id = %s",
@@ -1332,7 +1363,8 @@ def update_task(task_id: str, body: NewTask, request: Request,
 
     with cursor(commit=True) as cur:
         task = _owned_task(cur, task_id, identity)
-        assignee = _assignee_in_firm(cur, body.assignee_user_id, identity)
+        assignee = _assignee_in_firm(cur, body.assignee_user_id, identity,
+                                     task["case_id"])
 
         cur.execute(
             "select id from task_types where id = %s and firm_id = %s",
@@ -1400,7 +1432,8 @@ def reassign_task(task_id: str, body: TaskAssignee, request: Request,
     require_csrf(request)
     with cursor(commit=True) as cur:
         task = _owned_task(cur, task_id, identity)
-        assignee = _assignee_in_firm(cur, body.assignee_user_id, identity)
+        assignee = _assignee_in_firm(cur, body.assignee_user_id, identity,
+                                     task["case_id"])
         cur.execute(
             """update case_tasks
                   set assignee_user_id = %s,

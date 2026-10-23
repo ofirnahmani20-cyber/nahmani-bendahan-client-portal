@@ -32,7 +32,7 @@ from server.db import seed_templates
 
 from .test_extraction import FIX, read
 from .test_firm_isolation import second_firm  # noqa: F401  (fixture)
-from .test_processing import OTHER_STAFF, STAFF, enqueue, login, make_file
+from .test_processing import OTHER_STAFF, STAFF, assigned_to, enqueue, login, make_file
 from .test_uploads import LOCAL
 
 
@@ -429,7 +429,8 @@ def test_audit_log_reader_without_medical_permission_sees_no_document_kind(api, 
             cur.execute("select case_id from case_documents where id = %s",
                         (classified["document_id"],))
             case_id = cur.fetchone()["case_id"]
-        log = other.get("/api/office/audit-log?case_id=%s" % case_id)
+        with assigned_to(OTHER_STAFF[0], classified["document_id"]):
+            log = other.get("/api/office/audit-log?case_id=%s" % case_id)
         assert log.status_code == 200
         dump = json.dumps(log.json(), ensure_ascii=False)
         for code in doc_taxonomy.ALL:

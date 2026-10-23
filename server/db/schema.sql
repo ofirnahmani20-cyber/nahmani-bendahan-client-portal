@@ -986,4 +986,64 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- -------------------------------------------------------------
+--  אימות דו-שלבי לצוות (TOTP) - docs/10, 23.10
+--
+--  totp_secret הייתה עמודה מתה מאז הסכמה הראשונה. עכשיו היא
+--  מחזיקה את הסוד מוצפן (Fernet, PORTAL_ID_ENC_KEY): מי שקורא את
+--  המסד אינו יכול לייצר קודים.
+--
+--  totp_pending - סוד שהופק ועוד לא אומת בקוד. רק אימות מוצלח
+--  מעביר אותו ל-totp_secret, כך שהרשמה שננטשה באמצע אינה נועלת
+--  את המשתמש מחוץ לחשבון.
+--
+--  totp_last_step - צעד הזמן האחרון שהתקבל. קוד שכבר שימש אינו
+--  מתקבל שוב, גם בתוך 30 השניות שלו.
+-- -------------------------------------------------------------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_pending    text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_step  bigint;
+
+-- כרטיס בין הסיסמה לקוד. הסיסמה אומתה, ה-session עוד לא נפתח.
+-- נשמר hash בלבד, כמו ב-sessions.
+CREATE TABLE IF NOT EXISTS mfa_tickets (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id     uuid NOT NULL REFERENCES firms(id) ON DELETE RESTRICT,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ticket_hash text NOT NULL UNIQUE,
+  purpose     text NOT NULL CHECK (purpose IN ('verify', 'enroll')),
+  attempts    integer NOT NULL DEFAULT 0,
+  expires_at  timestamptz NOT NULL,
+  consumed_at timestamptz,
+  ip          text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- קודי גיבוי חד-פעמיים, לטלפון שאבד. hash בלבד; הקוד עצמו מוצג
+-- פעם אחת ברגע ההרשמה.
+CREATE TABLE IF NOT EXISTS mfa_backup_codes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash  text NOT NULL,
+  used_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS mfa_backup_codes_user ON mfa_backup_codes (user_id) WHERE used_at IS NULL;
+
+-- -------------------------------------------------------------
+--  שירות ההתראות (server/notifier.py) - docs/10, 23.10
+--
+--  message_deliveries משמשת לכל משלוח, ולא רק לתזכורת על דרישה.
+--  case_id    - לאיזה תיק המשלוח שייך (עדכון, ועדה).
+--  dedupe_key - מפתח שמונע משלוח כפול של אותו אירוע, גם כשהשירות
+--               רץ פעמיים או נפל באמצע. NULL מותר וחוזר על עצמו
+--               (משלוח ידני מהממשק).
+-- -------------------------------------------------------------
+ALTER TABLE message_deliveries ADD COLUMN IF NOT EXISTS case_id    uuid;
+ALTER TABLE message_deliveries ADD COLUMN IF NOT EXISTS dedupe_key text;
+CREATE UNIQUE INDEX IF NOT EXISTS message_deliveries_dedupe
+  ON message_deliveries (firm_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS message_deliveries_subject_sent
+  ON message_deliveries (subject_type, subject_id, template_key, sent_at DESC);
+
 COMMIT;

@@ -72,6 +72,24 @@ services:
   # server.sandbox - שאין לו לא זה ולא זה - לכל קובץ.
   # שלוש שכבות זיכרון: RLIMIT_AS בתוך ה-sandbox (limits.py),
   # mem_limit כאן, ו-timeout ב-worker.py.
+  # שירות ההתראות (server/notifier.py): תזכורות, "יש עדכון", ועדות,
+  # סיכום בוקר. השירות היחיד מלבד app שיוצא לאינטרנט - אל ספק ה-SMS
+  # והמייל. אין לו גישה לקבצים שהועלו: הוא אינו צריך אותם.
+  notifier:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    restart: unless-stopped
+    environment:
+      PORTAL_MODE: production
+    env_file: [/etc/nahmani/portal.env]   # PORTAL_PUBLIC_URL + פרטי הספק
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    ulimits: { core: 0 }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: python -m server.notifier --loop
+    depends_on: [db]
+    networks: [internal, edge]
+
   worker:
     build: { context: .., dockerfile: deploy/Dockerfile }
     restart: unless-stopped

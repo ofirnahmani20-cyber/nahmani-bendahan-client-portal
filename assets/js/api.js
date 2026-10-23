@@ -140,7 +140,33 @@
                       { email: email, password: password },
                       { allowUnauthorized: true });
     },
+    // אימות דו-שלבי. ticket מגיע מ-staffLogin; בלעדיו - מחובר שמפעיל מיוזמתו.
+    mfaVerify: function (ticket, code) {
+      return Api.post('/api/office/auth/verify-2fa', { ticket: ticket, code: code },
+                      { allowUnauthorized: true });
+    },
+    mfaEnrollStart: function (ticket) {
+      return Api.post('/api/office/auth/mfa/enroll/start', { ticket: ticket || null },
+                      { allowUnauthorized: true });
+    },
+    mfaEnrollConfirm: function (ticket, code) {
+      return Api.post('/api/office/auth/mfa/enroll/confirm',
+                      { ticket: ticket || null, code: code },
+                      { allowUnauthorized: true });
+    },
     staffLogout: function () { return Api.post('/api/office/auth/logout'); },
+
+    // ---- פתיחת תיק ועריכה (api_intake.py) ----
+    intakeLookup: function (nationalId) {
+      return Api.post('/api/office/intake/lookup', { national_id: nationalId });
+    },
+    createCase: function (body) { return Api.post('/api/office/cases', body); },
+    updateClient: function (id, body) {
+      return Api.post('/api/office/clients/' + encodeURIComponent(id) + '/update', body);
+    },
+    updateCase: function (id, body) {
+      return Api.post('/api/office/cases/' + encodeURIComponent(id) + '/update', body);
+    },
     officeCases: function () { return Api.get('/api/office/cases'); },
     officeCase:  function (id) { return Api.get('/api/office/cases/' + encodeURIComponent(id)); },
 

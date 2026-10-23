@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import audit
-from .auth import require_client, require_csrf, require_staff
+from .auth import case_scope, require_client, require_csrf, require_staff
 from .db.pool import cursor
 
 router = APIRouter()
@@ -66,7 +66,8 @@ def office_conversation(case_id: str, request: Request,
                         identity=Depends(require_staff)):
     with cursor() as cur:
         cur.execute(
-            "select id from cases where id = %s and firm_id = %s",
+            "select c.id from cases c where c.id = %s and c.firm_id = %s and "
+            + case_scope(identity),
             (case_id, identity.firm_id),
         )
         if cur.fetchone() is None:
@@ -96,7 +97,8 @@ def office_send(case_id: str, body: OfficeReply, request: Request,
     require_csrf(request)
     with cursor(commit=True) as cur:
         cur.execute(
-            "select id from cases where id = %s and firm_id = %s",
+            "select c.id from cases c where c.id = %s and c.firm_id = %s and "
+            + case_scope(identity),
             (case_id, identity.firm_id),
         )
         if cur.fetchone() is None:
@@ -138,8 +140,10 @@ def mark_read(message_id: str, request: Request,
     require_csrf(request)
     with cursor(commit=True) as cur:
         cur.execute(
-            """select id, case_id from case_conversation
-                where id = %s and firm_id = %s and direction = 'inbound'""",
+            """select m.id, m.case_id from case_conversation m
+                 join cases c on c.id = m.case_id and c.firm_id = m.firm_id
+                where m.id = %s and m.firm_id = %s and m.direction = 'inbound'
+                  and """ + case_scope(identity),
             (message_id, identity.firm_id),
         )
         row = cur.fetchone()

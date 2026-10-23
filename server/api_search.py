@@ -44,7 +44,7 @@ api_search.py - חיפוש רוחבי במשרד.
 
 from fastapi import APIRouter, Depends, Request
 
-from .auth import require_staff
+from .auth import require_staff, sees_all_cases
 from .db.pool import cursor
 
 router = APIRouter()
@@ -130,6 +130,7 @@ _CLIENT_SQL = """
       from clients cl
       left join cases c on c.client_id = cl.id and c.firm_id = cl.firm_id
      where cl.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by cl.id, c.opened_at desc nulls last
 """.format(rank=_rank("cl.full_name"),
            any=_any("cl.full_name", "coalesce(cl.phone, '')"))
@@ -149,6 +150,7 @@ _CASE_SQL = """
       left join case_current_stage st on st.case_id = c.id
       left join users u on u.id = c.assigned_user_id and u.firm_id = c.firm_id
      where c.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, c.opened_at desc
 """.format(rank=_rank("c.case_number", "cl.full_name"),
            any=_any("c.case_number", "cl.full_name", "coalesce(ct.name, '')",
@@ -166,6 +168,7 @@ _DOCUMENT_SQL = """
       join cases c on c.id = d.case_id and c.firm_id = d.firm_id
       join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
      where d.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, coalesce(d.reviewed_at, d.created_at) desc
 """.format(rank=_rank("d.name"),
            any=_any("d.name", "coalesce(d.guidance, '')"))
@@ -180,6 +183,7 @@ _TASK_SQL = """
       join cases c on c.id = t.case_id and c.firm_id = t.firm_id
       join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
      where t.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, t.status in ('done', 'cancelled'),
               coalesce(t.due_at, t.created_at) desc
 """.format(rank=_rank("t.title"),
@@ -195,6 +199,7 @@ _REQUIREMENT_SQL = """
       join cases c on c.id = r.case_id and c.firm_id = r.firm_id
       join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
      where r.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, r.status in ('completed', 'cancelled'),
               coalesce(r.due_at, r.created_at) desc
 """.format(rank=_rank("r.title"),
@@ -214,6 +219,7 @@ _DECISION_SQL = """
       join cases c on c.id = d.case_id and c.firm_id = d.firm_id
       join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
      where d.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, d.decided_at desc
 """.format(rank=_rank("coalesce(d.office_note, '')"),
            any=_any("coalesce(d.office_note, '')",
@@ -231,6 +237,7 @@ _MESSAGE_SQL = """
       join cases c on c.id = m.case_id and c.firm_id = m.firm_id
       join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
      where m.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, m.sent_at desc
 """.format(rank=_rank("m.title"),
            any=_any("m.title", "m.body"))
@@ -248,6 +255,7 @@ _CONVERSATION_SQL = """
       join cases c on c.id = v.case_id and c.firm_id = v.firm_id
       join clients cl on cl.id = c.client_id and cl.firm_id = c.firm_id
      where v.firm_id = %(firm)s and ({any})
+       and (%(all)s or c.assigned_user_id = %(me)s)
      order by rank, v.created_at desc
 """.format(rank=_rank("v.body"), any=_any("v.body"))
 
@@ -405,6 +413,11 @@ def search(request: Request, q: str = "", kinds: str | None = None,
     # תו % בקלט אינו הופך לתו כללי גם בדפוס התחילית.
     params = {
         "firm": identity.firm_id,
+        # היקף התיקים (docs/10): מי שאינו מנהל מוצא רק את מה
+        # שבתיקים שהוא האחראי עליהם. אותו כלל של case_scope,
+        # כפרמטרים ולא כטקסט, כי השאילתות כאן כבר בנויות מראש.
+        "all": sees_all_cases(identity),
+        "me": identity.subject_id,
         "q": _like(q),
         "exact": q,
         "prefix": _escape(q) + "%",

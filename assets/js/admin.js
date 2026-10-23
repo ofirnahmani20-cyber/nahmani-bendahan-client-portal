@@ -35,7 +35,13 @@
 
     /* ההשוואה בשרת, מול bcrypt. הדפדפן אינו מחזיק סיסמאות. */
     Api.staffLogin(u, p)
-       .then(function () { start(); })
+       .then(function (res) {
+         /* 23.10: סיסמה נכונה עשויה להחזיר כרטיס במקום session -
+            השלב השני של האימות. ראו server/mfa.py. */
+         if (res && res.mfa === 'verify') return showMfaVerify(res.ticket);
+         if (res && res.mfa === 'enroll') return showMfaEnroll(res.ticket);
+         start();
+       })
        .catch(function (err) {
          loginFail(err.status === 429
            ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
@@ -43,11 +49,108 @@
        });
   });
 
-  function loginFail(msg) {
+  function loginFail(msg, focusId) {
     loginErr.textContent = msg;
     loginErr.hidden = false;
-    $('staffUser').focus();
+    $(focusId || 'staffUser').focus();
   }
+
+  /* ================= אימות דו-שלבי ================= */
+
+  var mfaTicket = null;
+
+  function onlyStep(id) {
+    ['staffLoginForm', 'mfaVerifyForm', 'mfaEnrollForm', 'mfaBackupView']
+      .forEach(function (x) { $(x).hidden = x !== id; });
+    loginErr.hidden = true;
+  }
+
+  /* כרטיס שפג (5 דקות לאימות, 15 להרשמה) - חוזרים לסיסמה. */
+  function mfaExpired() {
+    mfaTicket = null;
+    onlyStep('staffLoginForm');
+    $('staffPass').value = '';
+    loginFail('עבר יותר מדי זמן. צריך להתחבר מחדש.', 'staffPass');
+  }
+
+  function showMfaVerify(ticket) {
+    mfaTicket = ticket;
+    onlyStep('mfaVerifyForm');
+    $('mfaCode').value = '';
+    $('mfaCode').focus();
+  }
+
+  $('mfaVerifyForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = $('mfaCode').value.trim();
+    if (!code) return loginFail('צריך להזין את הקוד.', 'mfaCode');
+    Api.mfaVerify(mfaTicket, code)
+       .then(function (res) {
+         if (res && res.backupCodesLeft !== undefined && res.backupCodesLeft <= 3) {
+           alert('נכנסת עם קוד גיבוי. נותרו ' + res.backupCodesLeft +
+                 ' קודים. כדאי לבקש ממנהל איפוס והרשמה מחדש.');
+         }
+         start();
+       })
+       .catch(function (err) {
+         /* אותה הודעה לקוד שגוי ולכרטיס שפג - השרת אינו מבדיל
+            ביניהם, בכוונה. נשארים במסך הקוד, וההודעה אומרת מה
+            לעשות אם זה חוזר. */
+         loginFail(err.status === 429
+           ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
+           : 'הקוד שגוי או שפג תוקפו. אם זה חוזר - התחבר מחדש.', 'mfaCode');
+       });
+  });
+
+  function showMfaEnroll(ticket) {
+    mfaTicket = ticket;
+    onlyStep('mfaEnrollForm');
+    $('mfaQr').innerHTML = '';
+    $('mfaSecret').textContent = '';
+    Api.mfaEnrollStart(ticket)
+       .then(function (res) {
+         /* SVG שנוצר בשרת שלנו - לא קלט משתמש. */
+         $('mfaQr').innerHTML = res.qrSvg;
+         $('mfaSecret').textContent = res.secret;
+         $('mfaEnrollCode').focus();
+       })
+       .catch(function (err) {
+         if (err.status === 401) return mfaExpired();
+         loginFail('לא הצלחנו להתחיל את ההרשמה. נסה שוב.', 'mfaEnrollCode');
+       });
+  }
+
+  $('mfaEnrollForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = $('mfaEnrollCode').value.trim();
+    if (!code) return loginFail('צריך להזין את הקוד מהאפליקציה.', 'mfaEnrollCode');
+    Api.mfaEnrollConfirm(mfaTicket, code)
+       .then(function (res) { showBackupCodes(res.backupCodes || []); })
+       .catch(function (err) {
+         if (err.status === 401) return mfaExpired();
+         loginFail(err.status === 429
+           ? 'יותר מדי ניסיונות. נסה שוב מאוחר יותר.'
+           : 'הקוד אינו תואם. ודא שהשעון בטלפון מכוון ונסה את הקוד הבא.',
+           'mfaEnrollCode');
+       });
+  });
+
+  function showBackupCodes(codes) {
+    onlyStep('mfaBackupView');
+    var ul = $('mfaCodes');
+    ul.innerHTML = '';
+    codes.forEach(function (c) {
+      var li = document.createElement('li');
+      li.textContent = c;
+      ul.appendChild(li);
+    });
+    $('mfaBackupDone').focus();
+  }
+
+  $('mfaBackupDone').addEventListener('click', function () {
+    mfaTicket = null;
+    start();
+  });
 
   $('staffLogout').addEventListener('click', function () {
     Api.staffLogout().then(reloadPage, reloadPage);
@@ -768,6 +871,126 @@
     td.appendChild(box);
     return td;
   }
+
+  /* ================= פתיחת תיק (23.10) =================
+     לקוח נוצר רק יחד עם תיק - ראו server/api_intake.py.
+     ת"ז קיימת: הלקוח הקיים משמש ושדות הלקוח מוסתרים, כי
+     השרת ממילא אינו דורס את פרטיו מכאן. */
+
+  var ncLoaded = false;
+  var ncExisting = false;
+
+  function ncError(msg, focusId) {
+    var box = $('newCaseError');
+    box.textContent = msg;
+    box.hidden = !msg;
+    if (msg && focusId) $(focusId).focus();
+  }
+
+  function ncToggle(open) {
+    $('newCaseBlock').hidden = !open;
+    $('newCaseToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) { $('newCaseToggle').focus(); return Promise.resolve(); }
+    ncError('');
+    return ncLoadOptions().then(function () { $('ncId').focus(); });
+  }
+
+  /* סוגי התביעה מהקטלוג, ואנשי הצוות - רק למנהל, שרק הוא
+     רשאי לשייך תיק לאחר. כל אחד אחר פותח לעצמו. */
+  function ncLoadOptions() {
+    if (ncLoaded) return Promise.resolve();
+    var isAdmin = staff && staff.role === 'admin';
+    return Promise.all([Api.officeCatalogs(), isAdmin ? Api.officeStaff() : null])
+      .then(function (res) {
+        var sel = $('ncType');
+        sel.textContent = '';
+        res[0].claimTypes.filter(function (t) { return t.active && t.stages.length; })
+          .forEach(function (t) {
+            var o = el('option', null, t.name);
+            o.value = t.id;
+            sel.appendChild(o);
+          });
+        if (isAdmin) {
+          var who = $('ncAssignee');
+          who.textContent = '';
+          var none = el('option', null, 'בלי אחראי בינתיים');
+          none.value = '';
+          who.appendChild(none);
+          res[1].staff.forEach(function (s) {
+            var o = el('option', null, s.name + (s.title ? ' · ' + s.title : ''));
+            o.value = s.id;
+            if (s.id === staff.id) o.selected = true;
+            who.appendChild(o);
+          });
+          $('ncAssigneeField').hidden = false;
+        }
+        $('ncOpened').value = new Date().toISOString().slice(0, 10);
+        ncLoaded = true;
+      });
+  }
+
+  $('newCaseToggle').addEventListener('click', function () {
+    ncToggle($('newCaseBlock').hidden).catch(function (err) {
+      ncError(err.message || 'לא הצלחנו לטעון את הטופס.');
+    });
+  });
+  $('newCaseCancel').addEventListener('click', function () { ncToggle(false); });
+
+  /* בדיקת ת"ז ביציאה מהשדה. השם מוחזר רק אם הלקוח בתיקים
+     שלך - אחרת רק "קיים", כדי לא לפתוח כפילות. */
+  $('ncId').addEventListener('change', function () {
+    var value = $('ncId').value.replace(/\D/g, '');
+    var hint = $('ncIdHint');
+    ncExisting = false;
+    $('ncClientFields').hidden = false;
+    if (value.length < 5) { hint.textContent = '9 ספרות. נבדק מול לקוחות המשרד.'; return; }
+    Api.intakeLookup(value).then(function (res) {
+      ncExisting = res.exists;
+      $('ncClientFields').hidden = res.exists;
+      hint.textContent = !res.exists
+        ? 'לקוח חדש - יש למלא את פרטיו.'
+        : (res.name ? 'לקוח קיים: ' + res.name + '. התיק ייפתח תחתיו.'
+                    : 'הלקוח כבר קיים במשרד. התיק ייפתח תחתיו.');
+    }).catch(function (err) {
+      hint.textContent = err.message || 'לא הצלחנו לבדוק את תעודת הזהות.';
+    });
+  });
+
+  $('newCaseForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    ncError('');
+    var body = {
+      national_id:   $('ncId').value.trim(),
+      claim_type_id: $('ncType').value,
+      branch:        $('ncBranch').value.trim() || null,
+      opened_at:     $('ncOpened').value || null
+    };
+    if (!body.national_id) return ncError('צריך להזין תעודת זהות.', 'ncId');
+    if (!ncExisting) {
+      body.full_name = $('ncName').value.trim();
+      body.phone     = $('ncPhone').value.trim();
+      body.email     = $('ncEmail').value.trim() || null;
+      if (!body.full_name) return ncError('לקוח חדש - צריך שם מלא.', 'ncName');
+      if (!body.phone)     return ncError('לקוח חדש - צריך טלפון נייד.', 'ncPhone');
+    }
+    if (!$('ncAssigneeField').hidden) body.assigned_user_id = $('ncAssignee').value || null;
+
+    Api.createCase(body).then(function (res) {
+      $('newCaseForm').reset();
+      $('ncClientFields').hidden = false;
+      ncExisting = false;
+      $('newCaseBlock').hidden = true;
+      $('newCaseToggle').setAttribute('aria-expanded', 'false');
+      announce('תיק ' + res.caseNumber + ' נפתח' +
+               (res.clientNew ? ' עם לקוח חדש.' : ' ללקוח קיים.'));
+      /* תיק בלי אחראי אינו גלוי לאף אחד מלבד המנהל - ובכל זאת
+         הוא נפתח למי שפתח אותו, כי רק מנהל יכול ליצור כזה. */
+      return openCase(res.caseId, 'state');
+    }).catch(function (err) {
+      ncError(err.message || 'פתיחת התיק נכשלה.');
+    });
+  });
+
 
   /* ================= תיק בודד ================= */
 
@@ -1541,6 +1764,7 @@
          ומשמש רק להודעת שגיאה, ולכן הוא מוסתר כשהוא ריק. */
       $('caseMeta').textContent = '';
 
+      renderCaseMeta(file);
       renderStage(file);
       renderDecisionForm(file);
       renderCatalog(file);
@@ -1559,6 +1783,78 @@
       $('caseMeta').textContent = err.message || 'לא הצלחנו לטעון את התיק.';
     });
   }
+
+  /* ---- פרטי התיק (23.10) ----
+     מועד הוועדה, סטטוס, סניף, ואחראי - האחרון למנהל בלבד, כי
+     איש צוות שמעביר תיק לאחר מאבד אליו גישה באותו רגע. */
+
+  var cmStaffLoaded = false;
+
+  /* datetime-local מצפה לשעון מקומי בלי אזור זמן. */
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function renderCaseMeta(file) {
+    $('cmError').hidden = true;
+    $('cmHearing').value = toLocalInput(file.nextHearing);
+    $('cmStatus').value  = file.status;
+    $('cmBranch').value  = file.branch || '';
+
+    if (!(staff && staff.role === 'admin')) return;
+    $('cmAssigneeField').hidden = false;
+    var fill = cmStaffLoaded ? Promise.resolve() : Api.officeStaff().then(function (res) {
+      var sel = $('cmAssignee');
+      sel.textContent = '';
+      var none = el('option', null, 'בלי אחראי');
+      none.value = '';
+      sel.appendChild(none);
+      res.staff.forEach(function (s) {
+        var o = el('option', null, s.name);
+        o.value = s.id;
+        sel.appendChild(o);
+      });
+      cmStaffLoaded = true;
+    });
+    fill.then(function () { $('cmAssignee').value = file.assigneeId || ''; });
+  }
+
+  $('caseMetaForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = currentCase;
+    if (!f) return;
+    var errBox = $('cmError');
+    errBox.hidden = true;
+
+    /* רק מה שהשתנה, כדי שהיומן ירשום את מה שבאמת שונה. */
+    var body = {};
+    var hearing = $('cmHearing').value;
+    if (hearing !== toLocalInput(f.nextHearing)) {
+      if (hearing) body.next_hearing_at = new Date(hearing).toISOString();
+      else body.clear_next_hearing = true;
+    }
+    if ($('cmStatus').value !== f.status) body.status = $('cmStatus').value;
+    if ($('cmBranch').value.trim() !== (f.branch || '')) body.branch = $('cmBranch').value.trim();
+    if (!$('cmAssigneeField').hidden && $('cmAssignee').value !== (f.assigneeId || '')) {
+      if ($('cmAssignee').value) body.assigned_user_id = $('cmAssignee').value;
+      else body.unassign = true;
+    }
+    if (!Object.keys(body).length) { announce('אין שינוי לשמור.'); return; }
+    if (body.status && body.status.indexOf('closed') === 0 &&
+        !confirm('לסגור את התיק? הוא יעבור לאזור "תיקים שהושלמו".')) return;
+
+    Api.updateCase(f.id, body).then(function () {
+      announce('פרטי התיק נשמרו.');
+      return renderCase();
+    }).catch(function (err) {
+      errBox.textContent = err.message || 'השמירה נכשלה.';
+      errBox.hidden = false;
+    });
+  });
 
   /* ---- מצב טכני: מה חוסם ומה חסר ---- */
 
@@ -1730,7 +2026,96 @@
         : c.activeCases === 1 ? 'אחד פעיל' : c.activeCases + ' פעילים'));
     li.appendChild(n);
 
+    li.appendChild(clientEditor(c));
     return li;
+  }
+
+  /* עריכת פרטי קשר וסטטוס (23.10). ת"ז אינה כאן: היא מפתח
+     ההתחברות של הלקוח, ושינוי שלה הוא החלפת זהות ולא עריכה. */
+  function clientEditor(c) {
+    var wrap = el('div', 'client-edit');
+    var open = el('button', 'btn btn-outline btn-sm', 'עריכת פרטים');
+    open.type = 'button';
+    open.setAttribute('aria-expanded', 'false');
+    wrap.appendChild(open);
+
+    var form = el('form', 'client-edit-form');
+    form.hidden = true;
+    form.noValidate = true;
+    var uid = 'ce' + c.id.slice(0, 8);
+
+    function field(label, id, value, type) {
+      var f = el('div', 'field');
+      var l = el('label', null, label);
+      l.htmlFor = uid + id;
+      var input = el('input');
+      input.id = uid + id;
+      input.type = type || 'text';
+      input.value = value || '';
+      if (type === 'tel' || type === 'email') input.dir = 'ltr';
+      f.appendChild(l);
+      f.appendChild(input);
+      form.appendChild(f);
+      return input;
+    }
+    var name  = field('שם מלא', 'n', c.name);
+    var phone = field('טלפון נייד', 'p', c.phone, 'tel');
+    var email = field('אימייל', 'e', c.email, 'email');
+
+    var st = el('div', 'field');
+    var stl = el('label', null, 'גישה לאתר');
+    stl.htmlFor = uid + 's';
+    var sel = el('select');
+    sel.id = uid + 's';
+    [['active', 'פעילה'], ['disabled', 'מושבתת - הלקוח לא יוכל להיכנס']].forEach(function (o) {
+      var opt = el('option', null, o[1]);
+      opt.value = o[0];
+      if (c.status === o[0]) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    st.appendChild(stl);
+    st.appendChild(sel);
+    form.appendChild(st);
+
+    var err = el('p', 'alert alert-error');
+    err.setAttribute('role', 'alert');
+    err.hidden = true;
+    form.appendChild(err);
+
+    var save = el('button', 'btn btn-primary btn-sm', 'שמירה');
+    save.type = 'submit';
+    form.appendChild(save);
+    wrap.appendChild(form);
+
+    open.addEventListener('click', function () {
+      form.hidden = !form.hidden;
+      open.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+      if (!form.hidden) name.focus();
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      err.hidden = true;
+      /* רק מה שהשתנה נשלח - והיומן ירשום בדיוק את השדות האלה. */
+      var body = {};
+      if (name.value.trim() !== (c.name || ''))   body.full_name = name.value.trim();
+      if (phone.value.trim() !== (c.phone || '')) body.phone = phone.value.trim();
+      if (email.value.trim() !== (c.email || '')) body.email = email.value.trim();
+      if (sel.value !== c.status)                 body.status = sel.value;
+      if (!Object.keys(body).length) { form.hidden = true; return; }
+      if (body.status === 'disabled' &&
+          !confirm('להשבית את הגישה של ' + c.name + ' לאתר? הוא ינותק מיד.')) return;
+
+      Api.updateClient(c.id, body).then(function () {
+        announce('פרטי הלקוח עודכנו.');
+        return loadClients();
+      }).catch(function (x) {
+        err.textContent = x.message || 'העדכון נכשל.';
+        err.hidden = false;
+      });
+    });
+
+    return wrap;
   }
 
 

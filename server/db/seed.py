@@ -177,7 +177,9 @@ TASKS = {
          5, "16:00", "normal", "waiting_client", "nahmani@nahmani-bendahan.co.il"),
         ("nii-inquiry", "לברר מול הסניף את מספר האסמכתא",
          "האסמכתא טרם התקבלה בכתב. נדרשת לצורך הערר, ולכן בעדיפות קריטית.",
-         9, "09:00", "critical", "open", "bendahan@nahmani-bendahan.co.il"),
+         # nahmani@ ולא bendahan@: מאז 23.10 משימה מוטלת רק על
+         # האחראי על התיק או על מנהל (docs/10).
+         9, "09:00", "critical", "open", "nahmani@nahmani-bendahan.co.il"),
         ("medical-record", "לבקש חוות דעת אורתופדית",
          "התקבלה והוגשה.",
          -10, "09:00", "normal", "done", "nahmani@nahmani-bendahan.co.il"),

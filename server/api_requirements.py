@@ -15,9 +15,9 @@ api_requirements.py - דרישות מהלקוח, משלוח ותזכורות.
    ב-worker שירוץ בעתיד: ההשלמה עצמה מבטלת את המשלוחים הממתינים
    ומשהה את הכללים, בתוך אותה טרנזקציה.
 
-⚠️ אין כאן scheduler ואין ספק אמיתי. get_sender() מחזיר
-   ConsoleSender בפיתוח ו-NullSender בייצור, ושניהם אינם שולחים
-   דבר החוצה. השליחה יזומה בלחיצה בלבד.
+⚠️ אין עדיין ספק אמיתי. get_sender() מחזיר ConsoleSender בפיתוח
+   ו-NullSender בייצור, ושניהם אינם שולחים דבר החוצה.
+   הכללים כן רצים מאז 23.10 - server/notifier.py.
 """
 
 from datetime import datetime
@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import audit, notify
-from .auth import require_csrf, require_staff
+from .auth import case_scope, require_csrf, require_staff
 from .db.pool import cursor
 
 router = APIRouter()
@@ -40,9 +40,11 @@ LIVE_STATUSES = ("open", "sent")
 
 def _owned_requirement(cur, requirement_id, identity):
     cur.execute(
-        """select id, firm_id, case_id, kind, title, status, document_id
-             from case_requirements
-            where id = %s and firm_id = %s""",
+        """select q.id, q.firm_id, q.case_id, q.kind, q.title, q.status,
+                  q.document_id
+             from case_requirements q
+             join cases c on c.id = q.case_id and c.firm_id = q.firm_id
+            where q.id = %s and q.firm_id = %s and """ + case_scope(identity),
         (requirement_id, identity.firm_id),
     )
     row = cur.fetchone()
@@ -53,7 +55,8 @@ def _owned_requirement(cur, requirement_id, identity):
 
 def _owned_case(cur, case_id, identity):
     cur.execute(
-        "select id, firm_id from cases where id = %s and firm_id = %s",
+        "select c.id, c.firm_id from cases c"
+        " where c.id = %s and c.firm_id = %s and " + case_scope(identity),
         (case_id, identity.firm_id),
     )
     row = cur.fetchone()
@@ -486,8 +489,8 @@ class NewReminder(BaseModel):
 def create_reminder(requirement_id: str, body: NewReminder, request: Request,
                     identity=Depends(require_staff)):
     """
-    שומר כלל תזכורת. הוא אינו רץ: אין scheduler בפרויקט, והשליחה
-    יזומה. הכלל נשמר כדי שהפעלת worker בעתיד לא תדרוש הזנה מחדש.
+    שומר כלל תזכורת. server/notifier.py מריץ אותו (23.10), בחלון
+    השעות והימים שהוגדרו בו.
     """
     require_csrf(request)
     if body.hours_from >= body.hours_to:
@@ -547,7 +550,8 @@ def set_reminder_state(reminder_id: str, body: ReminderState, request: Request,
             """select r.id, r.requirement_id, q.case_id, q.status
                  from reminder_rules r
                  join case_requirements q on q.id = r.requirement_id
-                where r.id = %s and r.firm_id = %s""",
+                 join cases c on c.id = q.case_id and c.firm_id = q.firm_id
+                where r.id = %s and r.firm_id = %s and """ + case_scope(identity),
             (reminder_id, identity.firm_id),
         )
         rule = cur.fetchone()
