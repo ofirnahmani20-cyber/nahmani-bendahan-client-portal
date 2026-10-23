@@ -602,7 +602,9 @@ def _one(cur, firm_id, number, spec, users, claims, task_types, stages):
                   completed_at, completed_by_user_id, created_by_user_id)
                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (firm_id, case_id, task_types.get(code, task_types["other"]),
-             title, desc if not legal else None, lawyer or author,
+             # תיק בלי אחראי - משימה בלי אחראי. author (bendahan@)
+             # אינו מנהל, ומאז 23.10 אינו רואה תיק שאינו שלו.
+             title, desc if not legal else None, lawyer,
              dt.datetime.combine(due, dt.time(12, 0)).astimezone(),
              status, priority,
              # מועד משפטי מחייב מקור ואישור אנושי - אילוץ בסכמה,

@@ -14,6 +14,7 @@
 כל המסמכים כאן סינתטיים (tests/samples.py).
 """
 
+import contextlib
 import datetime
 import json
 import tempfile
@@ -47,6 +48,29 @@ def api():
 def login(api, who=STAFF):
     r = api.post("/api/office/auth/login", json={"email": who[0], "password": who[1]})
     assert r.status_code == 200, r.text
+
+
+@contextlib.contextmanager
+def assigned_to(email, document_id):
+    """
+    משייך זמנית את התיק של המסמך לאיש הצוות. מאז 23.10 איש צוות
+    שאינו מנהל רואה רק תיקים שהוא האחראי עליהם (docs/10), ובדיקות
+    ההרשאה הרפואית צריכות מישהו שרואה את התיק אבל לא את התוכן.
+    """
+    with cursor(commit=True) as cur:
+        cur.execute("""select c.id, c.assigned_user_id from cases c
+                         join case_documents d on d.case_id = c.id
+                        where d.id = %s""", (document_id,))
+        case = cur.fetchone()
+        cur.execute("""update cases set assigned_user_id =
+                         (select id from users where email = %s) where id = %s""",
+                    (email, case["id"]))
+    try:
+        yield
+    finally:
+        with cursor(commit=True) as cur:
+            cur.execute("update cases set assigned_user_id = %s where id = %s",
+                        (case["assigned_user_id"], case["id"]))
 
 
 def make_file(case, data=TEXT_PDF, scan_status="clean", firm_id=None, document_id=None):
@@ -384,10 +408,11 @@ def test_staff_without_medical_permission_gets_403(api, file_with_text):
                     (OTHER_STAFF[0],))
     try:
         login(api, OTHER_STAFF)
-        assert api.get(pages_url(file_with_text)).status_code == 403
-        # מצב העיבוד אינו תוכן - נגיש לכל הצוות
-        status = api.get(pages_url(file_with_text).replace("/pages", "/processing"))
-        assert status.status_code == 200
+        with assigned_to(OTHER_STAFF[0], file_with_text["document_id"]):
+            assert api.get(pages_url(file_with_text)).status_code == 403
+            # מצב העיבוד אינו תוכן - נגיש לכל הצוות שרואה את התיק
+            status = api.get(pages_url(file_with_text).replace("/pages", "/processing"))
+            assert status.status_code == 200
     finally:
         with cursor(commit=True) as cur:
             cur.execute("update users set can_view_medical = true where email = %s",
@@ -396,12 +421,13 @@ def test_staff_without_medical_permission_gets_403(api, file_with_text):
 
 def test_permission_revocation_applies_immediately(api, file_with_text):
     login(api, OTHER_STAFF)
-    assert api.get(pages_url(file_with_text)).status_code == 200
-    with cursor(commit=True) as cur:
-        cur.execute("update users set can_view_medical = false where email = %s",
-                    (OTHER_STAFF[0],))
     try:
-        assert api.get(pages_url(file_with_text)).status_code == 403
+        with assigned_to(OTHER_STAFF[0], file_with_text["document_id"]):
+            assert api.get(pages_url(file_with_text)).status_code == 200
+            with cursor(commit=True) as cur:
+                cur.execute("update users set can_view_medical = false where email = %s",
+                            (OTHER_STAFF[0],))
+            assert api.get(pages_url(file_with_text)).status_code == 403
     finally:
         with cursor(commit=True) as cur:
             cur.execute("update users set can_view_medical = true where email = %s",

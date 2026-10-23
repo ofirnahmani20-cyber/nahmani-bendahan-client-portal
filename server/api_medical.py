@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import audit, doc_taxonomy, processing, scan
-from .auth import require_csrf, require_medical, require_staff
+from .auth import case_scope, require_csrf, require_medical, require_staff
 from .db.pool import cursor
 
 router = APIRouter()
@@ -29,7 +29,9 @@ def _file(cur, identity, document_id, file_id):
         """select f.id, f.scan_status, d.case_id
              from document_files f
              join case_documents d on d.id = f.document_id and d.firm_id = f.firm_id
-            where f.id = %s and f.document_id = %s and f.firm_id = %s""",
+             join cases c on c.id = d.case_id and c.firm_id = d.firm_id
+            where f.id = %s and f.document_id = %s and f.firm_id = %s
+              and """ + case_scope(identity),
         (file_id, document_id, identity.firm_id))
     row = cur.fetchone()
     if row is None:

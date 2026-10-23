@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import os
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
@@ -254,6 +255,46 @@ def require_admin(request: Request):
     if identity.role != "admin":
         raise HTTPException(status_code=403, detail="נדרשת הרשאת מנהל.")
     return identity
+
+
+# ================================================================
+#  היקף התיקים של איש צוות
+# ================================================================
+#  החלטת מוצר 23.10 (docs/10): איש צוות רואה רק את התיקים שהוא
+#  האחראי עליהם, והמנהל רואה את כל תיקי המשרד. חובת החיסיון היא
+#  כלפי הלקוח, לא כלפי המשרד כמקשה אחת.
+#
+#  לפני כן firm_id היה הגבול היחיד, וכל עובד ראה כל תיק. הבדיקה
+#  יושבת כאן ולא בכל שאילתה בנפרד, כדי ששאילתה חדשה לא תוכל
+#  "לשכוח" אותה בשקט: כל נתיב משרדי שנוגע בתיק עובר דרך
+#  case_scope או can_see_case.
+#
+#  תיק בלי אחראי גלוי למנהל בלבד. המנהל משייך אותו.
+# ================================================================
+
+def sees_all_cases(identity) -> bool:
+    return identity.is_staff and identity.role == "admin"
+
+
+def case_scope(identity, alias="c") -> str:
+    """
+    תנאי SQL שמגביל לתיקים הגלויים לאיש הצוות. מוחזר כטקסט כדי
+    שיתאים גם לשאילתות עם פרמטרים ממוספרים וגם לשמיים.
+
+    הזרקה אינה אפשרית: alias הוא קבוע בקוד, ומזהה המשתמש עובר
+    דרך uuid.UUID - כלומר רק 32 ספרות הקס ומקפים מגיעים ל-SQL.
+    """
+    if sees_all_cases(identity):
+        return "true"
+    if not alias.isidentifier():
+        raise ValueError("alias לא חוקי")
+    return "%s.assigned_user_id = '%s'::uuid" % (alias, uuid.UUID(str(identity.subject_id)))
+
+
+def can_see_case(identity, assigned_user_id) -> bool:
+    if sees_all_cases(identity):
+        return True
+    return assigned_user_id is not None and str(assigned_user_id) == str(identity.subject_id)
 
 
 # ================================================================
