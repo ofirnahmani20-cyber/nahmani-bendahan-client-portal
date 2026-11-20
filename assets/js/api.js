@@ -264,6 +264,22 @@
       return Api.post('/api/office/fee-payments/' + encodeURIComponent(id) + '/cancel');
     },
     clientPayments: function () { return Api.get('/api/client/payments'); },
+    clientCalculators: function () { return Api.get('/api/client/calculators'); },
+    computeCalculator: function (id, inputs) {
+      return Api.post('/api/client/calculators/' + encodeURIComponent(id), { inputs: inputs });
+    },
+    clientRights: function () { return Api.get('/api/client/rights'); },
+    calcParameters: function () { return Api.get('/api/office/calc-parameters'); },
+    addCalcParameter: function (body) { return Api.post('/api/office/calc-parameters', body); },
+    reviewCalcParameter: function (id, action) {
+      return Api.post('/api/office/calc-parameters/' + encodeURIComponent(id) + '/review',
+                      { action: action });
+    },
+    officeRights: function () { return Api.get('/api/office/rights'); },
+    saveRight: function (body) { return Api.post('/api/office/rights', body); },
+    setRightStatus: function (id, status) {
+      return Api.post('/api/office/rights/' + encodeURIComponent(id) + '/status', { status: status });
+    },
     mailboxFileUrl: function (id) {
       return '/api/office/mailbox/' + encodeURIComponent(id) + '/file';
     },
