@@ -17,6 +17,7 @@ import importlib
 import pytest
 from starlette.testclient import TestClient
 
+from server import throttle
 from server.db.pool import cursor
 
 LOCAL = ("127.0.0.1", 45123)
@@ -107,7 +108,7 @@ def test_rate_limit_kicks_in(api, monkeypatch):
     """הגבלת הקצב עוצרת הצפה של הנקודה שעולה כסף."""
     import server.app as app_module
     monkeypatch.setattr(app_module, "AI_MAX_CALLS", 3)
-    app_module._ai_calls.clear()
+    throttle.clear()
 
     csrf = _staff_login(api)
     codes = [api.post("/api/office/assist", json=BODY,

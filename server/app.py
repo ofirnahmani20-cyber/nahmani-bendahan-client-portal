@@ -18,8 +18,6 @@ import ipaddress
 import json
 import os
 import pathlib
-import time
-from collections import deque
 
 import anthropic
 from fastapi import FastAPI, HTTPException, Request
@@ -28,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import (api_auth, api_binder, api_client, api_conversation, api_benefits, api_intake, api_mailbox, api_payments, api_medical, api_office,
-               api_requirements, api_search, audit, crypto, maintenance, scan)
+               api_requirements, api_search, audit, crypto, maintenance, scan, throttle)
 from .auth import require_csrf, require_staff
 from .db.pool import healthy as db_healthy
 from .policy import POLICY_MODE, assert_clean, build_context
@@ -297,25 +295,20 @@ def require_ai_allowed(request: Request):
 
 
 # ---- הגבלת קצב -------------------------------------------------
-#  לפי IP במנה א'; יעבור ל-session במנה ב'. בזיכרון בלבד - מספיק
-#  לתהליך יחיד, ואינו תלות חדשה.
+#  לפי IP, במסד (server/throttle.py) - שורדת הפעלה מחדש ויותר
+#  מתהליך אחד. זו הנקודה שעולה כסף, ולכן היא מוגבלת גם אם המסך
+#  שקורא לה כבר מוגבל.
 AI_MAX_CALLS = int(os.environ.get("PORTAL_AI_RATE_LIMIT", "20"))
 AI_WINDOW_SECONDS = 300
-_ai_calls: dict[str, deque] = {}
 
 
 def enforce_rate_limit(request: Request) -> None:
     key = (request.client.host if request.client else "unknown")
-    now = time.monotonic()
-    hits = _ai_calls.setdefault(key, deque())
-    while hits and now - hits[0] > AI_WINDOW_SECONDS:
-        hits.popleft()
-    if len(hits) >= AI_MAX_CALLS:
+    if not throttle.hit("ai", key, AI_MAX_CALLS, AI_WINDOW_SECONDS):
         raise HTTPException(
             status_code=429,
             detail="יותר מדי בקשות ניתוח. נסה שוב בעוד מספר דקות.",
         )
-    hits.append(now)
 
 
 @app.get("/api/health")

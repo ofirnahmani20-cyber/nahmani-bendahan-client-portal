@@ -397,6 +397,15 @@ def run_rates_watch(now):
         return {"error": type(exc).__name__}
 
 
+def run_throttle_purge():
+    """שורות הגבלת קצב שעברו את החלון (throttle.py)."""
+    from . import throttle
+    try:
+        return throttle.purge()
+    except Exception as exc:                             # noqa: BLE001
+        return {"error": type(exc).__name__}
+
+
 def run_once(now=None):
     now = now or datetime.now(timezone.utc)
     return {
@@ -406,6 +415,7 @@ def run_once(now=None):
         "updates": run_client_updates(now),
         "hearings": run_hearing_reminders(now),
         "digests": run_staff_digest(now),
+        "throttle": run_throttle_purge(),
     }
 
 

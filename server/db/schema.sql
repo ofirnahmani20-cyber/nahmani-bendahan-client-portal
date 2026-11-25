@@ -1263,4 +1263,15 @@ CREATE TABLE IF NOT EXISTS rights_catalog (
     CHECK (status <> 'published' OR (approved_by_user_id IS NOT NULL AND approved_at IS NOT NULL))
 );
 
+-- הגבלת קצב (server/throttle.py). בלי firm_id בכוונה: ניסיון
+-- התחברות קודם לזיהוי המשרד. key הוא HMAC - אין כאן IP, אימייל
+-- או ת"ז, והשורות נמחקות אחרי יממה לכל היותר.
+CREATE TABLE IF NOT EXISTS rate_limit_hits (
+  id      bigserial PRIMARY KEY,
+  key     text NOT NULL,
+  hit_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rate_limit_hits_key ON rate_limit_hits (key, hit_at);
+CREATE INDEX IF NOT EXISTS rate_limit_hits_age ON rate_limit_hits (hit_at);
+
 COMMIT;

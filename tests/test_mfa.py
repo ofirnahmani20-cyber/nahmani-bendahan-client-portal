@@ -11,7 +11,7 @@ import time
 import pytest
 from starlette.testclient import TestClient
 
-from server import api_auth, mfa
+from server import mfa, throttle
 from server.app import app
 from server.db.pool import cursor
 
@@ -62,11 +62,11 @@ def test_match_rejects_malformed_codes():
 
 @pytest.fixture(autouse=True)
 def clean_user():
-    api_auth._attempts.clear()
+    throttle.clear()
     _reset(USER[0])
     yield
     _reset(USER[0])
-    api_auth._attempts.clear()
+    throttle.clear()
 
 
 def _reset(email):
@@ -191,7 +191,7 @@ def test_ticket_locks_after_too_many_wrong_codes(api, require_mfa):
     res = _login(api)
     for _ in range(mfa.TICKET_MAX_ATTEMPTS):
         api.post("/api/office/auth/verify-2fa", json={"ticket": res["ticket"], "code": "000000"})
-    api_auth._attempts.clear()   # הבדיקה היא על הכרטיס, לא על מגבלת הקצב
+    throttle.clear()   # הבדיקה היא על הכרטיס, לא על מגבלת הקצב
     r = api.post("/api/office/auth/verify-2fa",
                  json={"ticket": res["ticket"], "code": _code(secret, +1)})
     assert r.status_code == 401

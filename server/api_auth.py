@@ -23,13 +23,12 @@ bcrypt, והזהות חוזרת ב-cookie מסוג HttpOnly.
 import hashlib
 import os
 import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import audit, auth, mfa
+from . import audit, auth, mfa, throttle
 from .db.connect import id_lookup
 from .db.pool import cursor
 from .notify import SmsNotConfigured, get_sender
@@ -39,20 +38,34 @@ router = APIRouter()
 OTP_TTL_MINUTES = 10
 OTP_MAX_ATTEMPTS = 5
 
-# הגבלת קצב להתחברות, בזיכרון. מונעת ניחוש קוד וסיסמה בכוח.
-_attempts = {}
+# הגבלת קצב להתחברות, במסד (server/throttle.py). מונעת ניחוש קוד
+# וסיסמה בכוח, ושורדת הפעלה מחדש ויותר מתהליך אחד.
 LOGIN_WINDOW_SECONDS = 300
 LOGIN_MAX_TRIES = 10
+
+# לפי חשבון ולא רק לפי IP: תוקף עם הרבה כתובות עדיין מוגבל על
+# חשבון אחד. הסף גבוה יותר מזה של ה-IP, כדי שתוקף לא יוכל לנעול
+# בקלות עורך דין מחוץ לחשבון שלו.
+ACCOUNT_WINDOW_SECONDS = 900
+ACCOUNT_MAX_TRIES = 20
+
+# כל בקשת קוד שולחת SMS שעולה כסף ומטרידה את הלקוח.
+OTP_SEND_WINDOW_SECONDS = 3600
+OTP_SEND_MAX = 5
+
+_TOO_MANY = "יותר מדי ניסיונות. נסה שוב מאוחר יותר."
 
 
 def _throttle(key, request):
     ip = request.client.host if request.client else "unknown"
-    bucket = _attempts.setdefault("%s|%s" % (key, ip), [])
-    now = time.monotonic()
-    bucket[:] = [t for t in bucket if now - t < LOGIN_WINDOW_SECONDS]
-    if len(bucket) >= LOGIN_MAX_TRIES:
-        raise HTTPException(status_code=429, detail="יותר מדי ניסיונות. נסה שוב מאוחר יותר.")
-    bucket.append(now)
+    if not throttle.hit("ip:" + key, ip, LOGIN_MAX_TRIES, LOGIN_WINDOW_SECONDS):
+        raise HTTPException(status_code=429, detail=_TOO_MANY)
+
+
+def _throttle_account(key, subject, limit=None, window=None):
+    if not throttle.hit("acct:" + key, subject.strip().lower(),
+                        limit or ACCOUNT_MAX_TRIES, window or ACCOUNT_WINDOW_SECONDS):
+        raise HTTPException(status_code=429, detail=_TOO_MANY)
 
 
 def _hash_code(code):
@@ -91,6 +104,7 @@ def request_otp(body: OtpRequest, request: Request):
     שאין למסור.
     """
     _throttle("otp", request)
+    _throttle_account("otp", body.national_id, OTP_SEND_MAX, OTP_SEND_WINDOW_SECONDS)
     generic = {"sent": True, "expires_in_minutes": OTP_TTL_MINUTES}
 
     client = _find_client(body.national_id)
@@ -121,6 +135,7 @@ def request_otp(body: OtpRequest, request: Request):
 @router.post("/api/client/auth/verify-otp")
 def verify_otp(body: OtpVerify, request: Request, response: Response):
     _throttle("otp-verify", request)
+    _throttle_account("otp-verify", body.national_id)
     client = _find_client(body.national_id)
     if not client or client["status"] != "active":
         raise HTTPException(status_code=401, detail="הקוד שגוי או שפג תוקפו.")
@@ -176,6 +191,7 @@ class StaffLogin(BaseModel):
 @router.post("/api/office/auth/login")
 def staff_login(body: StaffLogin, request: Request, response: Response):
     _throttle("staff", request)
+    _throttle_account("staff", body.email)
 
     with cursor() as cur:
         cur.execute(

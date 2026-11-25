@@ -10,6 +10,7 @@
 | אימות בצד שרת (sessions ב-DB) | **implemented** — cookie HttpOnly, hash של הטוקן בלבד |
 | הרשאות ובידוד בין לקוחות ובין משרדים | **implemented** — נאכף בשאילתה, מכוסה בבדיקות |
 | CSRF (double-submit + Origin) | **implemented** |
+| הגבלת קצב | **implemented** — במסד (`server/throttle.py`), לפי IP ולפי חשבון; שורדת הפעלה מחדש ויותר מתהליך אחד |
 | יומן ביקורת והיסטוריית שלבים | **implemented** |
 | העלאת קבצים (magic bytes, checksum, אחסון מחוץ ל-webroot) | **implemented** — נקראת לזיכרון בלבד, בלי קובץ זמני |
 | הצפנה במנוחה של קבצים | **implemented** — AES-256-GCM, מפתח נגזר לכל קובץ, מפתחות-על בקבצי סוד מחוץ לריפו ולמסד. נוהל DR: `docs/07` |
